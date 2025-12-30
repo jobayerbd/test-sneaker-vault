@@ -195,7 +195,7 @@ const OrderList: React.FC<{ filteredOrders: Order[], searchQuery: string, setSea
                 <td className="px-8 py-6"><div className="flex flex-col"><span className="font-bold text-sm">{order.first_name} {order.last_name}</span><span className="text-[10px] text-gray-400 font-bold uppercase">{order.email}</span></div></td>
                 <td className="px-8 py-6"><span className="text-[10px] font-black bg-black text-white px-2 py-0.5 rounded italic">{order.items?.length || 0} SECURED</span></td>
                 <td className="px-8 py-6"><span className={`px-4 py-2 rounded-xl border text-[9px] font-black uppercase tracking-widest inline-flex items-center ${getStatusBadgeStyles(order.status)}`}><span className="w-1.5 h-1.5 rounded-full bg-current mr-2.5"></span>{order.status}</span></td>
-                <td className="px-8 py-6"><span className="font-black text-sm italic">{order.total.toLocaleString()}৳</span></td>
+                <td className="px-8 py-6"><span className="font-black text-sm italic">{order.total?.toLocaleString() || '0'}৳</span></td>
                 <td className="px-8 py-6 text-right"><button className="w-10 h-10 border border-gray-100 rounded-xl flex items-center justify-center"><i className="fa-solid fa-arrow-right-long text-xs"></i></button></td>
               </tr>
             ))}
@@ -217,6 +217,8 @@ const OrderDetail: React.FC<{
   const handlePrint = () => {
     window.print();
   };
+
+  const assetSubtotal = (order.total || 0) - (order.shipping_rate || 0);
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -280,7 +282,7 @@ const OrderDetail: React.FC<{
                   <div className="flex-1 flex flex-col justify-center">
                     <div className="flex justify-between items-start mb-3">
                        <h4 className="font-black text-lg uppercase leading-tight font-heading group-hover:text-red-600 transition-colors">{item.name}</h4>
-                       <span className="font-black text-lg italic">{item.price.toLocaleString()}৳</span>
+                       <span className="font-black text-lg italic">{item.price?.toLocaleString() || '0'}৳</span>
                     </div>
                     <p className="text-[11px] text-gray-400 font-black uppercase tracking-[0.2em] flex items-center">
                       <span className="bg-gray-100 px-3 py-1 rounded-lg mr-3 text-black">SIZE: {item.size}</span>
@@ -315,6 +317,24 @@ const OrderDetail: React.FC<{
                 </p>
               </div>
             </div>
+          </div>
+
+          <div className="bg-white rounded-3xl border border-gray-100 shadow-xl p-8">
+             <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em] mb-4">Logistics Manifest</p>
+             <div className="space-y-3">
+               <div className="flex justify-between text-xs font-bold uppercase">
+                 <span className="text-gray-400">Asset Subtotal</span>
+                 <span>{assetSubtotal?.toLocaleString() || '0'}৳</span>
+               </div>
+               <div className="flex justify-between text-xs font-bold uppercase">
+                 <span className="text-gray-400">Shipping: {order.shipping_name || 'N/A'}</span>
+                 <span className="text-red-600">{order.shipping_rate?.toLocaleString() || '0'}৳</span>
+               </div>
+               <div className="pt-4 border-t border-gray-50 flex justify-between items-end">
+                 <span className="text-[10px] font-black uppercase tracking-widest italic">Net Settlement</span>
+                 <span className="text-2xl font-black italic">{order.total?.toLocaleString() || '0'}৳</span>
+               </div>
+             </div>
           </div>
         </div>
       </div>
@@ -360,7 +380,7 @@ const OrderDetail: React.FC<{
              </div>
              <div className="flex justify-between items-center">
                 <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">Vault Logistics</span>
-                <span className="text-xs font-black uppercase italic text-green-600">Secure Transport</span>
+                <span className="text-xs font-black uppercase italic text-red-600">{order.shipping_name || 'Secure Transport'}</span>
              </div>
           </div>
         </div>
@@ -384,7 +404,7 @@ const OrderDetail: React.FC<{
                   </td>
                   <td className="py-6 text-center font-bold text-xs uppercase">{item.size}</td>
                   <td className="py-6 text-center font-bold text-xs">{item.quantity}</td>
-                  <td className="py-6 text-right font-black italic text-xs">{(item.price * item.quantity).toLocaleString()}৳</td>
+                  <td className="py-6 text-right font-black italic text-xs">{((item.price || 0) * (item.quantity || 0)).toLocaleString()}৳</td>
                 </tr>
               ))}
             </tbody>
@@ -395,15 +415,15 @@ const OrderDetail: React.FC<{
           <div className="w-64 space-y-4">
             <div className="flex justify-between items-end">
               <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">Asset Subtotal</span>
-              <span className="font-bold text-sm">{(order.total).toLocaleString()}৳</span>
+              <span className="font-bold text-sm">{assetSubtotal?.toLocaleString() || '0'}৳</span>
             </div>
             <div className="flex justify-between items-end">
-              <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">Distribution Fee</span>
-              <span className="text-xs font-bold uppercase italic text-green-600">Protocol Waived</span>
+              <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">Distribution Fee ({order.shipping_name})</span>
+              <span className="text-xs font-bold uppercase italic text-red-600">{order.shipping_rate?.toLocaleString() || '0'}৳</span>
             </div>
             <div className="pt-4 border-t border-gray-100 flex justify-between items-end">
                <span className="text-xs font-black uppercase italic tracking-tighter text-red-600">Net Settlement</span>
-               <span className="text-2xl font-black italic">{(order.total).toLocaleString()}৳</span>
+               <span className="text-2xl font-black italic">{order.total?.toLocaleString() || '0'}৳</span>
             </div>
           </div>
         </div>

@@ -64,6 +64,8 @@ export interface Order {
   status: OrderStatus;
   total: number;
   items: OrderItem[];
+  shipping_name?: string;
+  shipping_rate?: number;
   created_at?: string;
 }
 

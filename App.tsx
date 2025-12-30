@@ -22,6 +22,7 @@ const App: React.FC = () => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [sneakers, setSneakers] = useState<Sneaker[]>([]);
   const [shippingOptions, setShippingOptions] = useState<ShippingOption[]>([]);
+  const [selectedShipping, setSelectedShipping] = useState<ShippingOption | null>(null);
   const [lastOrder, setLastOrder] = useState<Order | null>(null);
   const [isPlacingOrder, setIsPlacingOrder] = useState(false);
   const [isFetchingOrders, setIsFetchingOrders] = useState(false);
@@ -94,6 +95,7 @@ const App: React.FC = () => {
       if (response.ok) {
         const data = await response.json();
         setShippingOptions(data);
+        if (data.length > 0) setSelectedShipping(data[0]);
       }
     } catch (err) {
       console.error("Failed to fetch shipping options:", err);
@@ -320,7 +322,7 @@ const App: React.FC = () => {
     setIsPlacingOrder(true);
 
     const subtotal = cart.reduce((acc, item) => acc + (item.price * item.quantity), 0);
-    const total = subtotal;
+    const total = subtotal + (selectedShipping?.rate || 0);
 
     const orderId = `ORD-${Math.floor(Math.random() * 90000) + 10000}`;
     const newOrder = {
@@ -333,6 +335,8 @@ const App: React.FC = () => {
       zip_code: checkoutForm.zip,
       total: total,
       status: OrderStatus.PLACED,
+      shipping_name: selectedShipping?.name,
+      shipping_rate: selectedShipping?.rate,
       items: cart.map(item => ({
         sneakerId: item.id,
         name: item.name,
@@ -441,7 +445,7 @@ const App: React.FC = () => {
               <div className="flex justify-between items-end mb-4">
                 <div>
                   <span className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] block mb-1">Estimated Protocol Value</span>
-                  <span className="text-[9px] font-bold text-green-600 uppercase">Secure Shipping: Included</span>
+                  <span className="text-[9px] font-bold text-green-600 uppercase">Secure Shipping: Calculated at Checkout</span>
                 </div>
                 <span className="text-3xl font-black italic tracking-tighter">{total.toLocaleString()}৳</span>
               </div>
@@ -553,7 +557,7 @@ const App: React.FC = () => {
                  </div>
                  <div className="text-right">
                    <p className="text-[9px] font-black uppercase tracking-widest text-gray-400">Protocol Value</p>
-                   <p className="text-2xl font-black italic">{lastOrder?.total.toLocaleString()}৳</p>
+                   <p className="text-2xl font-black italic">{lastOrder?.total?.toLocaleString() || '0'}৳</p>
                  </div>
                </div>
                <div className="p-10 space-y-8">
@@ -582,7 +586,7 @@ const App: React.FC = () => {
                             <p className="text-[10px] font-black uppercase truncate">{item.name}</p>
                             <p className="text-[8px] text-gray-400 font-bold uppercase">Size: {item.size} | Qty: {item.quantity}</p>
                           </div>
-                          <span className="text-[10px] font-black">{item.price.toLocaleString()}৳</span>
+                          <span className="text-[10px] font-black">{item.price?.toLocaleString() || '0'}৳</span>
                         </div>
                       ))}
                     </div>
@@ -597,7 +601,8 @@ const App: React.FC = () => {
           </div>
         );
       case 'checkout':
-        const checkTotal = cart.reduce((acc, item) => acc + (item.price * item.quantity), 0);
+        const checkSubtotal = cart.reduce((acc, item) => acc + (item.price * item.quantity), 0);
+        const checkTotal = checkSubtotal + (selectedShipping?.rate || 0);
         return (
           <div className="max-w-5xl mx-auto px-4 py-16">
             <h1 className="text-4xl font-black font-heading mb-10 italic uppercase tracking-tighter">Secure Checkout</h1>
@@ -614,6 +619,31 @@ const App: React.FC = () => {
                     <div><label className="text-[10px] font-black uppercase tracking-widest text-gray-400 block mb-2 italic">Physical Location</label><input type="text" value={checkoutForm.address} onChange={e => setCheckoutForm({...checkoutForm, address: e.target.value})} className="w-full border-b-2 border-gray-100 py-3 outline-none focus:border-red-600 transition-colors font-bold text-xs" placeholder="STREET, AREA" /></div>
                   </div>
                 </div>
+
+                <div className="bg-white p-8 border border-gray-100 rounded-xl shadow-sm">
+                  <h3 className="text-lg font-black font-heading uppercase mb-6 italic">Logistics Registry</h3>
+                  <div className="space-y-3">
+                    {shippingOptions.map((option) => (
+                      <div 
+                        key={option.id}
+                        onClick={() => setSelectedShipping(option)}
+                        className={`p-4 border-2 rounded-xl flex items-center justify-between cursor-pointer transition-all ${selectedShipping?.id === option.id ? 'border-black bg-gray-50' : 'border-gray-100 hover:border-gray-200'}`}
+                      >
+                        <div className="flex items-center">
+                          <div className={`w-4 h-4 rounded-full border-2 mr-4 flex items-center justify-center ${selectedShipping?.id === option.id ? 'border-red-600' : 'border-gray-300'}`}>
+                            {selectedShipping?.id === option.id && <div className="w-2 h-2 bg-red-600 rounded-full"></div>}
+                          </div>
+                          <div>
+                            <p className="font-black text-[10px] uppercase tracking-widest">{option.name}</p>
+                            <p className="text-[9px] text-gray-400 font-bold uppercase italic">Secure Vault Transport</p>
+                          </div>
+                        </div>
+                        <span className="font-black italic text-xs">{option.rate?.toLocaleString() || '0'}৳</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
                 <div className="bg-white p-8 border border-gray-100 rounded-xl shadow-sm">
                   <h3 className="text-lg font-black font-heading uppercase mb-6 italic">Payment Protocol</h3>
                   <div className="p-5 border-2 border-black flex items-center justify-between bg-gray-50 rounded-xl"><div className="flex items-center"><i className="fa-solid fa-truck-fast mr-4 text-xl text-red-600"></i><span className="font-black text-[10px] uppercase tracking-widest">Cash on Delivery</span></div><i className="fa-solid fa-circle-check text-black"></i></div>
@@ -625,7 +655,10 @@ const App: React.FC = () => {
                   {cart.map((item, i) => (
                     <div key={`${item.id}-${item.selectedSize}`} className="flex justify-between text-[10px] font-bold uppercase tracking-widest text-gray-400"><span>{item.name} ({item.selectedSize}) x{item.quantity}</span><span className="text-white">{(item.price * item.quantity).toLocaleString()}৳</span></div>
                   ))}
-                  <div className="flex justify-between text-[10px] font-bold uppercase tracking-widest text-green-400"><span>Secure Shipping</span><span>FREE</span></div>
+                  <div className="flex justify-between text-[10px] font-bold uppercase tracking-widest text-gray-400">
+                    <span>Shipping: {selectedShipping?.name || '---'}</span>
+                    <span className="text-white">{selectedShipping?.rate?.toLocaleString() || '0'}৳</span>
+                  </div>
                 </div>
                 <div className="pt-6 border-t border-white/10 flex justify-between items-end">
                    <span className="text-xs font-black uppercase italic font-heading tracking-widest text-red-600">Total Settlement</span>
