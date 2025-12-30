@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Navigation from './components/Navigation';
 import Home from './components/Storefront/Home';
 import ProductDetail from './components/Storefront/ProductDetail';
 import Dashboard from './components/Admin/Dashboard';
+import Login from './components/Admin/Login';
 import { Sneaker, CartItem, Order, OrderStatus } from './types';
 import { MOCK_SNEAKERS, MOCK_ORDERS } from './constants';
 
@@ -10,16 +11,18 @@ import { MOCK_SNEAKERS, MOCK_ORDERS } from './constants';
 const SUPABASE_URL = 'https://vwbctddmakbnvfxzrjeo.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_8WhV41Km5aj8Dhvu6tUbvA_JnyPoVxu';
 
-type View = 'home' | 'shop' | 'admin' | 'cart' | 'pdp' | 'wishlist' | 'checkout' | 'order-success';
+type View = 'home' | 'shop' | 'admin' | 'cart' | 'pdp' | 'wishlist' | 'checkout' | 'order-success' | 'admin-login';
 
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<View>('home');
+  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Sneaker | null>(null);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [wishlist, setWishlist] = useState<Sneaker[]>([]);
-  const [orders, setOrders] = useState<Order[]>(MOCK_ORDERS);
+  const [orders, setOrders] = useState<Order[]>([]); // Start empty to wait for DB
   const [lastOrder, setLastOrder] = useState<Order | null>(null);
   const [isPlacingOrder, setIsPlacingOrder] = useState(false);
+  const [isFetchingOrders, setIsFetchingOrders] = useState(false);
 
   const [checkoutForm, setCheckoutForm] = useState({
     firstName: '',
@@ -30,27 +33,40 @@ const App: React.FC = () => {
     zip: ''
   });
 
-  useEffect(() => {
-    const fetchOrders = async () => {
-      try {
-        const response = await fetch(`${SUPABASE_URL}/rest/v1/orders?select=*&order=created_at.desc`, {
-          headers: {
-            'apikey': SUPABASE_KEY,
-            'Authorization': `Bearer ${SUPABASE_KEY}`
-          }
-        });
-        if (response.ok) {
-          const data = await response.json();
-          if (data && data.length > 0) {
-            setOrders([...data, ...MOCK_ORDERS]);
-          }
+  const fetchOrders = useCallback(async () => {
+    setIsFetchingOrders(true);
+    try {
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/orders?select=*&order=created_at.desc`, {
+        headers: {
+          'apikey': SUPABASE_KEY,
+          'Authorization': `Bearer ${SUPABASE_KEY}`
         }
-      } catch (err) {
-        console.error("Failed to fetch from Supabase:", err);
+      });
+      if (response.ok) {
+        const data = await response.json();
+        // If DB is empty, use mock for visuals, otherwise use real data
+        if (data && data.length > 0) {
+          setOrders(data);
+        } else {
+          setOrders(MOCK_ORDERS);
+        }
       }
-    };
-    fetchOrders();
+    } catch (err) {
+      console.error("Failed to fetch from Supabase:", err);
+      setOrders(MOCK_ORDERS); // Fallback on error
+    } finally {
+      setIsFetchingOrders(false);
+    }
   }, []);
+
+  useEffect(() => {
+    // Check for existing session
+    const session = localStorage.getItem('sv_admin_session');
+    if (session === 'active') {
+      setIsAdminAuthenticated(true);
+    }
+    fetchOrders();
+  }, [fetchOrders]);
 
   const handleSelectProduct = (sneaker: Sneaker) => {
     setSelectedProduct(sneaker);
@@ -86,6 +102,21 @@ const App: React.FC = () => {
 
   const removeFromCart = (index: number) => {
     setCart(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('sv_admin_session');
+    setIsAdminAuthenticated(false);
+    setCurrentView('home');
+  };
+
+  const navigateToAdmin = () => {
+    if (isAdminAuthenticated) {
+      setCurrentView('admin');
+      fetchOrders(); // Refresh when entering admin
+    } else {
+      setCurrentView('admin-login');
+    }
   };
 
   const handlePlaceOrder = async () => {
@@ -166,6 +197,18 @@ const App: React.FC = () => {
             isInWishlist={wishlist.some(s => s.id === selectedProduct.id)}
           />
         ) : <Home onSelectProduct={handleSelectProduct} onNavigate={setCurrentView} />;
+      case 'admin-login':
+        return (
+          <Login 
+            supabaseUrl={SUPABASE_URL} 
+            supabaseKey={SUPABASE_KEY} 
+            onLoginSuccess={() => {
+              setIsAdminAuthenticated(true);
+              setCurrentView('admin');
+              fetchOrders();
+            }} 
+          />
+        );
       case 'shop':
         return (
           <div className="max-w-7xl mx-auto px-4 py-10">
@@ -339,28 +382,12 @@ const App: React.FC = () => {
         );
       case 'admin':
         return (
-          <div className="flex bg-gray-50 min-h-screen">
-            <aside className="w-64 bg-white border-r border-gray-100 p-6 hidden lg:block">
-              <nav className="space-y-1">
-                {[
-                  { icon: 'fa-chart-pie', label: 'Overview', active: true },
-                  { icon: 'fa-box', label: 'Inventory' },
-                  { icon: 'fa-shopping-cart', label: 'Orders' },
-                  { icon: 'fa-users', label: 'Customers' },
-                  { icon: 'fa-bullhorn', label: 'Marketing' },
-                  { icon: 'fa-gear', label: 'Settings' },
-                ].map((item, i) => (
-                  <button key={i} className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-sm font-bold transition-all ${item.active ? 'bg-black text-white shadow-lg' : 'text-gray-500 hover:bg-gray-50 hover:text-black'}`}>
-                    <i className={`fa-solid ${item.icon} w-5`}></i>
-                    <span>{item.label}</span>
-                  </button>
-                ))}
-              </nav>
-            </aside>
-            <main className="flex-1 p-8 overflow-y-auto">
-              <Dashboard orders={orders} />
-            </main>
-          </div>
+          <Dashboard 
+            orders={orders} 
+            onRefresh={fetchOrders} 
+            isRefreshing={isFetchingOrders} 
+            onLogout={handleLogout}
+          />
         );
       default:
         return <Home onSelectProduct={handleSelectProduct} onNavigate={setCurrentView} />;
@@ -369,62 +396,66 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen flex flex-col bg-white">
-      <Navigation 
-        onNavigate={setCurrentView} 
-        cartCount={cart.length} 
-        wishlistCount={wishlist.length}
-        currentView={currentView} 
-      />
+      {currentView !== 'admin' && (
+        <Navigation 
+          onNavigate={(view) => {
+            if (view === 'admin') {
+              navigateToAdmin();
+            } else {
+              setCurrentView(view as View);
+            }
+          }} 
+          cartCount={cart.length} 
+          wishlistCount={wishlist.length}
+          currentView={currentView} 
+        />
+      )}
       <div className="flex-1">
         {renderView()}
       </div>
       
-      {/* Redesigned Footer matching Richkid reference */}
-      <footer className="bg-[#1A1A1A] text-white pt-16 pb-8 border-t-4 border-red-700">
-        <div className="max-w-7xl mx-auto px-4 grid grid-cols-1 md:grid-cols-3 gap-16 mb-12">
-          {/* About Us */}
-          <div>
-            <h4 className="text-[10px] font-black uppercase tracking-[0.3em] mb-6 border-b border-white/10 pb-2">About Us</h4>
-            <p className="text-xs text-gray-400 leading-relaxed mb-4">
-              SneakerVault is the premium marketplace for authentic sneakers and streetwear grails. We provide only verified quality shoes and accessories for enthusiasts and collectors.
-            </p>
-            <p className="text-[10px] font-bold text-red-500 uppercase tracking-widest">Contact Us | Career</p>
-          </div>
-          
-          {/* Policy */}
-          <div>
-            <h4 className="text-[10px] font-black uppercase tracking-[0.3em] mb-6 border-b border-white/10 pb-2">Policy</h4>
-            <ul className="space-y-3 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-              <li className="hover:text-white cursor-pointer transition-colors">Happiness Program</li>
-              <li className="hover:text-white cursor-pointer transition-colors">Exchange & Complain</li>
-              <li className="hover:text-white cursor-pointer transition-colors">Return & Refund</li>
-              <li className="hover:text-white cursor-pointer transition-colors">Privacy Policy</li>
-              <li className="hover:text-white cursor-pointer transition-colors">Terms and Conditions</li>
-            </ul>
-          </div>
-
-          {/* Connect */}
-          <div>
-            <h4 className="text-[10px] font-black uppercase tracking-[0.3em] mb-6 border-b border-white/10 pb-2">Connect With Us</h4>
-            <p className="text-[10px] text-gray-400 mb-6 italic uppercase tracking-tighter leading-relaxed">
-              Join our SneakerVault Elite community for exclusive drop access and community events.
-            </p>
-            <button className="bg-red-700 text-white px-6 py-2 text-[10px] font-black uppercase tracking-widest mb-6 hover:bg-white hover:text-red-700 transition-all rounded-sm">
-              Join Elite Review Group &gt;
-            </button>
-            <div className="flex space-x-4 text-gray-400">
-               <i className="fa-brands fa-facebook text-xl hover:text-white cursor-pointer"></i>
-               <i className="fa-brands fa-instagram text-xl hover:text-white cursor-pointer"></i>
-               <i className="fa-brands fa-tiktok text-xl hover:text-white cursor-pointer"></i>
-               <i className="fa-brands fa-youtube text-xl hover:text-white cursor-pointer"></i>
+      {/* Footer is only visible on customer-facing views */}
+      {currentView !== 'admin' && (
+        <footer className="bg-[#1A1A1A] text-white pt-16 pb-8 border-t-4 border-red-700">
+          <div className="max-w-7xl mx-auto px-4 grid grid-cols-1 md:grid-cols-3 gap-16 mb-12">
+            <div>
+              <h4 className="text-[10px] font-black uppercase tracking-[0.3em] mb-6 border-b border-white/10 pb-2">About Us</h4>
+              <p className="text-xs text-gray-400 leading-relaxed mb-4">
+                SneakerVault is the premium marketplace for authentic sneakers and streetwear grails. We provide only verified quality shoes and accessories for enthusiasts and collectors.
+              </p>
+              <p className="text-[10px] font-bold text-red-500 uppercase tracking-widest">Contact Us | Career</p>
+            </div>
+            <div>
+              <h4 className="text-[10px] font-black uppercase tracking-[0.3em] mb-6 border-b border-white/10 pb-2">Policy</h4>
+              <ul className="space-y-3 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                <li className="hover:text-white cursor-pointer transition-colors">Happiness Program</li>
+                <li className="hover:text-white cursor-pointer transition-colors">Exchange & Complain</li>
+                <li className="hover:text-white cursor-pointer transition-colors">Return & Refund</li>
+                <li className="hover:text-white cursor-pointer transition-colors">Privacy Policy</li>
+                <li className="hover:text-white cursor-pointer transition-colors">Terms and Conditions</li>
+              </ul>
+            </div>
+            <div>
+              <h4 className="text-[10px] font-black uppercase tracking-[0.3em] mb-6 border-b border-white/10 pb-2">Connect With Us</h4>
+              <p className="text-[10px] text-gray-400 mb-6 italic uppercase tracking-tighter leading-relaxed">
+                Join our SneakerVault Elite community for exclusive drop access and community events.
+              </p>
+              <button className="bg-red-700 text-white px-6 py-2 text-[10px] font-black uppercase tracking-widest mb-6 hover:bg-white hover:text-red-700 transition-all rounded-sm">
+                Join Elite Review Group &gt;
+              </button>
+              <div className="flex space-x-4 text-gray-400">
+                 <i className="fa-brands fa-facebook text-xl hover:text-white cursor-pointer"></i>
+                 <i className="fa-brands fa-instagram text-xl hover:text-white cursor-pointer"></i>
+                 <i className="fa-brands fa-tiktok text-xl hover:text-white cursor-pointer"></i>
+                 <i className="fa-brands fa-youtube text-xl hover:text-white cursor-pointer"></i>
+              </div>
             </div>
           </div>
-        </div>
-        
-        <div className="max-w-7xl mx-auto px-4 pt-8 border-t border-white/5 text-center text-[10px] text-gray-600 font-bold uppercase tracking-widest">
-           <p>Copyright © 2025 | SneakerVault Lifestyle | Build v1.0.6</p>
-        </div>
-      </footer>
+          <div className="max-w-7xl mx-auto px-4 pt-8 border-t border-white/5 text-center text-[10px] text-gray-600 font-bold uppercase tracking-widest">
+             <p>Copyright © 2025 | SneakerVault Lifestyle | Build v1.0.6</p>
+          </div>
+        </footer>
+      )}
     </div>
   );
 };
