@@ -5,7 +5,7 @@ import { MOCK_SNEAKERS } from '../../constants';
 
 interface ProductDetailProps {
   sneaker: Sneaker;
-  onAddToCart: (item: CartItem) => void;
+  onAddToCart: (item: CartItem, shouldCheckout?: boolean) => void;
   onBack: () => void;
   onToggleWishlist: (sneaker: Sneaker) => void;
   isInWishlist: boolean;
@@ -44,11 +44,7 @@ const ProductDetail: React.FC<ProductDetailProps> = ({
       alert('Please select a size');
       return;
     }
-    onAddToCart({ ...sneaker, selectedSize, quantity });
-    if (directToCheckout) {
-      // In a real app, logic to navigate to checkout
-      console.log("Navigating to checkout...");
-    }
+    onAddToCart({ ...sneaker, selectedSize, quantity }, directToCheckout);
   };
 
   const relatedProducts = MOCK_SNEAKERS.filter(s => s.id !== sneaker.id).slice(0, 4);

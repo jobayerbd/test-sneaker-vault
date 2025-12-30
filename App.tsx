@@ -57,16 +57,21 @@ const App: React.FC = () => {
     setCurrentView('pdp');
   };
 
-  const handleAddToCart = (item: CartItem) => {
+  const handleAddToCart = (item: CartItem, shouldCheckout: boolean = false) => {
     setCart(prev => {
       const existing = prev.find(i => i.id === item.id && i.selectedSize === item.selectedSize);
       if (existing) {
         return prev.map(i => i.id === item.id && i.selectedSize === item.selectedSize 
-          ? { ...i, quantity: i.quantity + 1 } : i);
+          ? { ...i, quantity: i.quantity + item.quantity } : i);
       }
       return [...prev, item];
     });
-    alert(`Added ${item.name} to vault!`);
+    
+    if (shouldCheckout) {
+      setCurrentView('checkout');
+    } else {
+      alert(`Added ${item.name} to vault!`);
+    }
   };
 
   const toggleWishlist = (sneaker: Sneaker) => {
