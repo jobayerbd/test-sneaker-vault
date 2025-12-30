@@ -296,6 +296,25 @@ const OrderDetail: React.FC<{
         </div>
 
         <div className="space-y-8">
+          {/* Metadata Card - NEW */}
+          <div className="bg-black text-white rounded-3xl shadow-xl overflow-hidden p-8">
+            <p className="text-[10px] font-black text-gray-500 uppercase tracking-[0.3em] mb-6 italic">Protocol Registry</p>
+            <div className="space-y-6">
+               <div className="flex flex-col">
+                  <span className="text-[9px] font-black text-gray-600 uppercase tracking-widest mb-1">Creation Epoch</span>
+                  <span className="text-sm font-bold italic">{order.created_at ? new Date(order.created_at).toLocaleString() : 'UNDEFINED'}</span>
+               </div>
+               <div className="flex flex-col">
+                  <span className="text-[9px] font-black text-gray-600 uppercase tracking-widest mb-1">Transaction Identity</span>
+                  <span className="text-xs font-mono font-black tracking-tighter bg-white/5 p-2 rounded-lg">{order.id}</span>
+               </div>
+               <div className="flex flex-col">
+                  <span className="text-[9px] font-black text-gray-600 uppercase tracking-widest mb-1">Vault Status</span>
+                  <span className="text-sm font-black uppercase text-red-600 animate-pulse">{order.status}</span>
+               </div>
+            </div>
+          </div>
+
           <div className="bg-white rounded-3xl border border-gray-100 shadow-xl overflow-hidden">
             <div className="px-8 py-6 border-b border-gray-100 bg-gray-50/50 flex items-center">
                <i className="fa-solid fa-id-badge mr-4 text-gray-400"></i>
