@@ -35,7 +35,9 @@ const App: React.FC = () => {
     email: '',
     address: '',
     city: '',
-    zip: ''
+    zip: '',
+    createAccount: false,
+    password: ''
   });
 
   // Global Scroll Reset on View Change
@@ -330,6 +332,33 @@ const App: React.FC = () => {
 
     if (isPlacingOrder) return;
     setIsPlacingOrder(true);
+
+    // Optional Account Creation
+    if (checkoutForm.createAccount) {
+      if (!checkoutForm.password) {
+        alert("Please provide a security sequence (password) to initialize your vault membership.");
+        setIsPlacingOrder(false);
+        return;
+      }
+      try {
+        await fetch(`${SUPABASE_URL}/rest/v1/customers`, {
+          method: 'POST',
+          headers: {
+            'apikey': SUPABASE_KEY,
+            'Authorization': `Bearer ${SUPABASE_KEY}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            email: checkoutForm.email,
+            password: checkoutForm.password,
+            first_name: checkoutForm.firstName,
+            last_name: checkoutForm.lastName || ''
+          })
+        });
+      } catch (err) {
+        console.warn("Vault membership initialization failed - subject may already exist.");
+      }
+    }
 
     const subtotal = cart.reduce((acc, item) => acc + (item.price * item.quantity), 0);
     const total = subtotal + (selectedShipping.rate || 0);
@@ -635,6 +664,33 @@ const App: React.FC = () => {
                     </div>
                     <div><label className="text-[10px] font-black uppercase tracking-widest text-gray-400 block mb-2 italic">Email Address</label><input type="email" value={checkoutForm.email} onChange={e => setCheckoutForm({...checkoutForm, email: e.target.value})} className="w-full border-b-2 border-gray-100 py-3 outline-none focus:border-red-600 transition-colors font-bold text-xs" /></div>
                     <div><label className="text-[10px] font-black uppercase tracking-widest text-gray-400 block mb-2 italic">Physical Location</label><input type="text" value={checkoutForm.address} onChange={e => setCheckoutForm({...checkoutForm, address: e.target.value})} className="w-full border-b-2 border-gray-100 py-3 outline-none focus:border-red-600 transition-colors font-bold text-xs" placeholder="STREET, AREA" /></div>
+                  </div>
+
+                  {/* Account Creation Section */}
+                  <div className="mt-8 pt-8 border-t border-gray-100">
+                    <div className="flex items-center mb-4">
+                      <input 
+                        type="checkbox" 
+                        id="createAccount" 
+                        checked={checkoutForm.createAccount} 
+                        onChange={e => setCheckoutForm({...checkoutForm, createAccount: e.target.checked})}
+                        className="w-4 h-4 accent-black cursor-pointer"
+                      />
+                      <label htmlFor="createAccount" className="ml-3 text-[10px] font-black uppercase tracking-widest cursor-pointer select-none">Create a Vault Membership?</label>
+                    </div>
+                    {checkoutForm.createAccount && (
+                      <div className="animate-in fade-in slide-in-from-top-2 duration-300">
+                        <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 block mb-2 italic">Set Security Sequence (Password)</label>
+                        <input 
+                          type="password" 
+                          value={checkoutForm.password} 
+                          onChange={e => setCheckoutForm({...checkoutForm, password: e.target.value})} 
+                          className="w-full border-b-2 border-gray-100 py-3 outline-none focus:border-red-600 transition-colors font-bold text-xs" 
+                          placeholder="••••••••"
+                        />
+                        <p className="text-[9px] text-gray-400 font-bold uppercase mt-2 italic">Save this for future vault access.</p>
+                      </div>
+                    )}
                   </div>
                 </div>
 
