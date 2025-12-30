@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import Navigation from './components/Navigation.tsx';
-import Home from './components/Storefront/Home.tsx';
-import ProductDetail from './components/Storefront/ProductDetail.tsx';
-import Dashboard from './components/Admin/Dashboard.tsx';
-import { Sneaker, CartItem, Order, OrderStatus } from './types.ts';
-import { MOCK_SNEAKERS, MOCK_ORDERS } from './constants.tsx';
+import Navigation from './components/Navigation';
+import Home from './components/Storefront/Home';
+import ProductDetail from './components/Storefront/ProductDetail';
+import Dashboard from './components/Admin/Dashboard';
+import { Sneaker, CartItem, Order, OrderStatus } from './types';
+import { MOCK_SNEAKERS, MOCK_ORDERS } from './constants';
 
 // Supabase Configuration
 const SUPABASE_URL = 'https://vwbctddmakbnvfxzrjeo.supabase.co';
@@ -21,7 +21,6 @@ const App: React.FC = () => {
   const [lastOrder, setLastOrder] = useState<Order | null>(null);
   const [isPlacingOrder, setIsPlacingOrder] = useState(false);
 
-  // Form states for checkout
   const [checkoutForm, setCheckoutForm] = useState({
     firstName: '',
     lastName: '',
@@ -31,7 +30,6 @@ const App: React.FC = () => {
     zip: ''
   });
 
-  // Sync with Supabase on mount
   useEffect(() => {
     const fetchOrders = async () => {
       try {

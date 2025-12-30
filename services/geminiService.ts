@@ -1,10 +1,30 @@
-
 import { GoogleGenAI } from "@google/genai";
 
-// Fix: Use process.env.API_KEY directly as required by the coding guidelines
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// Initialize AI lazily or safely to prevent top-level crashes
+let aiInstance: GoogleGenAI | null = null;
+
+const getAi = () => {
+  if (aiInstance) return aiInstance;
+  
+  const apiKey = process.env.API_KEY;
+  if (!apiKey) {
+    console.warn("SneakerVault: API_KEY is missing. AI features will use fallback descriptions.");
+    return null;
+  }
+  
+  try {
+    aiInstance = new GoogleGenAI({ apiKey });
+    return aiInstance;
+  } catch (err) {
+    console.error("SneakerVault: Failed to initialize Gemini AI", err);
+    return null;
+  }
+};
 
 export const generateHypeDescription = async (sneakerName: string, colorway: string) => {
+  const ai = getAi();
+  if (!ai) return "Premium quality meets iconic design in this limited edition release.";
+
   try {
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
@@ -12,13 +32,12 @@ export const generateHypeDescription = async (sneakerName: string, colorway: str
     });
     return response.text || "A masterpiece of footwear engineering and street-ready style.";
   } catch (error) {
-    console.error("Gemini Error:", error);
-    return "Premium quality meets iconic design in this limited edition release.";
+    console.error("Gemini Generation Error:", error);
+    return "Premium craftsmanship meets cultural icon status in this essential sneaker.";
   }
 };
 
 export const getSmartRecommendations = async (sneakerName: string) => {
-  // Mock logic or AI logic to suggest similar items
-  // In a real app, we'd feed the full catalog to Gemini
+  // Simple fallback for recommendations
   return ["Nike Dunk Low", "Jordan 1 Mid", "Yeezy 350 V2"];
 };
