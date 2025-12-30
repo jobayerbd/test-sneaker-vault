@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import Navigation from './components/Navigation';
 import Home from './components/Storefront/Home';
@@ -44,7 +43,6 @@ const App: React.FC = () => {
         });
         if (response.ok) {
           const data = await response.json();
-          // Merge Supabase orders with mock data for a full-looking dashboard
           if (data && data.length > 0) {
             setOrders([...data, ...MOCK_ORDERS]);
           }
@@ -145,7 +143,7 @@ const App: React.FC = () => {
       setCurrentView('order-success');
     } catch (err) {
       console.error("Checkout Sync Error:", err);
-      alert("Vault sync failed. Ensure the 'orders' table is created in Supabase.");
+      alert("Order placement failed. Check the SQL editor in Supabase to ensure the 'orders' table exists.");
     } finally {
       setIsPlacingOrder(false);
     }
@@ -277,14 +275,14 @@ const App: React.FC = () => {
                   <h3 className="text-xl font-black font-heading uppercase mb-6 flex items-center"><span className="bg-black text-white w-8 h-8 rounded-full flex items-center justify-center mr-3 text-xs italic">1</span> Shipping Details</h3>
                   <div className="grid grid-cols-1 gap-6">
                     <div className="grid grid-cols-2 gap-6">
-                      <div><label className="text-[10px] font-black uppercase tracking-widest text-gray-400 block mb-2">First Name</label><input type="text" value={checkoutForm.firstName} onChange={e => setCheckoutForm({...checkoutForm, firstName: e.target.value})} className="w-full border-b-2 border-gray-100 py-3 outline-none focus:border-black transition-colors font-bold" /></div>
-                      <div><label className="text-[10px] font-black uppercase tracking-widest text-gray-400 block mb-2">Last Name</label><input type="text" value={checkoutForm.lastName} onChange={e => setCheckoutForm({...checkoutForm, lastName: e.target.value})} className="w-full border-b-2 border-gray-100 py-3 outline-none focus:border-black transition-colors font-bold" /></div>
+                      <div><label className="text-[10px] font-black uppercase tracking-widest text-gray-400 block mb-2">First Name</label><input type="text" placeholder="John" value={checkoutForm.firstName} onChange={e => setCheckoutForm({...checkoutForm, firstName: e.target.value})} className="w-full border-b-2 border-gray-100 py-3 outline-none focus:border-black transition-colors font-bold" /></div>
+                      <div><label className="text-[10px] font-black uppercase tracking-widest text-gray-400 block mb-2">Last Name</label><input type="text" placeholder="Doe" value={checkoutForm.lastName} onChange={e => setCheckoutForm({...checkoutForm, lastName: e.target.value})} className="w-full border-b-2 border-gray-100 py-3 outline-none focus:border-black transition-colors font-bold" /></div>
                     </div>
-                    <div><label className="text-[10px] font-black uppercase tracking-widest text-gray-400 block mb-2">Email Address</label><input type="email" value={checkoutForm.email} onChange={e => setCheckoutForm({...checkoutForm, email: e.target.value})} className="w-full border-b-2 border-gray-100 py-3 outline-none focus:border-black transition-colors font-bold" /></div>
-                    <div><label className="text-[10px] font-black uppercase tracking-widest text-gray-400 block mb-2">Street Address</label><input type="text" value={checkoutForm.address} onChange={e => setCheckoutForm({...checkoutForm, address: e.target.value})} className="w-full border-b-2 border-gray-100 py-3 outline-none focus:border-black transition-colors font-bold" /></div>
+                    <div><label className="text-[10px] font-black uppercase tracking-widest text-gray-400 block mb-2">Email Address</label><input type="email" placeholder="john@example.com" value={checkoutForm.email} onChange={e => setCheckoutForm({...checkoutForm, email: e.target.value})} className="w-full border-b-2 border-gray-100 py-3 outline-none focus:border-black transition-colors font-bold" /></div>
+                    <div><label className="text-[10px] font-black uppercase tracking-widest text-gray-400 block mb-2">Street Address</label><input type="text" placeholder="123 Sneaker St" value={checkoutForm.address} onChange={e => setCheckoutForm({...checkoutForm, address: e.target.value})} className="w-full border-b-2 border-gray-100 py-3 outline-none focus:border-black transition-colors font-bold" /></div>
                     <div className="grid grid-cols-2 gap-6">
-                      <div><label className="text-[10px] font-black uppercase tracking-widest text-gray-400 block mb-2">City</label><input type="text" value={checkoutForm.city} onChange={e => setCheckoutForm({...checkoutForm, city: e.target.value})} className="w-full border-b-2 border-gray-100 py-3 outline-none focus:border-black transition-colors font-bold" /></div>
-                      <div><label className="text-[10px] font-black uppercase tracking-widest text-gray-400 block mb-2">Zip Code</label><input type="text" value={checkoutForm.zip} onChange={e => setCheckoutForm({...checkoutForm, zip: e.target.value})} className="w-full border-b-2 border-gray-100 py-3 outline-none focus:border-black transition-colors font-bold" /></div>
+                      <div><label className="text-[10px] font-black uppercase tracking-widest text-gray-400 block mb-2">City</label><input type="text" placeholder="New York" value={checkoutForm.city} onChange={e => setCheckoutForm({...checkoutForm, city: e.target.value})} className="w-full border-b-2 border-gray-100 py-3 outline-none focus:border-black transition-colors font-bold" /></div>
+                      <div><label className="text-[10px] font-black uppercase tracking-widest text-gray-400 block mb-2">Zip Code</label><input type="text" placeholder="10001" value={checkoutForm.zip} onChange={e => setCheckoutForm({...checkoutForm, zip: e.target.value})} className="w-full border-b-2 border-gray-100 py-3 outline-none focus:border-black transition-colors font-bold" /></div>
                     </div>
                   </div>
                 </div>
