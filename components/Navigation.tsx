@@ -5,9 +5,10 @@ interface NavigationProps {
   cartCount: number;
   wishlistCount: number;
   currentView: string;
+  onOpenCart: () => void;
 }
 
-const Navigation: React.FC<NavigationProps> = ({ onNavigate, cartCount, wishlistCount, currentView }) => {
+const Navigation: React.FC<NavigationProps> = ({ onNavigate, cartCount, wishlistCount, currentView, onOpenCart }) => {
   return (
     <nav className="sticky top-0 z-50 bg-white border-b border-gray-100 shadow-sm">
       <div className="max-w-7xl mx-auto px-4">
@@ -39,11 +40,11 @@ const Navigation: React.FC<NavigationProps> = ({ onNavigate, cartCount, wishlist
               {wishlistCount > 0 && <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[8px] px-1 rounded-full">{wishlistCount}</span>}
             </button>
             <button 
-              onClick={() => onNavigate('cart')}
+              onClick={onOpenCart}
               className="flex items-center space-x-2 border border-gray-200 px-3 py-1.5 rounded-sm hover:border-black transition-colors"
             >
               <i className="fa-solid fa-bag-shopping text-gray-800"></i>
-              <span className="text-xs font-bold text-gray-800 italic">{cartCount}৳</span>
+              <span className="text-xs font-bold text-gray-800 italic">{cartCount} Secured</span>
             </button>
           </div>
         </div>

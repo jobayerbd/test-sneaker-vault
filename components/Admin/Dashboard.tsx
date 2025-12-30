@@ -18,24 +18,28 @@ interface DashboardProps {
   orders: Order[];
   sneakers: Sneaker[];
   onRefresh?: () => void;
+  onUpdateOrderStatus?: (orderId: string, newStatus: OrderStatus) => Promise<boolean>;
   isRefreshing?: boolean;
   onLogout?: () => void;
 }
 
 type AdminSubView = 'overview' | 'orders' | 'inventory' | 'customers' | 'order-detail';
+type SortKey = 'DATE' | 'STATUS' | 'VALUE';
 
-const Dashboard: React.FC<DashboardProps> = ({ orders, sneakers, onRefresh, isRefreshing, onLogout }) => {
+const Dashboard: React.FC<DashboardProps> = ({ orders, sneakers, onRefresh, onUpdateOrderStatus, isRefreshing, onLogout }) => {
   const [subView, setSubView] = useState<AdminSubView>('overview');
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
+  const [sortKey, setSortKey] = useState<SortKey>('DATE');
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
 
   // Derived Data
   const totalRevenue = orders.reduce((acc, o) => acc + (Number(o.total) || 0), 0);
   const avgOrderValue = orders.length > 0 ? Math.round(totalRevenue / orders.length) : 0;
 
   const filteredOrders = useMemo(() => {
-    return orders.filter(o => {
+    let result = orders.filter(o => {
       const matchesStatus = statusFilter === 'ALL' || o.status === statusFilter;
       const fullName = `${o.first_name} ${o.last_name}`.toLowerCase();
       const matchesSearch = 
@@ -44,12 +48,40 @@ const Dashboard: React.FC<DashboardProps> = ({ orders, sneakers, onRefresh, isRe
         o.email.toLowerCase().includes(searchQuery.toLowerCase());
       return matchesStatus && matchesSearch;
     });
-  }, [orders, statusFilter, searchQuery]);
+
+    // Sorting Logic
+    return result.sort((a, b) => {
+      if (sortKey === 'STATUS') {
+        return a.status.localeCompare(b.status);
+      } else if (sortKey === 'VALUE') {
+        return b.total - a.total;
+      } else {
+        // Default to Date DESC
+        const dateA = new Date(a.created_at || 0).getTime();
+        const dateB = new Date(b.created_at || 0).getTime();
+        return dateB - dateA;
+      }
+    });
+  }, [orders, statusFilter, searchQuery, sortKey]);
 
   // Handlers
   const handleViewOrder = (order: Order) => {
     setSelectedOrder(order);
     setSubView('order-detail');
+  };
+
+  const handleUpdateStatus = async (newStatus: OrderStatus) => {
+    if (!selectedOrder || !onUpdateOrderStatus) return;
+    
+    setIsUpdatingStatus(true);
+    const success = await onUpdateOrderStatus(selectedOrder.id, newStatus);
+    if (success) {
+      setSelectedOrder(prev => prev ? { ...prev, status: newStatus } : null);
+      alert('PROTOCOL STATUS UPDATED SUCCESSFULLY');
+    } else {
+      alert('FAILED TO UPDATE PROTOCOL STATUS');
+    }
+    setIsUpdatingStatus(false);
   };
 
   const getStatusBadgeStyles = (status: string) => {
@@ -167,6 +199,7 @@ const Dashboard: React.FC<DashboardProps> = ({ orders, sneakers, onRefresh, isRe
             />
           </div>
 
+          {/* Filter Dropdown */}
           <div className="relative group">
             <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
               <i className="fa-solid fa-filter text-xs text-gray-400 group-focus-within:text-black transition-colors"></i>
@@ -176,10 +209,26 @@ const Dashboard: React.FC<DashboardProps> = ({ orders, sneakers, onRefresh, isRe
               onChange={(e) => setStatusFilter(e.target.value)}
               className="bg-white border-2 border-gray-100 hover:border-gray-200 focus:border-black pl-11 pr-10 py-3 rounded-xl text-[10px] font-black uppercase tracking-[0.15em] outline-none transition-all appearance-none cursor-pointer shadow-sm"
             >
-              <option value="ALL">ALL PROTOCOLS</option>
+              <option value="ALL">FILTER BY STATUS</option>
               {Object.values(OrderStatus).map(status => (
                 <option key={status} value={status}>{status.toUpperCase()}</option>
               ))}
+            </select>
+          </div>
+
+          {/* Sort Dropdown */}
+          <div className="relative group">
+            <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
+              <i className="fa-solid fa-sort text-xs text-gray-400 group-focus-within:text-black transition-colors"></i>
+            </div>
+            <select 
+              value={sortKey}
+              onChange={(e) => setSortKey(e.target.value as SortKey)}
+              className="bg-white border-2 border-gray-100 hover:border-gray-200 focus:border-black pl-11 pr-10 py-3 rounded-xl text-[10px] font-black uppercase tracking-[0.15em] outline-none transition-all appearance-none cursor-pointer shadow-sm"
+            >
+              <option value="DATE">SORT BY DATE</option>
+              <option value="STATUS">SORT BY STATUS</option>
+              <option value="VALUE">SORT BY VALUE</option>
             </select>
           </div>
 
@@ -216,7 +265,7 @@ const Dashboard: React.FC<DashboardProps> = ({ orders, sneakers, onRefresh, isRe
                       </div>
                       <p className="text-gray-400 font-black uppercase tracking-widest text-[10px] italic">No orders match the current protocol parameters.</p>
                       <button 
-                        onClick={() => { setStatusFilter('ALL'); setSearchQuery(''); }}
+                        onClick={() => { setStatusFilter('ALL'); setSearchQuery(''); setSortKey('DATE'); }}
                         className="mt-4 text-[11px] font-black text-red-600 uppercase tracking-[0.2em] hover:underline"
                       >
                         Reset All Filters
@@ -365,10 +414,21 @@ const Dashboard: React.FC<DashboardProps> = ({ orders, sneakers, onRefresh, isRe
             </div>
             Protocol Hub
           </button>
+          
           <div className="flex space-x-2">
-            <button className="bg-white border border-gray-200 px-6 py-3 rounded-xl font-black uppercase tracking-widest text-[10px] hover:border-black transition-all shadow-sm">
-              <i className="fa-solid fa-print mr-2"></i> Print Manifest
-            </button>
+            <div className="flex items-center bg-white border border-gray-100 rounded-xl px-4 mr-2">
+              <span className="text-[10px] font-black uppercase tracking-widest text-gray-400 mr-4 italic">Update Protocol:</span>
+              <select 
+                defaultValue={selectedOrder.status}
+                onChange={(e) => handleUpdateStatus(e.target.value as OrderStatus)}
+                disabled={isUpdatingStatus}
+                className="bg-transparent text-[10px] font-black uppercase tracking-[0.2em] py-3 outline-none cursor-pointer text-red-700 disabled:opacity-50"
+              >
+                {Object.values(OrderStatus).map(status => (
+                  <option key={status} value={status}>{status.toUpperCase()}</option>
+                ))}
+              </select>
+            </div>
             <button className="bg-black text-white px-8 py-3 rounded-xl font-black uppercase tracking-widest text-[10px] hover:bg-red-700 transition-all shadow-2xl flex items-center">
               Execute Protocol <i className="fa-solid fa-bolt ml-4 text-[11px]"></i>
             </button>
@@ -380,7 +440,10 @@ const Dashboard: React.FC<DashboardProps> = ({ orders, sneakers, onRefresh, isRe
             <div className="bg-white rounded-3xl border border-gray-100 shadow-xl overflow-hidden">
               <div className="px-8 py-6 border-b border-gray-100 bg-gray-50/50 flex justify-between items-center">
                 <h3 className="text-sm font-black uppercase tracking-widest italic font-heading">Secure Inventory Manifest</h3>
-                <span className="text-[10px] font-black bg-black text-white px-3 py-1 rounded italic">VERIFIED BY VAULT</span>
+                <span className={`px-4 py-2 rounded-xl border text-[9px] font-black uppercase tracking-widest inline-flex items-center ${getStatusBadgeStyles(selectedOrder.status)}`}>
+                  <span className="w-1.5 h-1.5 rounded-full bg-current mr-2.5 animate-pulse"></span>
+                  {selectedOrder.status}
+                </span>
               </div>
               <div className="p-8 space-y-8">
                 {selectedOrder.items?.map((item, i) => (
@@ -409,9 +472,9 @@ const Dashboard: React.FC<DashboardProps> = ({ orders, sneakers, onRefresh, isRe
                 <div className="relative flex items-start space-x-8">
                   <div className="w-10 h-10 rounded-2xl bg-black text-white flex items-center justify-center shrink-0 shadow-xl z-10"><i className="fa-solid fa-paper-plane text-xs"></i></div>
                   <div className="flex-1 bg-gray-50/50 p-6 rounded-2xl border border-gray-100 group hover:border-black transition-colors">
-                    <p className="text-[11px] font-black uppercase tracking-widest text-gray-900 mb-1">Protocol Initiated</p>
-                    <p className="text-[10px] text-gray-400 font-black uppercase tracking-tighter">{new Date(selectedOrder.created_at || '').toLocaleString()}</p>
-                    <p className="text-[11px] text-gray-500 mt-4 font-bold leading-relaxed italic border-l-3 border-black pl-4">Order successfully received and logged into central vault database. Verification process complete.</p>
+                    <p className="text-[11px] font-black uppercase tracking-widest text-gray-900 mb-1">Status Evolution</p>
+                    <p className="text-[10px] text-gray-400 font-black uppercase tracking-tighter">Current Status: {selectedOrder.status.toUpperCase()}</p>
+                    <p className="text-[11px] text-gray-500 mt-4 font-bold leading-relaxed italic border-l-3 border-black pl-4">Protocol currently in state: {selectedOrder.status}. Secure fulfillment chain active.</p>
                   </div>
                 </div>
               </div>
@@ -459,7 +522,7 @@ const Dashboard: React.FC<DashboardProps> = ({ orders, sneakers, onRefresh, isRe
                  <div className="pt-8 border-t border-white/10 flex justify-between items-end">
                     <div>
                       <span className="text-xs font-black uppercase italic tracking-[0.3em] font-heading text-red-600">TOTAL SETTLED</span>
-                      <p className="text-[9px] text-gray-500 font-black uppercase mt-1 tracking-widest">Protocol: Complete</p>
+                      <p className="text-[9px] text-gray-500 font-black uppercase mt-1 tracking-widest">Protocol: Active</p>
                     </div>
                     <span className="text-4xl font-black italic group-hover:scale-110 transition-transform origin-right duration-500">{selectedOrder.total.toLocaleString()}৳</span>
                  </div>
