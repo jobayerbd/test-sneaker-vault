@@ -1,10 +1,9 @@
-
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App.tsx';
 
 // Deployment Verification Log
-const VERSION = "1.0.5";
+const VERSION = "1.0.6";
 const DEPLOY_TIME = new Date().toISOString();
 console.log(`SneakerVault [v${VERSION}]: Initializing...`);
 console.log(`Build Timestamp: ${DEPLOY_TIME}`);

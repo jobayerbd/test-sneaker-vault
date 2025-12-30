@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import Navigation from './components/Navigation';
 import Home from './components/Storefront/Home';
@@ -411,7 +410,7 @@ const App: React.FC = () => {
               Join our SneakerVault Elite community for exclusive drop access and community events.
             </p>
             <button className="bg-red-700 text-white px-6 py-2 text-[10px] font-black uppercase tracking-widest mb-6 hover:bg-white hover:text-red-700 transition-all rounded-sm">
-              Join Elite Review Group >
+              Join Elite Review Group &gt;
             </button>
             <div className="flex space-x-4 text-gray-400">
                <i className="fa-brands fa-facebook text-xl hover:text-white cursor-pointer"></i>
@@ -423,7 +422,7 @@ const App: React.FC = () => {
         </div>
         
         <div className="max-w-7xl mx-auto px-4 pt-8 border-t border-white/5 text-center text-[10px] text-gray-600 font-bold uppercase tracking-widest">
-           <p>Copyright © 2025 | SneakerVault Lifestyle | Build v1.0.5</p>
+           <p>Copyright © 2025 | SneakerVault Lifestyle | Build v1.0.6</p>
         </div>
       </footer>
     </div>
