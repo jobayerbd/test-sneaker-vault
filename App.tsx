@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import Navigation from './components/Navigation';
 import Home from './components/Storefront/Home';
@@ -422,7 +423,7 @@ const App: React.FC = () => {
         </div>
         
         <div className="max-w-7xl mx-auto px-4 pt-8 border-t border-white/5 text-center text-[10px] text-gray-600 font-bold uppercase tracking-widest">
-           <p>Copyright © 2025 | SneakerVault Lifestyle</p>
+           <p>Copyright © 2025 | SneakerVault Lifestyle | Build v1.0.5</p>
         </div>
       </footer>
     </div>
