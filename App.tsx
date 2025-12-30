@@ -5,7 +5,7 @@ import Home from './components/Storefront/Home';
 import ProductDetail from './components/Storefront/ProductDetail';
 import Dashboard from './components/Admin/Dashboard';
 import { Sneaker, CartItem, Order, OrderStatus } from './types';
-import { MOCK_SNEAKERS } from './constants';
+import { MOCK_SNEAKERS, MOCK_ORDERS } from './constants';
 
 // Supabase Configuration
 const SUPABASE_URL = 'https://vwbctddmakbnvfxzrjeo.supabase.co';
@@ -18,18 +18,18 @@ const App: React.FC = () => {
   const [selectedProduct, setSelectedProduct] = useState<Sneaker | null>(null);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [wishlist, setWishlist] = useState<Sneaker[]>([]);
-  const [orders, setOrders] = useState<Order[]>([]);
+  const [orders, setOrders] = useState<Order[]>(MOCK_ORDERS);
   const [lastOrder, setLastOrder] = useState<Order | null>(null);
   const [isPlacingOrder, setIsPlacingOrder] = useState(false);
 
-  // Updated Form states for checkout to be more granular
+  // Form states for checkout
   const [checkoutForm, setCheckoutForm] = useState({
-    firstName: 'Vault',
-    lastName: 'Member',
-    email: 'member@vault.com',
-    address: '123 Hype St',
-    city: 'New York',
-    zip: '10001'
+    firstName: '',
+    lastName: '',
+    email: '',
+    address: '',
+    city: '',
+    zip: ''
   });
 
   // Sync with Supabase on mount
@@ -44,7 +44,10 @@ const App: React.FC = () => {
         });
         if (response.ok) {
           const data = await response.json();
-          setOrders(data || []);
+          // Merge Supabase orders with mock data for a full-looking dashboard
+          if (data && data.length > 0) {
+            setOrders([...data, ...MOCK_ORDERS]);
+          }
         }
       } catch (err) {
         console.error("Failed to fetch from Supabase:", err);
@@ -85,13 +88,17 @@ const App: React.FC = () => {
   };
 
   const handlePlaceOrder = async () => {
+    if (!checkoutForm.firstName || !checkoutForm.email) {
+      alert("Please fill out your details.");
+      return;
+    }
+
     if (isPlacingOrder) return;
     setIsPlacingOrder(true);
 
     const subtotal = cart.reduce((acc, item) => acc + (item.price * item.quantity), 0);
     const total = Math.round(subtotal * 1.08);
 
-    // Create the order payload matching Supabase table columns
     const newOrder = {
       id: `ORD-${Math.floor(Math.random() * 90000) + 10000}`,
       first_name: checkoutForm.firstName,
@@ -129,14 +136,16 @@ const App: React.FC = () => {
         throw new Error(`Supabase Error: ${errorText}`);
       }
 
-      const [savedOrder] = await response.json();
+      const responseData = await response.json();
+      const savedOrder = Array.isArray(responseData) ? responseData[0] : responseData;
+      
       setOrders(prev => [savedOrder, ...prev]);
       setLastOrder(savedOrder);
       setCart([]);
       setCurrentView('order-success');
     } catch (err) {
       console.error("Checkout Sync Error:", err);
-      alert("Order placement failed. Please verify the Supabase table 'orders' exists with the correct columns.");
+      alert("Vault sync failed. Ensure the 'orders' table is created in Supabase.");
     } finally {
       setIsPlacingOrder(false);
     }
