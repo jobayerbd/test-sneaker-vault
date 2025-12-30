@@ -1,6 +1,6 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Cell } from 'recharts';
-import { Order, OrderStatus, Sneaker } from '../../types';
+import { Order, OrderStatus, Sneaker, Brand, SneakerVariant } from '../../types';
 
 const data = [
   { name: 'Mon', sales: 4000, traffic: 2400 },
@@ -19,20 +19,33 @@ interface DashboardProps {
   sneakers: Sneaker[];
   onRefresh?: () => void;
   onUpdateOrderStatus?: (orderId: string, newStatus: OrderStatus) => Promise<boolean>;
+  onSaveProduct?: (productData: Partial<Sneaker>) => Promise<boolean>;
+  onDeleteProduct?: (id: string) => Promise<boolean>;
   isRefreshing?: boolean;
   onLogout?: () => void;
 }
 
-type AdminSubView = 'overview' | 'orders' | 'inventory' | 'customers' | 'order-detail';
+type AdminSubView = 'overview' | 'orders' | 'inventory' | 'customers' | 'order-detail' | 'product-form';
 type SortKey = 'DATE' | 'STATUS' | 'VALUE';
 
-const Dashboard: React.FC<DashboardProps> = ({ orders, sneakers, onRefresh, onUpdateOrderStatus, isRefreshing, onLogout }) => {
+const Dashboard: React.FC<DashboardProps> = ({ 
+  orders, 
+  sneakers, 
+  onRefresh, 
+  onUpdateOrderStatus, 
+  onSaveProduct,
+  onDeleteProduct,
+  isRefreshing, 
+  onLogout 
+}) => {
   const [subView, setSubView] = useState<AdminSubView>('overview');
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [editingProduct, setEditingProduct] = useState<Partial<Sneaker> | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
   const [sortKey, setSortKey] = useState<SortKey>('DATE');
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+  const [isSavingProduct, setIsSavingProduct] = useState(false);
 
   // Derived Data
   const totalRevenue = orders.reduce((acc, o) => acc + (Number(o.total) || 0), 0);
@@ -49,14 +62,12 @@ const Dashboard: React.FC<DashboardProps> = ({ orders, sneakers, onRefresh, onUp
       return matchesStatus && matchesSearch;
     });
 
-    // Sorting Logic
     return result.sort((a, b) => {
       if (sortKey === 'STATUS') {
         return a.status.localeCompare(b.status);
       } else if (sortKey === 'VALUE') {
         return b.total - a.total;
       } else {
-        // Default to Date DESC
         const dateA = new Date(a.created_at || 0).getTime();
         const dateB = new Date(b.created_at || 0).getTime();
         return dateB - dateA;
@@ -72,16 +83,58 @@ const Dashboard: React.FC<DashboardProps> = ({ orders, sneakers, onRefresh, onUp
 
   const handleUpdateStatus = async (newStatus: OrderStatus) => {
     if (!selectedOrder || !onUpdateOrderStatus) return;
-    
     setIsUpdatingStatus(true);
     const success = await onUpdateOrderStatus(selectedOrder.id, newStatus);
     if (success) {
       setSelectedOrder(prev => prev ? { ...prev, status: newStatus } : null);
-      alert('PROTOCOL STATUS UPDATED SUCCESSFULLY');
-    } else {
-      alert('FAILED TO UPDATE PROTOCOL STATUS');
     }
     setIsUpdatingStatus(false);
+  };
+
+  const handleEditProduct = (sneaker: Sneaker) => {
+    setEditingProduct(sneaker);
+    setSubView('product-form');
+  };
+
+  const handleAddNewProduct = () => {
+    setEditingProduct({
+      name: '',
+      brand: Brand.NIKE,
+      price: 0,
+      image: '',
+      gallery: [],
+      description: '',
+      colorway: '',
+      variants: [{ size: '8', stock: 10 }, { size: '9', stock: 10 }, { size: '10', stock: 10 }],
+      is_drop: false,
+      trending: false,
+      fit_score: 'True to Size',
+      release_date: new Date().toISOString().split('T')[0]
+    });
+    setSubView('product-form');
+  };
+
+  const handleDelete = async (id: string) => {
+    if (window.confirm('WARNING: THIS WILL PERMANENTLY ERASE THIS MODEL FROM THE VAULT. CONTINUE?')) {
+      if (onDeleteProduct) {
+        await onDeleteProduct(id);
+      }
+    }
+  };
+
+  const handleSaveProductForm = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingProduct || !onSaveProduct) return;
+    
+    setIsSavingProduct(true);
+    const success = await onSaveProduct(editingProduct);
+    if (success) {
+      setSubView('inventory');
+      setEditingProduct(null);
+    } else {
+      alert('PROTOCOL ERROR: FAILED TO LOG PRODUCT INTO VAULT DATABASE');
+    }
+    setIsSavingProduct(false);
   };
 
   const getStatusBadgeStyles = (status: string) => {
@@ -199,7 +252,6 @@ const Dashboard: React.FC<DashboardProps> = ({ orders, sneakers, onRefresh, onUp
             />
           </div>
 
-          {/* Filter Dropdown */}
           <div className="relative group">
             <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
               <i className="fa-solid fa-filter text-xs text-gray-400 group-focus-within:text-black transition-colors"></i>
@@ -216,7 +268,6 @@ const Dashboard: React.FC<DashboardProps> = ({ orders, sneakers, onRefresh, onUp
             </select>
           </div>
 
-          {/* Sort Dropdown */}
           <div className="relative group">
             <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
               <i className="fa-solid fa-sort text-xs text-gray-400 group-focus-within:text-black transition-colors"></i>
@@ -263,7 +314,7 @@ const Dashboard: React.FC<DashboardProps> = ({ orders, sneakers, onRefresh, onUp
                       <div className="w-20 h-20 bg-gray-50 rounded-3xl flex items-center justify-center mb-6">
                         <i className="fa-solid fa-inbox text-gray-200 text-3xl"></i>
                       </div>
-                      <p className="text-gray-400 font-black uppercase tracking-widest text-[10px] italic">No orders match the current protocol parameters.</p>
+                      <p className="text-gray-400 font-black uppercase tracking-widest text-[10px] italic">No orders match parameters.</p>
                       <button 
                         onClick={() => { setStatusFilter('ALL'); setSearchQuery(''); setSortKey('DATE'); }}
                         className="mt-4 text-[11px] font-black text-red-600 uppercase tracking-[0.2em] hover:underline"
@@ -325,7 +376,10 @@ const Dashboard: React.FC<DashboardProps> = ({ orders, sneakers, onRefresh, onUp
           <h1 className="text-3xl font-black font-heading tracking-tight italic uppercase text-black">Inventory Vault</h1>
           <p className="text-gray-500 text-sm font-medium">Managing {sneakers.length} authenticated sneaker models in the central vault.</p>
         </div>
-        <button className="bg-black text-white px-8 py-4 rounded-xl font-black uppercase tracking-[0.2em] text-[10px] hover:bg-red-700 transition-all shadow-xl flex items-center">
+        <button 
+          onClick={handleAddNewProduct}
+          className="bg-black text-white px-8 py-4 rounded-xl font-black uppercase tracking-[0.2em] text-[10px] hover:bg-red-700 transition-all shadow-xl flex items-center"
+        >
           <i className="fa-solid fa-plus mr-3 text-sm"></i> Add New Product
         </button>
       </div>
@@ -382,10 +436,16 @@ const Dashboard: React.FC<DashboardProps> = ({ orders, sneakers, onRefresh, onUp
                     </td>
                     <td className="px-8 py-6 text-right">
                       <div className="flex justify-end space-x-3">
-                         <button className="p-3 text-gray-400 hover:text-black hover:bg-white rounded-xl transition-all border border-transparent hover:border-gray-200 shadow-sm">
+                         <button 
+                          onClick={() => handleEditProduct(sneaker)}
+                          className="p-3 text-gray-400 hover:text-black hover:bg-white rounded-xl transition-all border border-transparent hover:border-gray-200 shadow-sm"
+                         >
                            <i className="fa-solid fa-pen-to-square text-sm"></i>
                          </button>
-                         <button className="p-3 text-gray-400 hover:text-red-600 hover:bg-white rounded-xl transition-all border border-transparent hover:border-red-100 shadow-sm">
+                         <button 
+                          onClick={() => handleDelete(sneaker.id)}
+                          className="p-3 text-gray-400 hover:text-red-600 hover:bg-white rounded-xl transition-all border border-transparent hover:border-red-100 shadow-sm"
+                         >
                            <i className="fa-solid fa-trash-can text-sm"></i>
                          </button>
                       </div>
@@ -399,6 +459,275 @@ const Dashboard: React.FC<DashboardProps> = ({ orders, sneakers, onRefresh, onUp
       </div>
     </div>
   );
+
+  const ProductForm = () => {
+    if (!editingProduct) return null;
+
+    const handleVariantChange = (index: number, field: keyof SneakerVariant, value: any) => {
+      const newVariants = [...(editingProduct.variants || [])];
+      newVariants[index] = { ...newVariants[index], [field]: value };
+      setEditingProduct({ ...editingProduct, variants: newVariants });
+    };
+
+    const addVariant = () => {
+      setEditingProduct({
+        ...editingProduct,
+        variants: [...(editingProduct.variants || []), { size: '', stock: 0 }]
+      });
+    };
+
+    const removeVariant = (index: number) => {
+      setEditingProduct({
+        ...editingProduct,
+        variants: (editingProduct.variants || []).filter((_, i) => i !== index)
+      });
+    };
+
+    const handleGalleryImageChange = (index: number, value: string) => {
+      const newGallery = [...(editingProduct.gallery || [])];
+      newGallery[index] = value;
+      setEditingProduct({ ...editingProduct, gallery: newGallery });
+    };
+
+    const addGalleryImage = () => {
+      setEditingProduct({
+        ...editingProduct,
+        gallery: [...(editingProduct.gallery || []), '']
+      });
+    };
+
+    const removeGalleryImage = (index: number) => {
+      setEditingProduct({
+        ...editingProduct,
+        gallery: (editingProduct.gallery || []).filter((_, i) => i !== index)
+      });
+    };
+
+    return (
+      <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4">
+        <div className="flex justify-between items-center">
+          <button 
+            onClick={() => setSubView('inventory')}
+            className="group flex items-center space-x-4 text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 hover:text-black transition-colors"
+          >
+            <div className="w-10 h-10 rounded-full border border-gray-100 flex items-center justify-center group-hover:border-black group-hover:shadow-lg transition-all">
+              <i className="fa-solid fa-arrow-left"></i>
+            </div>
+            <span>Vault Inventory</span>
+          </button>
+          <h2 className="text-xl font-black italic uppercase tracking-tighter">
+            {editingProduct.id ? 'Modify Protocol' : 'Initialize New Asset'}
+          </h2>
+        </div>
+
+        <form onSubmit={handleSaveProductForm} className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <div className="lg:col-span-2 space-y-8">
+            <div className="bg-white p-10 rounded-3xl border border-gray-100 shadow-xl space-y-10">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div className="space-y-3">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 italic">Model Name</label>
+                  <input 
+                    type="text" 
+                    required
+                    value={editingProduct.name}
+                    onChange={e => setEditingProduct({...editingProduct, name: e.target.value})}
+                    placeholder="E.G. JORDAN 1 RETRO HIGH"
+                    className="w-full bg-gray-50 border-2 border-transparent focus:border-black p-4 rounded-xl outline-none font-bold text-xs uppercase transition-all"
+                  />
+                </div>
+                <div className="space-y-3">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 italic">Brand Identity</label>
+                  <select 
+                    value={editingProduct.brand}
+                    onChange={e => setEditingProduct({...editingProduct, brand: e.target.value as Brand})}
+                    className="w-full bg-gray-50 border-2 border-transparent focus:border-black p-4 rounded-xl outline-none font-bold text-xs uppercase transition-all appearance-none cursor-pointer"
+                  >
+                    {Object.values(Brand).map(b => <option key={b} value={b}>{b.toUpperCase()}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div className="space-y-3">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 italic">Market Value (৳)</label>
+                  <input 
+                    type="number" 
+                    required
+                    value={editingProduct.price}
+                    onChange={e => setEditingProduct({...editingProduct, price: Number(e.target.value)})}
+                    className="w-full bg-gray-50 border-2 border-transparent focus:border-black p-4 rounded-xl outline-none font-bold text-xs transition-all"
+                  />
+                </div>
+                <div className="space-y-3">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 italic">Colorway Signature</label>
+                  <input 
+                    type="text" 
+                    value={editingProduct.colorway}
+                    onChange={e => setEditingProduct({...editingProduct, colorway: e.target.value})}
+                    placeholder="CHICAGO / PANDA"
+                    className="w-full bg-gray-50 border-2 border-transparent focus:border-black p-4 rounded-xl outline-none font-bold text-xs uppercase transition-all"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 italic">Vault Description</label>
+                <textarea 
+                  rows={4}
+                  value={editingProduct.description}
+                  onChange={e => setEditingProduct({...editingProduct, description: e.target.value})}
+                  className="w-full bg-gray-50 border-2 border-transparent focus:border-black p-4 rounded-xl outline-none font-bold text-xs transition-all resize-none"
+                />
+              </div>
+
+              <div className="space-y-6">
+                <div className="flex justify-between items-center border-b border-gray-50 pb-4">
+                  <h3 className="text-[10px] font-black uppercase tracking-widest italic">Variant Manifest (Sizes)</h3>
+                  <button 
+                    type="button" 
+                    onClick={addVariant}
+                    className="text-[9px] font-black text-red-600 uppercase tracking-widest hover:underline"
+                  >
+                    + Add Size Entry
+                  </button>
+                </div>
+                <div className="grid grid-cols-1 gap-4 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
+                  {editingProduct.variants?.map((v, i) => (
+                    <div key={i} className="flex items-center space-x-4 bg-gray-50 p-3 rounded-xl">
+                      <div className="flex-1 grid grid-cols-2 gap-4">
+                        <input 
+                          type="text" 
+                          placeholder="SIZE"
+                          value={v.size}
+                          onChange={e => handleVariantChange(i, 'size', e.target.value)}
+                          className="bg-white p-2 rounded-lg text-xs font-bold uppercase border border-gray-100"
+                        />
+                        <input 
+                          type="number" 
+                          placeholder="STOCK"
+                          value={v.stock}
+                          onChange={e => handleVariantChange(i, 'stock', Number(e.target.value))}
+                          className="bg-white p-2 rounded-lg text-xs font-bold border border-gray-100"
+                        />
+                      </div>
+                      <button 
+                        type="button" 
+                        onClick={() => removeVariant(i)}
+                        className="w-8 h-8 rounded-lg bg-white border border-gray-100 text-gray-300 hover:text-red-600 transition-colors"
+                      >
+                        <i className="fa-solid fa-trash-can text-[10px]"></i>
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-8">
+            <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-xl space-y-8">
+              {/* Primary Image */}
+              <div className="space-y-3">
+                <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 italic">Primary Asset Image (URL)</label>
+                <input 
+                  type="text" 
+                  value={editingProduct.image}
+                  onChange={e => setEditingProduct({...editingProduct, image: e.target.value})}
+                  placeholder="https://example.com/image.jpg"
+                  className="w-full bg-gray-50 border-2 border-transparent focus:border-black p-4 rounded-xl outline-none font-bold text-xs transition-all"
+                />
+                {editingProduct.image && (
+                  <div className="aspect-[4/5] bg-gray-50 rounded-2xl p-4 border border-gray-100 overflow-hidden relative group">
+                    <img src={editingProduct.image} className="w-full h-full object-contain" alt="Preview" />
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                      <span className="text-[9px] font-black text-white uppercase tracking-widest">Main Thumbnail</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Gallery Management */}
+              <div className="pt-8 border-t border-gray-50 space-y-6">
+                <div className="flex justify-between items-center">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 italic">Asset Gallery (Multiple)</label>
+                  <button 
+                    type="button" 
+                    onClick={addGalleryImage}
+                    className="text-[9px] font-black text-red-600 uppercase tracking-widest hover:underline"
+                  >
+                    + Add Image
+                  </button>
+                </div>
+                
+                <div className="space-y-4 max-h-80 overflow-y-auto pr-2 custom-scrollbar">
+                  {(editingProduct.gallery || []).map((url, idx) => (
+                    <div key={idx} className="space-y-2 bg-gray-50 p-4 rounded-2xl border border-gray-100">
+                      <div className="flex items-center space-x-3">
+                        <input 
+                          type="text" 
+                          value={url}
+                          onChange={e => handleGalleryImageChange(idx, e.target.value)}
+                          placeholder="Gallery URL..."
+                          className="flex-1 bg-white border border-gray-100 p-2 rounded-lg outline-none font-bold text-[10px] transition-all"
+                        />
+                        <button 
+                          type="button" 
+                          onClick={() => removeGalleryImage(idx)}
+                          className="w-8 h-8 rounded-lg bg-white border border-gray-100 text-gray-300 hover:text-red-600 transition-colors"
+                        >
+                          <i className="fa-solid fa-xmark text-[10px]"></i>
+                        </button>
+                      </div>
+                      {url && (
+                        <div className="h-20 w-full bg-white rounded-lg border border-gray-100 p-1">
+                          <img src={url} className="h-full w-full object-contain" />
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                  {(editingProduct.gallery || []).length === 0 && (
+                    <p className="text-[9px] text-gray-400 font-bold uppercase text-center py-4 border-2 border-dashed border-gray-100 rounded-2xl">No gallery assets archived.</p>
+                  )}
+                </div>
+              </div>
+
+              <div className="pt-8 border-t border-gray-50 space-y-4">
+                <div className="flex items-center justify-between">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 italic">High Heat Drop</label>
+                  <button 
+                    type="button" 
+                    onClick={() => setEditingProduct({...editingProduct, is_drop: !editingProduct.is_drop})}
+                    className={`w-12 h-6 rounded-full transition-all relative ${editingProduct.is_drop ? 'bg-red-600' : 'bg-gray-200'}`}
+                  >
+                    <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${editingProduct.is_drop ? 'left-7' : 'left-1'}`}></div>
+                  </button>
+                </div>
+                <div className="flex items-center justify-between">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 italic">Trending Status</label>
+                  <button 
+                    type="button" 
+                    onClick={() => setEditingProduct({...editingProduct, trending: !editingProduct.trending})}
+                    className={`w-12 h-6 rounded-full transition-all relative ${editingProduct.trending ? 'bg-black' : 'bg-gray-200'}`}
+                  >
+                    <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${editingProduct.trending ? 'left-7' : 'left-1'}`}></div>
+                  </button>
+                </div>
+              </div>
+
+              <button 
+                type="submit" 
+                disabled={isSavingProduct}
+                className="w-full bg-black text-white py-5 rounded-2xl font-black uppercase tracking-[0.3em] text-[11px] shadow-2xl hover:bg-red-700 transition-all flex items-center justify-center transform active:scale-95 disabled:opacity-50"
+              >
+                {isSavingProduct ? <i className="fa-solid fa-circle-notch animate-spin mr-3"></i> : <i className="fa-solid fa-cloud-arrow-up mr-3"></i>}
+                {editingProduct.id ? 'UPDATE VAULT LOG' : 'COMMENCE ARCHIVE'}
+              </button>
+            </div>
+          </div>
+        </form>
+      </div>
+    );
+  };
 
   const OrderDetail = () => {
     if (!selectedOrder) return null;
@@ -416,7 +745,7 @@ const Dashboard: React.FC<DashboardProps> = ({ orders, sneakers, onRefresh, onUp
           </button>
           
           <div className="flex space-x-2">
-            <div className="flex items-center bg-white border border-gray-100 rounded-xl px-4 mr-2">
+            <div className="flex items-center bg-white border border-gray-100 rounded-xl px-4 mr-2 shadow-sm">
               <span className="text-[10px] font-black uppercase tracking-widest text-gray-400 mr-4 italic">Update Protocol:</span>
               <select 
                 defaultValue={selectedOrder.status}
@@ -465,20 +794,6 @@ const Dashboard: React.FC<DashboardProps> = ({ orders, sneakers, onRefresh, onUp
                 ))}
               </div>
             </div>
-
-            <div className="bg-white rounded-3xl border border-gray-100 shadow-xl p-8">
-              <h3 className="text-sm font-black uppercase tracking-widest italic font-heading mb-10 border-b border-gray-50 pb-5">Logistics Log</h3>
-              <div className="relative space-y-10 before:absolute before:inset-0 before:left-5 before:h-full before:w-0.5 before:bg-gray-50">
-                <div className="relative flex items-start space-x-8">
-                  <div className="w-10 h-10 rounded-2xl bg-black text-white flex items-center justify-center shrink-0 shadow-xl z-10"><i className="fa-solid fa-paper-plane text-xs"></i></div>
-                  <div className="flex-1 bg-gray-50/50 p-6 rounded-2xl border border-gray-100 group hover:border-black transition-colors">
-                    <p className="text-[11px] font-black uppercase tracking-widest text-gray-900 mb-1">Status Evolution</p>
-                    <p className="text-[10px] text-gray-400 font-black uppercase tracking-tighter">Current Status: {selectedOrder.status.toUpperCase()}</p>
-                    <p className="text-[11px] text-gray-500 mt-4 font-bold leading-relaxed italic border-l-3 border-black pl-4">Protocol currently in state: {selectedOrder.status}. Secure fulfillment chain active.</p>
-                  </div>
-                </div>
-              </div>
-            </div>
           </div>
 
           <div className="space-y-8">
@@ -504,30 +819,6 @@ const Dashboard: React.FC<DashboardProps> = ({ orders, sneakers, onRefresh, onUp
                 </div>
               </div>
             </div>
-
-            <div className="bg-black text-white rounded-3xl shadow-2xl overflow-hidden group">
-               <div className="px-8 py-6 border-b border-white/10 bg-white/5 flex items-center">
-                <i className="fa-solid fa-receipt mr-4 text-red-600"></i>
-                <h3 className="text-sm font-black uppercase tracking-widest italic font-heading">Ledger Resolution</h3>
-              </div>
-              <div className="p-8 space-y-6">
-                 <div className="flex justify-between text-[11px] font-black uppercase tracking-widest text-gray-500">
-                   <span>Inventory Value</span>
-                   <span className="text-white">{selectedOrder.total.toLocaleString()}৳</span>
-                 </div>
-                 <div className="flex justify-between text-[11px] font-black uppercase tracking-widest text-green-400">
-                   <span>Vault Shipping</span>
-                   <span>- FREE -</span>
-                 </div>
-                 <div className="pt-8 border-t border-white/10 flex justify-between items-end">
-                    <div>
-                      <span className="text-xs font-black uppercase italic tracking-[0.3em] font-heading text-red-600">TOTAL SETTLED</span>
-                      <p className="text-[9px] text-gray-500 font-black uppercase mt-1 tracking-widest">Protocol: Active</p>
-                    </div>
-                    <span className="text-4xl font-black italic group-hover:scale-110 transition-transform origin-right duration-500">{selectedOrder.total.toLocaleString()}৳</span>
-                 </div>
-              </div>
-            </div>
           </div>
         </div>
       </div>
@@ -540,6 +831,7 @@ const Dashboard: React.FC<DashboardProps> = ({ orders, sneakers, onRefresh, onUp
       case 'orders': return <OrderList />;
       case 'inventory': return <InventoryView />;
       case 'order-detail': return <OrderDetail />;
+      case 'product-form': return <ProductForm />;
       default: return (
         <div className="flex flex-col items-center justify-center py-40 animate-pulse">
           <i className="fa-solid fa-lock text-7xl text-gray-100 mb-8"></i>
@@ -552,7 +844,6 @@ const Dashboard: React.FC<DashboardProps> = ({ orders, sneakers, onRefresh, onUp
 
   return (
     <div className="flex bg-[#fafafa] min-h-screen">
-      {/* Sidebar Navigation */}
       <aside className="w-72 bg-white border-r border-gray-100 p-8 hidden lg:flex flex-col h-screen sticky top-0 shadow-2xl z-30">
         <div className="mb-14 text-center">
           <div className="inline-block p-4 bg-black rounded-3xl mb-6 shadow-2xl group hover:scale-110 transition-transform duration-500">
@@ -561,7 +852,7 @@ const Dashboard: React.FC<DashboardProps> = ({ orders, sneakers, onRefresh, onUp
           <div className="text-2xl font-black font-heading tracking-tighter italic text-black">
             SNEAKER<span className="text-red-600">VAULT</span>
           </div>
-          <p className="text-[9px] font-black text-gray-300 uppercase tracking-[0.5em] mt-2">ADMIN OS v2.0</p>
+          <p className="text-[9px] font-black text-gray-300 uppercase tracking-[0.5em] mt-2">ADMIN OS v2.5</p>
         </div>
 
         <nav className="space-y-2.5 flex-1">
@@ -569,7 +860,6 @@ const Dashboard: React.FC<DashboardProps> = ({ orders, sneakers, onRefresh, onUp
             { id: 'overview', icon: 'fa-gauge-high', label: 'Overview' },
             { id: 'orders', icon: 'fa-folder-tree', label: 'Orders' },
             { id: 'inventory', icon: 'fa-cubes-stacked', label: 'Inventory' },
-            { id: 'customers', icon: 'fa-address-card', label: 'Customers' },
           ].map((item) => (
             <button 
               key={item.id} 
@@ -578,7 +868,7 @@ const Dashboard: React.FC<DashboardProps> = ({ orders, sneakers, onRefresh, onUp
                 setStatusFilter('ALL');
                 setSearchQuery('');
               }}
-              className={`w-full flex items-center space-x-4 px-6 py-4.5 rounded-2xl text-[11px] font-black uppercase tracking-[0.2em] transition-all group ${subView === item.id || (subView === 'order-detail' && item.id === 'orders') ? 'bg-black text-white shadow-2xl translate-x-3 scale-105' : 'text-gray-400 hover:bg-gray-50 hover:text-black'}`}
+              className={`w-full flex items-center space-x-4 px-6 py-4.5 rounded-2xl text-[11px] font-black uppercase tracking-[0.2em] transition-all group ${subView === item.id || (subView === 'order-detail' && item.id === 'orders') || (subView === 'product-form' && item.id === 'inventory') ? 'bg-black text-white shadow-2xl translate-x-3 scale-105' : 'text-gray-400 hover:bg-gray-50 hover:text-black'}`}
             >
               <i className={`fa-solid ${item.icon} w-6 text-sm group-hover:scale-125 transition-transform`}></i>
               <span>{item.label}</span>
@@ -597,7 +887,6 @@ const Dashboard: React.FC<DashboardProps> = ({ orders, sneakers, onRefresh, onUp
         </div>
       </aside>
 
-      {/* Main Administrative Context Area */}
       <main className="flex-1 p-8 md:p-14 overflow-y-auto">
         <div className="max-w-7xl mx-auto">
           {renderContent()}
@@ -605,14 +894,11 @@ const Dashboard: React.FC<DashboardProps> = ({ orders, sneakers, onRefresh, onUp
       </main>
 
       <style>{`
-        .animate-in {
-          animation: enter 0.5s cubic-bezier(0.16, 1, 0.3, 1);
-        }
+        .animate-in { animation: enter 0.5s cubic-bezier(0.16, 1, 0.3, 1); }
         @keyframes enter {
           from { opacity: 0; transform: translateY(20px) scale(0.98); }
           to { opacity: 1; transform: translateY(0) scale(1); }
         }
-        select::-ms-expand { display: none; }
         .custom-scrollbar::-webkit-scrollbar { width: 4px; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #e5e7eb; border-radius: 10px; }
       `}</style>

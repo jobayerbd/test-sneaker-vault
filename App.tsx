@@ -39,7 +39,7 @@ const App: React.FC = () => {
   const fetchSneakers = useCallback(async () => {
     setIsFetchingSneakers(true);
     try {
-      const response = await fetch(`${SUPABASE_URL}/rest/v1/sneakers?select=*`, {
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/sneakers?select=*&order=name.asc`, {
         headers: {
           'apikey': SUPABASE_KEY,
           'Authorization': `Bearer ${SUPABASE_KEY}`
@@ -115,6 +115,58 @@ const App: React.FC = () => {
     }
   };
 
+  const handleSaveProduct = async (productData: Partial<Sneaker>) => {
+    const isNew = !productData.id;
+    const url = isNew 
+      ? `${SUPABASE_URL}/rest/v1/sneakers` 
+      : `${SUPABASE_URL}/rest/v1/sneakers?id=eq.${productData.id}`;
+    
+    const method = isNew ? 'POST' : 'PATCH';
+
+    try {
+      const response = await fetch(url, {
+        method,
+        headers: {
+          'apikey': SUPABASE_KEY,
+          'Authorization': `Bearer ${SUPABASE_KEY}`,
+          'Content-Type': 'application/json',
+          'Prefer': 'return=representation'
+        },
+        body: JSON.stringify(productData)
+      });
+
+      if (response.ok) {
+        await fetchSneakers();
+        return true;
+      }
+      return false;
+    } catch (err) {
+      console.error("Save product error:", err);
+      return false;
+    }
+  };
+
+  const handleDeleteProduct = async (id: string) => {
+    try {
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/sneakers?id=eq.${id}`, {
+        method: 'DELETE',
+        headers: {
+          'apikey': SUPABASE_KEY,
+          'Authorization': `Bearer ${SUPABASE_KEY}`
+        }
+      });
+
+      if (response.ok) {
+        setSneakers(prev => prev.filter(s => s.id !== id));
+        return true;
+      }
+      return false;
+    } catch (err) {
+      console.error("Delete product error:", err);
+      return false;
+    }
+  };
+
   const handleSelectProduct = (sneaker: Sneaker) => {
     setSelectedProduct(sneaker);
     setCurrentView('pdp');
@@ -123,7 +175,6 @@ const App: React.FC = () => {
 
   const handleAddToCart = (item: CartItem, shouldCheckout: boolean = false) => {
     setCart(prev => {
-      // Check if item with same ID AND same selectedSize exists
       const existingItemIndex = prev.findIndex(i => i.id === item.id && i.selectedSize === item.selectedSize);
       
       if (existingItemIndex !== -1) {
@@ -134,7 +185,6 @@ const App: React.FC = () => {
         };
         return newCart;
       }
-      // Otherwise add as a new variant entry
       return [...prev, item];
     });
     
@@ -516,7 +566,18 @@ const App: React.FC = () => {
           </div>
         );
       case 'admin':
-        return <Dashboard sneakers={sneakers} orders={orders} onRefresh={() => { fetchOrders(); fetchSneakers(); }} onUpdateOrderStatus={handleUpdateOrderStatus} isRefreshing={isFetchingOrders || isFetchingSneakers} onLogout={handleLogout} />;
+        return (
+          <Dashboard 
+            sneakers={sneakers} 
+            orders={orders} 
+            onRefresh={() => { fetchOrders(); fetchSneakers(); }} 
+            onUpdateOrderStatus={handleUpdateOrderStatus}
+            onSaveProduct={handleSaveProduct}
+            onDeleteProduct={handleDeleteProduct}
+            isRefreshing={isFetchingOrders || isFetchingSneakers} 
+            onLogout={handleLogout} 
+          />
+        );
       default:
         return <Home sneakers={sneakers} onSelectProduct={handleSelectProduct} onNavigate={setCurrentView} />;
     }
