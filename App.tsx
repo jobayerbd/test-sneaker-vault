@@ -363,7 +363,7 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col bg-white">
       <Navigation 
         onNavigate={setCurrentView} 
         cartCount={cart.length} 
@@ -373,43 +373,51 @@ const App: React.FC = () => {
       <div className="flex-1">
         {renderView()}
       </div>
-      <footer className="bg-black text-white pt-20 pb-10 mt-auto">
-        <div className="max-w-7xl mx-auto px-4 grid grid-cols-1 md:grid-cols-4 gap-12 mb-16">
-          <div className="md:col-span-2">
-            <h2 className="text-4xl font-black font-heading tracking-tighter mb-6 italic uppercase">JOIN THE VAULT</h2>
-            <p className="text-gray-400 mb-8 max-w-md">Subscribe to get early access to drops, exclusive discounts, and streetwear news directly to your inbox.</p>
-            <div className="flex max-w-sm">
-              <input type="email" placeholder="Email address" className="bg-white/10 border-none px-6 py-4 flex-1 text-sm focus:ring-1 focus:ring-white outline-none" />
-              <button className="bg-white text-black font-bold uppercase px-8 text-xs tracking-widest hover:bg-red-600 hover:text-white transition-colors">Join</button>
+      
+      {/* Redesigned Footer matching Richkid reference */}
+      <footer className="bg-[#1A1A1A] text-white pt-16 pb-8 border-t-4 border-red-700">
+        <div className="max-w-7xl mx-auto px-4 grid grid-cols-1 md:grid-cols-3 gap-16 mb-12">
+          {/* About Us */}
+          <div>
+            <h4 className="text-[10px] font-black uppercase tracking-[0.3em] mb-6 border-b border-white/10 pb-2">About Us</h4>
+            <p className="text-xs text-gray-400 leading-relaxed mb-4">
+              SneakerVault is the premium marketplace for authentic sneakers and streetwear grails. We provide only verified quality shoes and accessories for enthusiasts and collectors.
+            </p>
+            <p className="text-[10px] font-bold text-red-500 uppercase tracking-widest">Contact Us | Career</p>
+          </div>
+          
+          {/* Policy */}
+          <div>
+            <h4 className="text-[10px] font-black uppercase tracking-[0.3em] mb-6 border-b border-white/10 pb-2">Policy</h4>
+            <ul className="space-y-3 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+              <li className="hover:text-white cursor-pointer transition-colors">Happiness Program</li>
+              <li className="hover:text-white cursor-pointer transition-colors">Exchange & Complain</li>
+              <li className="hover:text-white cursor-pointer transition-colors">Return & Refund</li>
+              <li className="hover:text-white cursor-pointer transition-colors">Privacy Policy</li>
+              <li className="hover:text-white cursor-pointer transition-colors">Terms and Conditions</li>
+            </ul>
+          </div>
+
+          {/* Connect */}
+          <div>
+            <h4 className="text-[10px] font-black uppercase tracking-[0.3em] mb-6 border-b border-white/10 pb-2">Connect With Us</h4>
+            <p className="text-[10px] text-gray-400 mb-6 italic uppercase tracking-tighter leading-relaxed">
+              Join our SneakerVault Elite community for exclusive drop access and community events.
+            </p>
+            <button className="bg-red-700 text-white px-6 py-2 text-[10px] font-black uppercase tracking-widest mb-6 hover:bg-white hover:text-red-700 transition-all rounded-sm">
+              Join Elite Review Group >
+            </button>
+            <div className="flex space-x-4 text-gray-400">
+               <i className="fa-brands fa-facebook text-xl hover:text-white cursor-pointer"></i>
+               <i className="fa-brands fa-instagram text-xl hover:text-white cursor-pointer"></i>
+               <i className="fa-brands fa-tiktok text-xl hover:text-white cursor-pointer"></i>
+               <i className="fa-brands fa-youtube text-xl hover:text-white cursor-pointer"></i>
             </div>
           </div>
-          <div>
-            <h4 className="font-bold uppercase tracking-widest text-xs mb-6">Explore</h4>
-            <ul className="space-y-4 text-sm text-gray-400">
-              <li><button onClick={() => setCurrentView('shop')} className="hover:text-white transition-colors">New Releases</button></li>
-              <li><button className="hover:text-white transition-colors">Upcoming Drops</button></li>
-              <li><button className="hover:text-white transition-colors">Best Sellers</button></li>
-              <li><button className="hover:text-white transition-colors">Gift Cards</button></li>
-            </ul>
-          </div>
-          <div>
-            <h4 className="font-bold uppercase tracking-widest text-xs mb-6">Support</h4>
-            <ul className="space-y-4 text-sm text-gray-400">
-              <li><button className="hover:text-white transition-colors">Shipping Info</button></li>
-              <li><button className="hover:text-white transition-colors">Return Policy</button></li>
-              <li><button className="hover:text-white transition-colors">Authenticity</button></li>
-              <li><button className="hover:text-white transition-colors">Contact Us</button></li>
-            </ul>
-          </div>
         </div>
-        <div className="max-w-7xl mx-auto px-4 pt-10 border-t border-white/10 flex flex-col md:flex-row justify-between items-center text-xs text-gray-500 font-bold uppercase tracking-widest">
-           <p>© 2024 SneakerVault. All rights reserved.</p>
-           <div className="flex space-x-8 mt-6 md:mt-0">
-             <i className="fa-brands fa-instagram text-xl cursor-pointer hover:text-white"></i>
-             <i className="fa-brands fa-twitter text-xl cursor-pointer hover:text-white"></i>
-             <i className="fa-brands fa-tiktok text-xl cursor-pointer hover:text-white"></i>
-             <i className="fa-brands fa-youtube text-xl cursor-pointer hover:text-white"></i>
-           </div>
+        
+        <div className="max-w-7xl mx-auto px-4 pt-8 border-t border-white/5 text-center text-[10px] text-gray-600 font-bold uppercase tracking-widest">
+           <p>Copyright © 2025 | SneakerVault Lifestyle</p>
         </div>
       </footer>
     </div>

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { MOCK_SNEAKERS } from '../../constants';
 import { Sneaker } from '../../types';
@@ -9,147 +8,122 @@ interface HomeProps {
 }
 
 const Home: React.FC<HomeProps> = ({ onSelectProduct, onNavigate }) => {
-  const [timeLeft, setTimeLeft] = useState({ hours: 12, minutes: 45, seconds: 30 });
-  const drops = MOCK_SNEAKERS.filter(s => s.isDrop);
-  const trending = MOCK_SNEAKERS.filter(s => s.trending);
+  const sections = [
+    { title: "NEW ARRIVAL", data: MOCK_SNEAKERS.slice(0, 4) },
+    { title: "BEST SELLING", subtitle: "BEST SELLING SHOES NOMINATED BY YOU", data: MOCK_SNEAKERS.slice(1, 5) },
+    { title: "MENS COLLECTION", data: MOCK_SNEAKERS.slice(0, 4) },
+    { title: "LADIES COLLECTION", data: MOCK_SNEAKERS.slice(2, 6) },
+  ];
 
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setTimeLeft(prev => {
-        if (prev.seconds > 0) return { ...prev, seconds: prev.seconds - 1 };
-        if (prev.minutes > 0) return { ...prev, minutes: prev.minutes - 1, seconds: 59 };
-        return { ...prev, hours: Math.max(0, prev.hours - 1), minutes: 59, seconds: 59 };
-      });
-    }, 1000);
-    return () => clearInterval(timer);
-  }, []);
-
-  return (
-    <div className="space-y-16 pb-20">
-      {/* Hero Section */}
-      <section className="relative h-[80vh] overflow-hidden bg-black flex items-center">
-        <div className="absolute inset-0 opacity-60">
-          <img 
-            src="https://images.unsplash.com/photo-1552346154-21d32810aba3?auto=format&fit=crop&q=80&w=2000" 
-            className="w-full h-full object-cover" 
-            alt="Hero Background"
-          />
+  const ProductCard = ({ sneaker }: { sneaker: Sneaker }) => (
+    <div 
+      onClick={() => onSelectProduct(sneaker)}
+      className="group bg-white border border-gray-100 p-0 flex flex-col cursor-pointer hover:shadow-lg transition-shadow"
+    >
+      <div className="relative aspect-[4/5] bg-white overflow-hidden">
+        <img 
+          src={sneaker.image} 
+          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" 
+          alt={sneaker.name} 
+        />
+        {/* Discount Badge */}
+        <div className="absolute top-3 left-3 w-10 h-10 bg-black/80 rounded-full flex items-center justify-center text-[10px] text-white font-bold">
+          -41%
         </div>
-        <div className="relative z-10 max-w-7xl mx-auto px-4 w-full">
-          <div className="max-w-2xl text-white">
-            <h1 className="text-7xl font-black font-heading leading-none mb-6 tracking-tighter uppercase italic">
-              UNLEASH THE<br /><span className="text-red-600">HYPE</span>
-            </h1>
-            <p className="text-lg text-gray-300 mb-8 max-w-md">
-              Secure the most coveted releases. Authentic. Verified. Delivered to your vault.
-            </p>
-            <div className="flex space-x-4">
-              <button 
-                onClick={() => onNavigate('shop')}
-                className="bg-white text-black px-8 py-4 font-bold uppercase tracking-widest hover:bg-gray-200 transition-colors"
-              >
-                Shop All
-              </button>
-              <button className="border-2 border-white text-white px-8 py-4 font-bold uppercase tracking-widest hover:bg-white hover:text-black transition-colors">
-                Upcoming Drops
-              </button>
-            </div>
-          </div>
+        {/* Brand Overlay */}
+        <div className="absolute top-3 right-3 opacity-30 text-[10px] font-black uppercase tracking-tighter italic">
+          {sneaker.brand}
         </div>
-      </section>
-
-      {/* Upcoming Drops Section */}
-      <section className="max-w-7xl mx-auto px-4">
-        <div className="flex justify-between items-end mb-8">
-          <div>
-            <h2 className="text-3xl font-black font-heading uppercase italic">Next Big Drop</h2>
-            <p className="text-gray-500">Don't miss out on the most anticipated releases.</p>
-          </div>
-          <div className="flex space-x-4">
-            <div className="bg-black text-white px-4 py-2 rounded flex flex-col items-center min-w-[60px]">
-              <span className="text-xl font-bold">{timeLeft.hours}</span>
-              <span className="text-[10px] uppercase">Hrs</span>
-            </div>
-            <div className="bg-black text-white px-4 py-2 rounded flex flex-col items-center min-w-[60px]">
-              <span className="text-xl font-bold">{timeLeft.minutes}</span>
-              <span className="text-[10px] uppercase">Min</span>
-            </div>
-            <div className="bg-black text-white px-4 py-2 rounded flex flex-col items-center min-w-[60px] animate-pulse-red">
-              <span className="text-xl font-bold">{timeLeft.seconds}</span>
-              <span className="text-[10px] uppercase">Sec</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {drops.map(sneaker => (
-            <div 
-              key={sneaker.id}
-              onClick={() => onSelectProduct(sneaker)}
-              className="group cursor-pointer bg-white border border-gray-100 p-4 relative overflow-hidden transition-all hover:shadow-2xl"
-            >
-              <div className="absolute top-4 right-4 z-10">
-                <span className="bg-red-600 text-white text-[10px] font-bold px-2 py-1 uppercase tracking-widest">Limited Drop</span>
-              </div>
-              <div className="aspect-square bg-gray-50 mb-4 overflow-hidden rounded">
-                <img 
-                  src={sneaker.image} 
-                  alt={sneaker.name}
-                  className="w-full h-full object-contain group-hover:scale-110 transition-transform duration-500"
-                />
-              </div>
-              <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">{sneaker.brand}</p>
-              <h3 className="text-xl font-bold mb-2 group-hover:text-red-600 transition-colors">{sneaker.name}</h3>
-              <div className="flex justify-between items-center">
-                <span className="text-lg font-black">${sneaker.price}</span>
-                <button className="bg-black text-white px-4 py-2 text-xs font-bold uppercase tracking-tighter hover:bg-red-600 transition-colors">
-                  Notify Me
-                </button>
-              </div>
-            </div>
+      </div>
+      
+      <div className="p-4 flex flex-col items-center text-center">
+        {/* Size Selector Mockup */}
+        <div className="flex flex-wrap justify-center gap-1 mb-3">
+          {['38', '40', '42', '44'].map(size => (
+            <span key={size} className="text-[8px] font-bold text-gray-400 border border-gray-100 px-1.5 py-0.5 rounded-sm">
+              Size/{size}
+            </span>
           ))}
         </div>
-      </section>
+        
+        <h3 className="text-[11px] font-bold text-gray-800 uppercase mb-1 truncate w-full">{sneaker.name}</h3>
+        
+        <div className="flex items-center space-x-2">
+          <span className="text-[10px] text-gray-400 line-through">{(sneaker.price * 1.5).toFixed(0)}৳</span>
+          <span className="text-[11px] font-black text-red-600 italic">{sneaker.price}৳</span>
+        </div>
+      </div>
+    </div>
+  );
 
-      {/* Brand Navigation */}
-      <section className="bg-gray-100 py-12">
-        <div className="max-w-7xl mx-auto px-4">
-          <h3 className="text-center text-sm font-bold text-gray-400 uppercase tracking-[0.3em] mb-10">Featured Partners</h3>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-8 items-center justify-items-center opacity-40 grayscale hover:grayscale-0 transition-all">
-            {['Nike', 'Adidas', 'Jordan', 'Yeezy', 'New Balance'].map(brand => (
-              <span key={brand} className="text-2xl font-black font-heading italic">{brand.toUpperCase()}</span>
+  return (
+    <div className="bg-white">
+      {/* 1. Winter Fest Banner */}
+      <div className="relative w-full aspect-[21/9] md:aspect-[21/7] bg-[#B91C1C] overflow-hidden">
+        <div className="absolute inset-0 opacity-20 pointer-events-none">
+          {/* Snowflake background simulation */}
+          <div className="grid grid-cols-12 grid-rows-6 h-full w-full">
+            {Array.from({ length: 48 }).map((_, i) => (
+              <i key={i} className="fa-solid fa-snowflake text-white/40 text-sm m-auto"></i>
             ))}
           </div>
         </div>
-      </section>
-
-      {/* Trending Now */}
-      <section className="max-w-7xl mx-auto px-4">
-        <h2 className="text-3xl font-black font-heading uppercase italic mb-8">Trending Now</h2>
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-6">
-          {trending.map(sneaker => (
-            <div 
-              key={sneaker.id}
-              onClick={() => onSelectProduct(sneaker)}
-              className="group cursor-pointer"
-            >
-              <div className="aspect-square bg-gray-50 mb-3 overflow-hidden rounded relative">
-                 <img 
-                  src={sneaker.image} 
-                  alt={sneaker.name}
-                  className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300"
-                />
-                <div className="absolute bottom-0 left-0 right-0 p-3 translate-y-full group-hover:translate-y-0 transition-transform bg-white/90 backdrop-blur-sm">
-                   <button className="w-full bg-black text-white py-2 text-[10px] font-bold uppercase tracking-widest">Quick View</button>
-                </div>
-              </div>
-              <p className="text-[10px] font-bold text-gray-500 uppercase">{sneaker.brand}</p>
-              <h4 className="text-sm font-bold truncate mb-1">{sneaker.name}</h4>
-              <p className="text-sm font-black">${sneaker.price}</p>
-            </div>
-          ))}
+        
+        <div className="relative h-full flex flex-col items-center justify-center text-center px-4">
+          <p className="text-yellow-400 text-sm md:text-xl font-bold mb-2 tracking-widest italic drop-shadow-md">মাসব্যাপী শীত উৎসব</p>
+          <h1 className="text-white text-5xl md:text-9xl font-black font-heading leading-none drop-shadow-2xl">
+            WINTER <br />
+            <span className="text-yellow-400 italic text-4xl md:text-8xl mt-[-10px] block">Fest 2025</span>
+          </h1>
+          
+          <div className="absolute bottom-6 left-0 right-0 flex justify-between px-10 text-[10px] text-white font-bold tracking-widest uppercase opacity-80">
+            <span>❄ Exclusive offers & deals</span>
+            <span>❄ Quality is Affordable</span>
+          </div>
         </div>
-      </section>
+      </div>
+
+      {/* 2. Promo Grid */}
+      <div className="max-w-7xl mx-auto px-4 grid grid-cols-1 md:grid-cols-3 gap-4 mt-8">
+        {[
+          { label: '99 DEALS', color: 'bg-[#7F1D1D]' },
+          { label: 'HOT SALE', color: 'bg-black' },
+          { label: 'NEW ARRIVAL', color: 'bg-[#1F2937]' }
+        ].map((promo, i) => (
+          <div key={i} className={`${promo.color} h-32 flex flex-col items-center justify-center text-white relative group cursor-pointer overflow-hidden rounded-sm`}>
+            <div className="absolute inset-0 bg-white/5 group-hover:bg-transparent transition-colors"></div>
+            <i className="fa-solid fa-gift text-2xl mb-2"></i>
+            <span className="text-lg font-black font-heading tracking-widest italic">{promo.label}</span>
+            <span className="text-[8px] mt-2 border-b border-white opacity-60">SHOP NOW</span>
+          </div>
+        ))}
+      </div>
+
+      {/* 3. Dynamic Categorical Sections */}
+      <div className="max-w-7xl mx-auto px-4 py-12 space-y-20">
+        {sections.map((section, idx) => (
+          <section key={idx} className="flex flex-col items-center">
+            <div className="text-center mb-10">
+              <h2 className="text-lg font-black text-red-700 font-heading italic tracking-wider">{section.title}</h2>
+              <div className="w-10 h-[2px] bg-red-700 mx-auto mt-2 mb-2"></div>
+              {section.subtitle && <p className="text-[9px] font-bold text-gray-400 uppercase tracking-[0.2em]">{section.subtitle}</p>}
+            </div>
+
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 w-full">
+              {section.data.map(sneaker => (
+                <ProductCard key={sneaker.id} sneaker={sneaker} />
+              ))}
+            </div>
+
+            <button 
+              onClick={() => onNavigate('shop')}
+              className="mt-12 px-6 py-2 border-2 border-red-700 text-red-700 text-[10px] font-black uppercase tracking-widest hover:bg-red-700 hover:text-white transition-all flex items-center"
+            >
+              Shop All <i className="fa-solid fa-chevron-right ml-2 text-[8px]"></i>
+            </button>
+          </section>
+        ))}
+      </div>
     </div>
   );
 };

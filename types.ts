@@ -60,6 +60,8 @@ export interface Order {
   total: number;
   items: OrderItem[];
   created_at?: string;
+  trackingNumber?: string;
+  carrier?: string;
 }
 
 export interface CartItem extends Sneaker {
