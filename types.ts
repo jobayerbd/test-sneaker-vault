@@ -1,4 +1,3 @@
-
 export enum Brand {
   NIKE = 'Nike',
   ADIDAS = 'Adidas',
@@ -26,15 +25,15 @@ export interface Sneaker {
   name: string;
   brand: Brand;
   price: number;
-  originalPrice?: number;
+  original_price?: number;
   image: string;
   gallery: string[];
   description: string;
-  releaseDate: string;
-  isDrop: boolean;
+  release_date: string;
+  is_drop: boolean;
   colorway: string;
   variants: SneakerVariant[];
-  fitScore: string;
+  fit_score: string;
   trending: boolean;
 }
 
@@ -55,25 +54,13 @@ export interface Order {
   street_address: string;
   city: string;
   zip_code: string;
-  date?: string; // For display
   status: OrderStatus;
   total: number;
   items: OrderItem[];
   created_at?: string;
-  trackingNumber?: string;
-  carrier?: string;
 }
 
 export interface CartItem extends Sneaker {
   selectedSize: string;
   quantity: number;
-}
-
-export interface User {
-  id: string;
-  name: string;
-  email: string;
-  role: 'customer' | 'admin';
-  ltv: number;
-  segments: string[];
 }
