@@ -213,102 +213,238 @@ const OrderDetail: React.FC<{
   executeStatusUpdate: () => void,
   isUpdatingStatus: boolean,
   setSubView: (v: AdminSubView) => void
-}> = ({ order, pendingStatus, setPendingStatus, executeStatusUpdate, isUpdatingStatus, setSubView }) => (
-  <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-    <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
-      <button 
-        onClick={() => setSubView('orders')} 
-        className="group text-gray-400 hover:text-black font-bold uppercase tracking-widest text-[10px] flex items-center transition-all"
-      >
-        <div className="w-10 h-10 rounded-full border border-gray-100 flex items-center justify-center mr-4 group-hover:border-black transition-colors group-hover:shadow-xl">
-          <i className="fa-solid fa-arrow-left"></i>
-        </div>
-        Protocol Hub
-      </button>
-      
-      <div className="flex space-x-2">
-        <div className="flex items-center bg-white border border-gray-100 rounded-xl px-4 mr-2 shadow-sm">
-          <span className="text-[10px] font-black uppercase tracking-widest text-gray-400 mr-4 italic">Update Protocol:</span>
-          <select 
-            value={pendingStatus || order.status}
-            onChange={(e) => setPendingStatus(e.target.value as OrderStatus)}
-            disabled={isUpdatingStatus}
-            className="bg-transparent text-[10px] font-black uppercase tracking-[0.2em] py-3 outline-none cursor-pointer text-red-700 disabled:opacity-50"
-          >
-            {Object.values(OrderStatus).map(status => (
-              <option key={status} value={status}>{status.toUpperCase()}</option>
-            ))}
-          </select>
-        </div>
+}> = ({ order, pendingStatus, setPendingStatus, executeStatusUpdate, isUpdatingStatus, setSubView }) => {
+  const handlePrint = () => {
+    window.print();
+  };
+
+  return (
+    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 print:hidden">
         <button 
-          onClick={executeStatusUpdate}
-          disabled={isUpdatingStatus || (pendingStatus === order.status)}
-          className="bg-black text-white px-8 py-3 rounded-xl font-black uppercase tracking-widest text-[10px] hover:bg-red-700 transition-all shadow-2xl flex items-center disabled:opacity-50"
+          onClick={() => setSubView('orders')} 
+          className="group text-gray-400 hover:text-black font-bold uppercase tracking-widest text-[10px] flex items-center transition-all"
         >
-          {isUpdatingStatus ? 'Executing...' : 'Commit Status'} <i className="fa-solid fa-bolt ml-4 text-[11px]"></i>
+          <div className="w-10 h-10 rounded-full border border-gray-100 flex items-center justify-center mr-4 group-hover:border-black transition-colors group-hover:shadow-xl">
+            <i className="fa-solid fa-arrow-left"></i>
+          </div>
+          Protocol Hub
         </button>
-      </div>
-    </div>
-
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-      <div className="lg:col-span-2 space-y-8">
-        <div className="bg-white rounded-3xl border border-gray-100 shadow-xl overflow-hidden">
-          <div className="px-8 py-6 border-b border-gray-100 bg-gray-50/50 flex justify-between items-center">
-            <h3 className="text-sm font-black uppercase tracking-widest italic font-heading">Secure Inventory Manifest</h3>
-            <span className={`px-4 py-2 rounded-xl border text-[9px] font-black uppercase tracking-widest inline-flex items-center ${getStatusBadgeStyles(order.status)}`}>
-              <span className="w-1.5 h-1.5 rounded-full bg-current mr-2.5"></span>
-              {order.status}
-            </span>
+        
+        <div className="flex space-x-2">
+          <button 
+            onClick={handlePrint}
+            className="bg-white border-2 border-black text-black px-6 py-3 rounded-xl font-black uppercase tracking-widest text-[10px] hover:bg-black hover:text-white transition-all shadow-sm flex items-center"
+          >
+            <i className="fa-solid fa-print mr-3"></i> Print Protocol
+          </button>
+          <div className="flex items-center bg-white border border-gray-100 rounded-xl px-4 mr-2 shadow-sm">
+            <span className="text-[10px] font-black uppercase tracking-widest text-gray-400 mr-4 italic">Update Protocol:</span>
+            <select 
+              value={pendingStatus || order.status}
+              onChange={(e) => setPendingStatus(e.target.value as OrderStatus)}
+              disabled={isUpdatingStatus}
+              className="bg-transparent text-[10px] font-black uppercase tracking-[0.2em] py-3 outline-none cursor-pointer text-red-700 disabled:opacity-50"
+            >
+              {Object.values(OrderStatus).map(status => (
+                <option key={status} value={status}>{status.toUpperCase()}</option>
+              ))}
+            </select>
           </div>
-          <div className="p-8 space-y-8">
-            {order.items?.map((item, i) => (
-              <div key={i} className="flex space-x-8 border-b border-gray-50 pb-8 last:border-0 last:pb-0 group">
-                <div className="w-28 h-28 bg-white rounded-2xl p-2 flex-shrink-0 border border-gray-100 shadow-sm group-hover:scale-105 transition-transform duration-500">
-                  <img src={item.image} className="w-full h-full object-contain" alt={item.name} />
-                </div>
-                <div className="flex-1 flex flex-col justify-center">
-                  <div className="flex justify-between items-start mb-3">
-                     <h4 className="font-black text-lg uppercase leading-tight font-heading group-hover:text-red-600 transition-colors">{item.name}</h4>
-                     <span className="font-black text-lg italic">{item.price.toLocaleString()}৳</span>
+          <button 
+            onClick={executeStatusUpdate}
+            disabled={isUpdatingStatus || (pendingStatus === order.status)}
+            className="bg-black text-white px-8 py-3 rounded-xl font-black uppercase tracking-widest text-[10px] hover:bg-red-700 transition-all shadow-2xl flex items-center disabled:opacity-50"
+          >
+            {isUpdatingStatus ? 'Executing...' : 'Commit Status'} <i className="fa-solid fa-bolt ml-4 text-[11px]"></i>
+          </button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 print:hidden">
+        <div className="lg:col-span-2 space-y-8">
+          <div className="bg-white rounded-3xl border border-gray-100 shadow-xl overflow-hidden">
+            <div className="px-8 py-6 border-b border-gray-100 bg-gray-50/50 flex justify-between items-center">
+              <h3 className="text-sm font-black uppercase tracking-widest italic font-heading">Secure Inventory Manifest</h3>
+              <span className={`px-4 py-2 rounded-xl border text-[9px] font-black uppercase tracking-widest inline-flex items-center ${getStatusBadgeStyles(order.status)}`}>
+                <span className="w-1.5 h-1.5 rounded-full bg-current mr-2.5"></span>
+                {order.status}
+              </span>
+            </div>
+            <div className="p-8 space-y-8">
+              {order.items?.map((item, i) => (
+                <div key={i} className="flex space-x-8 border-b border-gray-50 pb-8 last:border-0 last:pb-0 group">
+                  <div className="w-28 h-28 bg-white rounded-2xl p-2 flex-shrink-0 border border-gray-100 shadow-sm group-hover:scale-105 transition-transform duration-500">
+                    <img src={item.image} className="w-full h-full object-contain" alt={item.name} />
                   </div>
-                  <p className="text-[11px] text-gray-400 font-black uppercase tracking-[0.2em] flex items-center">
-                    <span className="bg-gray-100 px-3 py-1 rounded-lg mr-3 text-black">SIZE: {item.size}</span>
-                    <span className="bg-gray-100 px-3 py-1 rounded-lg text-black">QTY: {item.quantity}</span>
-                  </p>
+                  <div className="flex-1 flex flex-col justify-center">
+                    <div className="flex justify-between items-start mb-3">
+                       <h4 className="font-black text-lg uppercase leading-tight font-heading group-hover:text-red-600 transition-colors">{item.name}</h4>
+                       <span className="font-black text-lg italic">{item.price.toLocaleString()}৳</span>
+                    </div>
+                    <p className="text-[11px] text-gray-400 font-black uppercase tracking-[0.2em] flex items-center">
+                      <span className="bg-gray-100 px-3 py-1 rounded-lg mr-3 text-black">SIZE: {item.size}</span>
+                      <span className="bg-gray-100 px-3 py-1 rounded-lg text-black">QTY: {item.quantity}</span>
+                    </p>
+                  </div>
                 </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div className="space-y-8">
+          <div className="bg-white rounded-3xl border border-gray-100 shadow-xl overflow-hidden">
+            <div className="px-8 py-6 border-b border-gray-100 bg-gray-50/50 flex items-center">
+               <i className="fa-solid fa-id-badge mr-4 text-gray-400"></i>
+               <h3 className="text-sm font-black uppercase tracking-widest italic font-heading">Subject Profile</h3>
+            </div>
+            <div className="p-8">
+              <div className="mb-10 p-6 bg-gray-50 rounded-2xl border border-gray-100 group hover:border-red-600 transition-colors">
+                <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em] mb-3">Identity Tag</p>
+                <p className="font-black text-xl leading-tight text-gray-900 italic uppercase">{order.first_name} {order.last_name}</p>
+                <p className="text-xs text-gray-500 font-bold mt-2 uppercase tracking-tight">{order.email}</p>
               </div>
-            ))}
+              <div className="p-6 rounded-2xl border-2 border-gray-50 group hover:border-black transition-colors">
+                <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em] mb-4">Coordinates</p>
+                <p className="text-[11px] font-black uppercase tracking-widest leading-relaxed text-gray-700">
+                  <i className="fa-solid fa-map-pin mr-3 text-red-600"></i>
+                  {order.street_address || 'NOT SPECIFIED'}<br />
+                  <span className="ml-6 block mt-1">{order.city || 'N/A'}, {order.zip_code || 'N/A'}</span>
+                  <span className="ml-6 block mt-1 font-bold italic">BANGLADESH</span>
+                </p>
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
-      <div className="space-y-8">
-        <div className="bg-white rounded-3xl border border-gray-100 shadow-xl overflow-hidden">
-          <div className="px-8 py-6 border-b border-gray-100 bg-gray-50/50 flex items-center">
-             <i className="fa-solid fa-id-badge mr-4 text-gray-400"></i>
-             <h3 className="text-sm font-black uppercase tracking-widest italic font-heading">Subject Profile</h3>
-          </div>
-          <div className="p-8">
-            <div className="mb-10 p-6 bg-gray-50 rounded-2xl border border-gray-100 group hover:border-red-600 transition-colors">
-              <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em] mb-3">Identity Tag</p>
-              <p className="font-black text-xl leading-tight text-gray-900 italic uppercase">{order.first_name} {order.last_name}</p>
-              <p className="text-xs text-gray-500 font-bold mt-2 uppercase tracking-tight">{order.email}</p>
+      {/* Printable Invoice Section */}
+      <div id="printable-invoice" className="hidden print:block bg-white p-12 max-w-[800px] mx-auto text-black border border-gray-200">
+        <div className="flex justify-between items-start border-b-2 border-black pb-8 mb-10">
+          <div>
+            <h1 className="text-3xl font-black font-heading italic uppercase leading-none">
+              SNEAKER<span className="text-red-600">VAULT</span>
+            </h1>
+            <p className="text-[10px] font-black uppercase tracking-[0.3em] mt-2 italic text-gray-500">Authenticated Protocol Manifest</p>
+            <div className="mt-6 space-y-1">
+              <p className="text-xs font-bold uppercase">Transaction ID: <span className="font-mono">{order.id}</span></p>
+              <p className="text-xs font-bold uppercase">Protocol Epoch: <span>{new Date(order.created_at || Date.now()).toLocaleDateString()}</span></p>
             </div>
-            <div className="p-6 rounded-2xl border-2 border-gray-50 group hover:border-black transition-colors">
-              <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em] mb-4">Coordinates</p>
-              <p className="text-[11px] font-black uppercase tracking-widest leading-relaxed text-gray-700">
-                <i className="fa-solid fa-map-pin mr-3 text-red-600"></i>
-                {order.street_address || 'NOT SPECIFIED'}<br />
-                <span className="ml-6 block mt-1">{order.city || 'N/A'}, {order.zip_code || 'N/A'}</span>
-                <span className="ml-6 block mt-1 font-bold italic">BANGLADESH</span>
-              </p>
+          </div>
+          <div className="text-right">
+            <h2 className="text-sm font-black uppercase tracking-widest bg-black text-white px-4 py-2 inline-block italic mb-4">Official Receipt</h2>
+            <div className="text-[10px] font-black uppercase tracking-widest text-gray-400 space-y-1">
+              <p>House 12, Road 4, Sector 7</p>
+              <p>Uttara, Dhaka - 1230</p>
+              <p>support@sneakervault.bd</p>
             </div>
           </div>
         </div>
+
+        <div className="grid grid-cols-2 gap-12 mb-12">
+          <div>
+             <h3 className="text-[10px] font-black uppercase tracking-widest text-red-600 mb-4 border-b border-gray-100 pb-2">Subject Profile</h3>
+             <p className="font-black uppercase text-sm mb-1">{order.first_name} {order.last_name}</p>
+             <p className="text-xs font-bold text-gray-500 mb-4">{order.email}</p>
+             <p className="text-xs font-black uppercase tracking-widest leading-relaxed">
+               {order.street_address}<br />
+               {order.city}, {order.zip_code}<br />
+               BANGLADESH
+             </p>
+          </div>
+          <div className="bg-gray-50 p-6 rounded-xl border border-gray-100 flex flex-col justify-center">
+             <div className="flex justify-between items-center mb-2">
+                <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">Payment Protocol</span>
+                <span className="text-xs font-black uppercase italic">Cash on Delivery</span>
+             </div>
+             <div className="flex justify-between items-center">
+                <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">Vault Logistics</span>
+                <span className="text-xs font-black uppercase italic text-green-600">Secure Transport</span>
+             </div>
+          </div>
+        </div>
+
+        <div className="mb-12">
+          <table className="w-full text-left">
+            <thead>
+              <tr className="border-b-2 border-black">
+                <th className="py-4 text-[10px] font-black uppercase tracking-widest">Asset Description</th>
+                <th className="py-4 text-[10px] font-black uppercase tracking-widest text-center">Protocol Size</th>
+                <th className="py-4 text-[10px] font-black uppercase tracking-widest text-center">Qty</th>
+                <th className="py-4 text-[10px] font-black uppercase tracking-widest text-right">Settlement</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {order.items?.map((item, i) => (
+                <tr key={i}>
+                  <td className="py-6 pr-4">
+                    <p className="font-black text-xs uppercase italic leading-tight">{item.name}</p>
+                    <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mt-1">Verified Authentic</p>
+                  </td>
+                  <td className="py-6 text-center font-bold text-xs uppercase">{item.size}</td>
+                  <td className="py-6 text-center font-bold text-xs">{item.quantity}</td>
+                  <td className="py-6 text-right font-black italic text-xs">{(item.price * item.quantity).toLocaleString()}৳</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="flex justify-end pt-10 border-t-2 border-black">
+          <div className="w-64 space-y-4">
+            <div className="flex justify-between items-end">
+              <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">Asset Subtotal</span>
+              <span className="font-bold text-sm">{(order.total).toLocaleString()}৳</span>
+            </div>
+            <div className="flex justify-between items-end">
+              <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">Distribution Fee</span>
+              <span className="text-xs font-bold uppercase italic text-green-600">Protocol Waived</span>
+            </div>
+            <div className="pt-4 border-t border-gray-100 flex justify-between items-end">
+               <span className="text-xs font-black uppercase italic tracking-tighter text-red-600">Net Settlement</span>
+               <span className="text-2xl font-black italic">{(order.total).toLocaleString()}৳</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-20 flex justify-between items-end border-t border-gray-100 pt-10">
+          <div className="relative">
+             <div className="w-24 h-24 border-4 border-black rounded-full flex items-center justify-center opacity-10 absolute -top-8 -left-4 -rotate-12">
+                <span className="font-black text-[8px] uppercase tracking-widest text-center">AUTHENTIC<br/>VAULT<br/>SECURED</span>
+             </div>
+             <p className="text-[9px] font-black uppercase tracking-[0.2em] italic text-gray-300">Terms of Transport:</p>
+             <p className="text-[8px] font-bold text-gray-400 max-w-xs mt-2 uppercase leading-relaxed">
+               All assets verified by SneakerVault specialists. Returns only valid if original vault tags remain intact. Thank you for securing your grails with the vault.
+             </p>
+          </div>
+          <div className="text-center">
+            <div className="w-40 border-b border-black mb-2"></div>
+            <p className="text-[10px] font-black uppercase tracking-widest">Vault Dispatch Signature</p>
+          </div>
+        </div>
       </div>
+
+      <style>{`
+        @media print {
+          body * { visibility: hidden; }
+          #printable-invoice, #printable-invoice * { visibility: visible; }
+          #printable-invoice { 
+            position: absolute; 
+            left: 0; 
+            top: 0; 
+            width: 100%; 
+            display: block !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            border: none !important;
+          }
+          aside, nav, .print\\:hidden { display: none !important; }
+        }
+      `}</style>
     </div>
-  </div>
-);
+  );
+};
 
 const ProductForm: React.FC<{
   editingProduct: Partial<Sneaker>,
@@ -347,7 +483,7 @@ const ProductForm: React.FC<{
         <button onClick={() => setSubView('inventory')} className="flex items-center space-x-2 text-[10px] font-black uppercase text-gray-400 hover:text-black">
           <i className="fa-solid fa-arrow-left"></i><span>Return to Vault</span>
         </button>
-        <h2 className="text-xl font-black italic uppercase italic uppercase font-heading">{editingProduct.id ? 'Modify Archive' : 'Initialize Asset'}</h2>
+        <h2 className="text-xl font-black italic uppercase font-heading">{editingProduct.id ? 'Modify Archive' : 'Initialize Asset'}</h2>
       </div>
 
       <form onSubmit={(e) => { e.preventDefault(); onSave(); }} className="grid grid-cols-1 lg:grid-cols-3 gap-10">
@@ -666,7 +802,7 @@ const Dashboard: React.FC<DashboardProps> = ({
 
   return (
     <div className="flex bg-[#fafafa] min-h-screen">
-      <aside className="w-72 bg-white border-r border-gray-100 p-8 hidden lg:flex flex-col h-screen sticky top-0 shadow-2xl z-30">
+      <aside className="w-72 bg-white border-r border-gray-100 p-8 hidden lg:flex flex-col h-screen sticky top-0 shadow-2xl z-30 print:hidden">
         <div className="mb-14 text-center">
           <div className="inline-block p-4 bg-black rounded-3xl mb-6 shadow-2xl"><i className="fa-solid fa-vault text-white text-3xl"></i></div>
           <div className="text-2xl font-black font-heading tracking-tighter italic text-black">SNEAKER<span className="text-red-600">VAULT</span></div>
@@ -693,7 +829,7 @@ const Dashboard: React.FC<DashboardProps> = ({
           <button onClick={onLogout} className="w-full flex items-center space-x-4 px-6 py-4.5 rounded-2xl text-[11px] font-black uppercase text-red-600 hover:bg-red-50 transition-all group"><i className="fa-solid fa-sign-out-alt w-6 text-sm group-hover:rotate-45 transition-transform"></i><span>Log Off</span></button>
         </div>
       </aside>
-      <main className="flex-1 p-8 md:p-14 overflow-y-auto"><div className="max-w-7xl mx-auto">{renderContent()}</div></main>
+      <main className="flex-1 p-8 md:p-14 overflow-y-auto print:p-0"><div className="max-w-7xl mx-auto">{renderContent()}</div></main>
       <style>{`.animate-in { animation: enter 0.5s cubic-bezier(0.16, 1, 0.3, 1); } @keyframes enter { from { opacity: 0; transform: translateY(20px) scale(0.98); } to { opacity: 1; transform: translateY(0) scale(1); } }`}</style>
     </div>
   );
