@@ -33,6 +33,7 @@ const App: React.FC = () => {
     firstName: '',
     lastName: '',
     email: '',
+    mobileNumber: '',
     address: '',
     city: '',
     zip: '',
@@ -320,8 +321,15 @@ const App: React.FC = () => {
   };
 
   const handlePlaceOrder = async () => {
-    if (!checkoutForm.firstName || !checkoutForm.email) {
-      alert("Please fill out your coordinates (Name and Email) before initiating protocol.");
+    // Validation: Name and Mobile Number are ALWAYS mandatory.
+    if (!checkoutForm.firstName || !checkoutForm.mobileNumber) {
+      alert("Please provide your Name and Mobile Number (Mandatory) before initiating protocol.");
+      return;
+    }
+
+    // Validation: Email is mandatory ONLY IF creating an account.
+    if (checkoutForm.createAccount && !checkoutForm.email) {
+      alert("Email address is required to initialize your vault membership.");
       return;
     }
 
@@ -352,7 +360,8 @@ const App: React.FC = () => {
             email: checkoutForm.email,
             password: checkoutForm.password,
             first_name: checkoutForm.firstName,
-            last_name: checkoutForm.lastName || ''
+            last_name: checkoutForm.lastName || '',
+            mobile_number: checkoutForm.mobileNumber
           })
         });
       } catch (err) {
@@ -365,12 +374,13 @@ const App: React.FC = () => {
 
     const orderId = `ORD-${Math.floor(Math.random() * 90000) + 10000}`;
     
-    // Constructing order object with shipping columns included
+    // Constructing order object with shipping and mobile columns included
     const newOrder: any = {
       id: orderId,
       first_name: checkoutForm.firstName,
       last_name: checkoutForm.lastName || '',
-      email: checkoutForm.email,
+      email: checkoutForm.email || 'guest@sneakervault.bd',
+      mobile_number: checkoutForm.mobileNumber,
       street_address: checkoutForm.address || '',
       city: checkoutForm.city || '',
       zip_code: checkoutForm.zip || '',
@@ -659,10 +669,13 @@ const App: React.FC = () => {
                   <h3 className="text-lg font-black font-heading uppercase mb-6 flex items-center italic">Shipping Coordinates</h3>
                   <div className="grid grid-cols-1 gap-6">
                     <div className="grid grid-cols-2 gap-6">
-                      <div><label className="text-[10px] font-black uppercase tracking-widest text-gray-400 block mb-2 italic">First Name</label><input type="text" value={checkoutForm.firstName} onChange={e => setCheckoutForm({...checkoutForm, firstName: e.target.value})} className="w-full border-b-2 border-gray-100 py-3 outline-none focus:border-red-600 transition-colors font-bold text-xs" /></div>
+                      <div><label className="text-[10px] font-black uppercase tracking-widest text-gray-400 block mb-2 italic">First Name*</label><input type="text" value={checkoutForm.firstName} onChange={e => setCheckoutForm({...checkoutForm, firstName: e.target.value})} className="w-full border-b-2 border-gray-100 py-3 outline-none focus:border-red-600 transition-colors font-bold text-xs" /></div>
                       <div><label className="text-[10px] font-black uppercase tracking-widest text-gray-400 block mb-2 italic">Last Name</label><input type="text" value={checkoutForm.lastName} onChange={e => setCheckoutForm({...checkoutForm, lastName: e.target.value})} className="w-full border-b-2 border-gray-100 py-3 outline-none focus:border-red-600 transition-colors font-bold text-xs" /></div>
                     </div>
-                    <div><label className="text-[10px] font-black uppercase tracking-widest text-gray-400 block mb-2 italic">Email Address</label><input type="email" value={checkoutForm.email} onChange={e => setCheckoutForm({...checkoutForm, email: e.target.value})} className="w-full border-b-2 border-gray-100 py-3 outline-none focus:border-red-600 transition-colors font-bold text-xs" /></div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div><label className="text-[10px] font-black uppercase tracking-widest text-gray-400 block mb-2 italic">Mobile Number*</label><input type="tel" value={checkoutForm.mobileNumber} onChange={e => setCheckoutForm({...checkoutForm, mobileNumber: e.target.value})} className="w-full border-b-2 border-gray-100 py-3 outline-none focus:border-red-600 transition-colors font-bold text-xs" placeholder="01XXXXXXXXX" /></div>
+                      <div><label className="text-[10px] font-black uppercase tracking-widest text-gray-400 block mb-2 italic">Email Address {checkoutForm.createAccount ? '*' : '(Optional)'}</label><input type="email" value={checkoutForm.email} onChange={e => setCheckoutForm({...checkoutForm, email: e.target.value})} className="w-full border-b-2 border-gray-100 py-3 outline-none focus:border-red-600 transition-colors font-bold text-xs" /></div>
+                    </div>
                     <div><label className="text-[10px] font-black uppercase tracking-widest text-gray-400 block mb-2 italic">Physical Location</label><input type="text" value={checkoutForm.address} onChange={e => setCheckoutForm({...checkoutForm, address: e.target.value})} className="w-full border-b-2 border-gray-100 py-3 outline-none focus:border-red-600 transition-colors font-bold text-xs" placeholder="STREET, AREA" /></div>
                   </div>
 
@@ -680,7 +693,7 @@ const App: React.FC = () => {
                     </div>
                     {checkoutForm.createAccount && (
                       <div className="animate-in fade-in slide-in-from-top-2 duration-300">
-                        <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 block mb-2 italic">Set Security Sequence (Password)</label>
+                        <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 block mb-2 italic">Set Security Sequence (Password)*</label>
                         <input 
                           type="password" 
                           value={checkoutForm.password} 
