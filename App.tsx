@@ -49,7 +49,7 @@ const App: React.FC = () => {
       });
       if (response.ok) {
         const data = await response.json();
-        setSneakers(data.length > 0 ? data : MOCK_SNEAKERS);
+        setSneakers(Array.isArray(data) && data.length > 0 ? data : MOCK_SNEAKERS);
       } else {
         setSneakers(MOCK_SNEAKERS);
       }
@@ -72,7 +72,7 @@ const App: React.FC = () => {
       });
       if (response.ok) {
         const data = await response.json();
-        setOrders(data.length > 0 ? data : MOCK_ORDERS);
+        setOrders(Array.isArray(data) && data.length > 0 ? data : MOCK_ORDERS);
       } else {
         setOrders(MOCK_ORDERS);
       }
@@ -94,8 +94,8 @@ const App: React.FC = () => {
       });
       if (response.ok) {
         const data = await response.json();
-        setShippingOptions(data);
-        if (data.length > 0) setSelectedShipping(data[0]);
+        setShippingOptions(Array.isArray(data) ? data : []);
+        if (Array.isArray(data) && data.length > 0) setSelectedShipping(data[0]);
       }
     } catch (err) {
       console.error("Failed to fetch shipping options:", err);
@@ -518,7 +518,7 @@ const App: React.FC = () => {
               </div>
             ) : (
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 md:gap-10">
-                {sneakers.map(sneaker => (
+                {(sneakers || []).map(sneaker => (
                   <div 
                     key={sneaker.id}
                     onClick={() => handleSelectProduct(sneaker)}
@@ -579,7 +579,7 @@ const App: React.FC = () => {
                   <div className="pt-8 border-t border-gray-50 text-left">
                     <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-4 text-center">Protocol Manifest</p>
                     <div className="space-y-4 max-h-40 overflow-y-auto pr-4 custom-scrollbar">
-                      {lastOrder?.items.map((item, i) => (
+                      {lastOrder?.items?.map((item, i) => (
                         <div key={i} className="flex items-center space-x-4">
                           <div className="w-12 h-12 bg-gray-50 rounded p-1 shrink-0"><img src={item.image} className="w-full h-full object-contain" /></div>
                           <div className="flex-1">
@@ -623,7 +623,7 @@ const App: React.FC = () => {
                 <div className="bg-white p-8 border border-gray-100 rounded-xl shadow-sm">
                   <h3 className="text-lg font-black font-heading uppercase mb-6 italic">Logistics Registry</h3>
                   <div className="space-y-3">
-                    {shippingOptions.map((option) => (
+                    {(shippingOptions || []).map((option) => (
                       <div 
                         key={option.id}
                         onClick={() => setSelectedShipping(option)}
