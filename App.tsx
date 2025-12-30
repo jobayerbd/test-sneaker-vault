@@ -38,6 +38,11 @@ const App: React.FC = () => {
     zip: ''
   });
 
+  // Global Scroll Reset on View Change
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'auto' });
+  }, [currentView]);
+
   const fetchSneakers = useCallback(async () => {
     setIsFetchingSneakers(true);
     try {
@@ -314,7 +319,12 @@ const App: React.FC = () => {
 
   const handlePlaceOrder = async () => {
     if (!checkoutForm.firstName || !checkoutForm.email) {
-      alert("Please fill out your details.");
+      alert("Please fill out your coordinates (Name and Email) before initiating protocol.");
+      return;
+    }
+
+    if (!selectedShipping) {
+      alert("Please select a shipping method (Logistics Registry) before continuing.");
       return;
     }
 
@@ -322,21 +332,23 @@ const App: React.FC = () => {
     setIsPlacingOrder(true);
 
     const subtotal = cart.reduce((acc, item) => acc + (item.price * item.quantity), 0);
-    const total = subtotal + (selectedShipping?.rate || 0);
+    const total = subtotal + (selectedShipping.rate || 0);
 
     const orderId = `ORD-${Math.floor(Math.random() * 90000) + 10000}`;
-    const newOrder = {
+    
+    // Constructing order object with shipping columns included
+    const newOrder: any = {
       id: orderId,
       first_name: checkoutForm.firstName,
-      last_name: checkoutForm.lastName,
+      last_name: checkoutForm.lastName || '',
       email: checkoutForm.email,
-      street_address: checkoutForm.address,
-      city: checkoutForm.city,
-      zip_code: checkoutForm.zip,
+      street_address: checkoutForm.address || '',
+      city: checkoutForm.city || '',
+      zip_code: checkoutForm.zip || '',
       total: total,
       status: OrderStatus.PLACED,
-      shipping_name: selectedShipping?.name,
-      shipping_rate: selectedShipping?.rate,
+      shipping_name: selectedShipping.name,
+      shipping_rate: selectedShipping.rate,
       items: cart.map(item => ({
         sneakerId: item.id,
         name: item.name,
@@ -359,18 +371,24 @@ const App: React.FC = () => {
         body: JSON.stringify(newOrder)
       });
 
+      if (!response.ok) {
+        const errorData = await response.json();
+        const errorMsg = errorData.message || errorData.hint || JSON.stringify(errorData);
+        console.error("Vault Rejection Details:", errorData);
+        throw new Error(errorMsg);
+      }
+
       const responseData = await response.json();
       const savedOrder = Array.isArray(responseData) ? responseData[0] : responseData;
       
-      setOrders(prev => [savedOrder || newOrder, ...prev]);
-      setLastOrder(savedOrder || newOrder);
+      const finalOrder = { ...newOrder, ...savedOrder };
+      setOrders(prev => [finalOrder, ...prev]);
+      setLastOrder(finalOrder);
       setCart([]);
       setCurrentView('order-success');
-    } catch (err) {
-      console.error("Order error:", err);
-      setLastOrder(newOrder);
-      setCart([]);
-      setCurrentView('order-success');
+    } catch (err: any) {
+      console.error("Order Critical Failure:", err);
+      alert(`VAULT ERROR: ${err.message || 'Could not secure order in database.'}`);
     } finally {
       setIsPlacingOrder(false);
     }
@@ -623,24 +641,28 @@ const App: React.FC = () => {
                 <div className="bg-white p-8 border border-gray-100 rounded-xl shadow-sm">
                   <h3 className="text-lg font-black font-heading uppercase mb-6 italic">Logistics Registry</h3>
                   <div className="space-y-3">
-                    {(shippingOptions || []).map((option) => (
-                      <div 
-                        key={option.id}
-                        onClick={() => setSelectedShipping(option)}
-                        className={`p-4 border-2 rounded-xl flex items-center justify-between cursor-pointer transition-all ${selectedShipping?.id === option.id ? 'border-black bg-gray-50' : 'border-gray-100 hover:border-gray-200'}`}
-                      >
-                        <div className="flex items-center">
-                          <div className={`w-4 h-4 rounded-full border-2 mr-4 flex items-center justify-center ${selectedShipping?.id === option.id ? 'border-red-600' : 'border-gray-300'}`}>
-                            {selectedShipping?.id === option.id && <div className="w-2 h-2 bg-red-600 rounded-full"></div>}
+                    {(shippingOptions || []).length === 0 ? (
+                      <p className="text-[10px] font-black text-gray-400 uppercase italic p-4 text-center border-2 border-dashed border-gray-100 rounded-xl">No shipping methods available in vault records.</p>
+                    ) : (
+                      shippingOptions.map((option) => (
+                        <div 
+                          key={option.id}
+                          onClick={() => setSelectedShipping(option)}
+                          className={`p-4 border-2 rounded-xl flex items-center justify-between cursor-pointer transition-all ${selectedShipping?.id === option.id ? 'border-black bg-gray-50' : 'border-gray-100 hover:border-gray-200'}`}
+                        >
+                          <div className="flex items-center">
+                            <div className={`w-4 h-4 rounded-full border-2 mr-4 flex items-center justify-center ${selectedShipping?.id === option.id ? 'border-red-600' : 'border-gray-300'}`}>
+                              {selectedShipping?.id === option.id && <div className="w-2 h-2 bg-red-600 rounded-full"></div>}
+                            </div>
+                            <div>
+                              <p className="font-black text-[10px] uppercase tracking-widest">{option.name}</p>
+                              <p className="text-[9px] text-gray-400 font-bold uppercase italic">Secure Vault Transport</p>
+                            </div>
                           </div>
-                          <div>
-                            <p className="font-black text-[10px] uppercase tracking-widest">{option.name}</p>
-                            <p className="text-[9px] text-gray-400 font-bold uppercase italic">Secure Vault Transport</p>
-                          </div>
+                          <span className="font-black italic text-xs">{option.rate?.toLocaleString() || '0'}৳</span>
                         </div>
-                        <span className="font-black italic text-xs">{option.rate?.toLocaleString() || '0'}৳</span>
-                      </div>
-                    ))}
+                      ))
+                    )}
                   </div>
                 </div>
 
