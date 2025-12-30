@@ -296,7 +296,7 @@ const OrderDetail: React.FC<{
         </div>
 
         <div className="space-y-8">
-          {/* Metadata Card - NEW */}
+          {/* Metadata Card */}
           <div className="bg-black text-white rounded-3xl shadow-xl overflow-hidden p-8">
             <p className="text-[10px] font-black text-gray-500 uppercase tracking-[0.3em] mb-6 italic">Protocol Registry</p>
             <div className="space-y-6">
@@ -325,6 +325,11 @@ const OrderDetail: React.FC<{
                 <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em] mb-3">Identity Tag</p>
                 <p className="font-black text-xl leading-tight text-gray-900 italic uppercase">{order.first_name} {order.last_name}</p>
                 <p className="text-xs text-gray-500 font-bold mt-2 uppercase tracking-tight">{order.email}</p>
+                {order.mobile_number && (
+                  <p className="text-xs text-gray-800 font-black mt-1 uppercase tracking-tight flex items-center">
+                    <i className="fa-solid fa-phone mr-2 text-[10px] text-red-600"></i>{order.mobile_number}
+                  </p>
+                )}
               </div>
               <div className="p-6 rounded-2xl border-2 border-gray-50 group hover:border-black transition-colors">
                 <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em] mb-4">Coordinates</p>
@@ -385,7 +390,8 @@ const OrderDetail: React.FC<{
           <div>
              <h3 className="text-[10px] font-black uppercase tracking-widest text-red-600 mb-4 border-b border-gray-100 pb-2">Subject Profile</h3>
              <p className="font-black uppercase text-sm mb-1">{order.first_name} {order.last_name}</p>
-             <p className="text-xs font-bold text-gray-500 mb-4">{order.email}</p>
+             <p className="text-xs font-bold text-gray-500 mb-1">{order.email}</p>
+             {order.mobile_number && <p className="text-xs font-black mb-4">{order.mobile_number}</p>}
              <p className="text-xs font-black uppercase tracking-widest leading-relaxed">
                {order.street_address}<br />
                {order.city}, {order.zip_code}<br />

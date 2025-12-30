@@ -58,6 +58,7 @@ export interface Order {
   first_name: string;
   last_name: string;
   email: string;
+  mobile_number?: string;
   street_address: string;
   city: string;
   zip_code: string;
