@@ -1,0 +1,414 @@
+
+import React, { useState, useEffect } from 'react';
+import Navigation from './components/Navigation';
+import Home from './components/Storefront/Home';
+import ProductDetail from './components/Storefront/ProductDetail';
+import Dashboard from './components/Admin/Dashboard';
+import { Sneaker, CartItem, Order, OrderStatus } from './types';
+import { MOCK_SNEAKERS } from './constants';
+
+// Supabase Configuration
+const SUPABASE_URL = 'https://vwbctddmakbnvfxzrjeo.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_8WhV41Km5aj8Dhvu6tUbvA_JnyPoVxu';
+
+type View = 'home' | 'shop' | 'admin' | 'cart' | 'pdp' | 'wishlist' | 'checkout' | 'order-success';
+
+const App: React.FC = () => {
+  const [currentView, setCurrentView] = useState<View>('home');
+  const [selectedProduct, setSelectedProduct] = useState<Sneaker | null>(null);
+  const [cart, setCart] = useState<CartItem[]>([]);
+  const [wishlist, setWishlist] = useState<Sneaker[]>([]);
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [lastOrder, setLastOrder] = useState<Order | null>(null);
+  const [isPlacingOrder, setIsPlacingOrder] = useState(false);
+
+  // Updated Form states for checkout to be more granular
+  const [checkoutForm, setCheckoutForm] = useState({
+    firstName: 'Vault',
+    lastName: 'Member',
+    email: 'member@vault.com',
+    address: '123 Hype St',
+    city: 'New York',
+    zip: '10001'
+  });
+
+  // Sync with Supabase on mount
+  useEffect(() => {
+    const fetchOrders = async () => {
+      try {
+        const response = await fetch(`${SUPABASE_URL}/rest/v1/orders?select=*&order=created_at.desc`, {
+          headers: {
+            'apikey': SUPABASE_KEY,
+            'Authorization': `Bearer ${SUPABASE_KEY}`
+          }
+        });
+        if (response.ok) {
+          const data = await response.json();
+          setOrders(data || []);
+        }
+      } catch (err) {
+        console.error("Failed to fetch from Supabase:", err);
+      }
+    };
+    fetchOrders();
+  }, []);
+
+  const handleSelectProduct = (sneaker: Sneaker) => {
+    setSelectedProduct(sneaker);
+    setCurrentView('pdp');
+  };
+
+  const handleAddToCart = (item: CartItem) => {
+    setCart(prev => {
+      const existing = prev.find(i => i.id === item.id && i.selectedSize === item.selectedSize);
+      if (existing) {
+        return prev.map(i => i.id === item.id && i.selectedSize === item.selectedSize 
+          ? { ...i, quantity: i.quantity + 1 } : i);
+      }
+      return [...prev, item];
+    });
+    alert(`Added ${item.name} to vault!`);
+  };
+
+  const toggleWishlist = (sneaker: Sneaker) => {
+    setWishlist(prev => {
+      const exists = prev.find(s => s.id === sneaker.id);
+      if (exists) {
+        return prev.filter(s => s.id !== sneaker.id);
+      }
+      return [...prev, sneaker];
+    });
+  };
+
+  const removeFromCart = (index: number) => {
+    setCart(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handlePlaceOrder = async () => {
+    if (isPlacingOrder) return;
+    setIsPlacingOrder(true);
+
+    const subtotal = cart.reduce((acc, item) => acc + (item.price * item.quantity), 0);
+    const total = Math.round(subtotal * 1.08);
+
+    // Create the order payload matching Supabase table columns
+    const newOrder = {
+      id: `ORD-${Math.floor(Math.random() * 90000) + 10000}`,
+      first_name: checkoutForm.firstName,
+      last_name: checkoutForm.lastName,
+      email: checkoutForm.email,
+      street_address: checkoutForm.address,
+      city: checkoutForm.city,
+      zip_code: checkoutForm.zip,
+      total: total,
+      status: OrderStatus.PLACED,
+      items: cart.map(item => ({
+        sneakerId: item.id,
+        name: item.name,
+        image: item.image,
+        size: item.selectedSize,
+        quantity: item.quantity,
+        price: item.price
+      }))
+    };
+
+    try {
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/orders`, {
+        method: 'POST',
+        headers: {
+          'apikey': SUPABASE_KEY,
+          'Authorization': `Bearer ${SUPABASE_KEY}`,
+          'Content-Type': 'application/json',
+          'Prefer': 'return=representation'
+        },
+        body: JSON.stringify(newOrder)
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Supabase Error: ${errorText}`);
+      }
+
+      const [savedOrder] = await response.json();
+      setOrders(prev => [savedOrder, ...prev]);
+      setLastOrder(savedOrder);
+      setCart([]);
+      setCurrentView('order-success');
+    } catch (err) {
+      console.error("Checkout Sync Error:", err);
+      alert("Order placement failed. Please verify the Supabase table 'orders' exists with the correct columns.");
+    } finally {
+      setIsPlacingOrder(false);
+    }
+  };
+
+  const renderView = () => {
+    switch (currentView) {
+      case 'home':
+        return <Home onSelectProduct={handleSelectProduct} onNavigate={setCurrentView} />;
+      case 'pdp':
+        return selectedProduct ? (
+          <ProductDetail 
+            sneaker={selectedProduct} 
+            onAddToCart={handleAddToCart} 
+            onBack={() => setCurrentView('shop')} 
+            onToggleWishlist={toggleWishlist}
+            isInWishlist={wishlist.some(s => s.id === selectedProduct.id)}
+          />
+        ) : <Home onSelectProduct={handleSelectProduct} onNavigate={setCurrentView} />;
+      case 'shop':
+        return (
+          <div className="max-w-7xl mx-auto px-4 py-10">
+            <h1 className="text-5xl font-black font-heading italic uppercase mb-10">The Vault Collection</h1>
+            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-8">
+              {MOCK_SNEAKERS.map(sneaker => (
+                <div 
+                  key={sneaker.id}
+                  onClick={() => handleSelectProduct(sneaker)}
+                  className="group cursor-pointer"
+                >
+                  <div className="aspect-square bg-white border border-gray-100 rounded-xl overflow-hidden mb-4 relative shadow-sm group-hover:shadow-xl transition-all">
+                    <img src={sneaker.image} className="w-full h-full object-contain group-hover:scale-110 transition-transform duration-500" />
+                    {sneaker.isDrop && (
+                      <span className="absolute top-4 left-4 bg-red-600 text-white text-[10px] font-black px-2 py-1 uppercase tracking-widest italic">Drop</span>
+                    )}
+                  </div>
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">{sneaker.brand}</p>
+                  <h3 className="font-bold text-sm mb-1 group-hover:text-red-600 transition-colors">{sneaker.name}</h3>
+                  <p className="font-black">${sneaker.price}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      case 'wishlist':
+        return (
+          <div className="max-w-7xl mx-auto px-4 py-16">
+            <h1 className="text-4xl font-black font-heading mb-10 italic uppercase">Your Watchlist</h1>
+            {wishlist.length === 0 ? (
+              <div className="text-center py-32 bg-gray-50 rounded-3xl border-2 border-dashed border-gray-200">
+                <i className="fa-regular fa-heart text-7xl text-gray-200 mb-6"></i>
+                <p className="text-xl font-bold text-gray-400 mb-8 uppercase tracking-widest">No grails saved yet.</p>
+                <button onClick={() => setCurrentView('shop')} className="bg-black text-white px-10 py-4 font-black uppercase tracking-[0.2em] hover:bg-red-600 transition-all shadow-xl">Find Your Next Pair</button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+                {wishlist.map(sneaker => (
+                  <div key={sneaker.id} className="bg-white border border-gray-100 rounded-2xl p-4 group relative hover:shadow-2xl transition-all">
+                    <button onClick={(e) => { e.stopPropagation(); toggleWishlist(sneaker); }} className="absolute top-6 right-6 z-10 text-red-500 hover:scale-110 transition-transform"><i className="fa-solid fa-heart text-xl"></i></button>
+                    <div className="aspect-square bg-gray-50 rounded-xl mb-4 overflow-hidden" onClick={() => handleSelectProduct(sneaker)}><img src={sneaker.image} className="w-full h-full object-contain p-4 group-hover:scale-105 transition-transform" /></div>
+                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">{sneaker.brand}</p>
+                    <h3 className="font-bold text-sm mb-3 truncate" onClick={() => handleSelectProduct(sneaker)}>{sneaker.name}</h3>
+                    <div className="flex justify-between items-center"><span className="font-black text-lg">${sneaker.price}</span><button onClick={() => handleSelectProduct(sneaker)} className="bg-black text-white px-4 py-2 text-[10px] font-bold uppercase tracking-widest hover:bg-red-600 transition-colors">View Details</button></div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      case 'cart':
+        const cartTotal = cart.reduce((acc, item) => acc + (item.price * item.quantity), 0);
+        return (
+          <div className="max-w-4xl mx-auto px-4 py-16">
+            <h1 className="text-4xl font-black font-heading mb-10 italic uppercase">Your Vault Bag</h1>
+            {cart.length === 0 ? (
+              <div className="text-center py-20 bg-gray-50 rounded-2xl">
+                <i className="fa-solid fa-bag-shopping text-6xl text-gray-200 mb-6"></i>
+                <p className="text-xl font-bold text-gray-400 mb-8 font-heading uppercase tracking-widest">Your vault is empty.</p>
+                <button onClick={() => setCurrentView('shop')} className="bg-black text-white px-8 py-3 font-bold uppercase tracking-widest hover:bg-red-600 transition-colors">Go Shop</button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
+                <div className="lg:col-span-2 space-y-8">
+                  {cart.map((item, idx) => (
+                    <div key={idx} className="flex space-x-6 border-b border-gray-100 pb-8">
+                      <div className="w-32 h-32 bg-gray-50 rounded-xl p-2 flex-shrink-0"><img src={item.image} className="w-full h-full object-contain" /></div>
+                      <div className="flex-1 flex flex-col justify-between">
+                        <div>
+                          <div className="flex justify-between items-start">
+                            <h3 className="font-bold text-lg uppercase leading-tight font-heading">{item.name}</h3>
+                            <button onClick={() => removeFromCart(idx)} className="text-gray-400 hover:text-red-600"><i className="fa-solid fa-trash-can"></i></button>
+                          </div>
+                          <p className="text-xs text-gray-500 uppercase font-bold mt-1 tracking-widest">{item.brand} | Size: {item.selectedSize}</p>
+                        </div>
+                        <div className="flex justify-between items-end">
+                           <div className="flex items-center border rounded overflow-hidden">
+                             <button className="px-3 py-1 hover:bg-gray-100 border-r text-xs font-bold">-</button>
+                             <span className="px-4 font-bold text-sm">{item.quantity}</span>
+                             <button className="px-3 py-1 hover:bg-gray-100 border-l text-xs font-bold">+</button>
+                           </div>
+                           <span className="font-black text-xl">${item.price * item.quantity}</span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="bg-gray-50 p-8 rounded-2xl h-fit border border-gray-100">
+                   <h3 className="text-xl font-black font-heading uppercase italic mb-6 border-b pb-4 border-gray-200">Order Summary</h3>
+                   <div className="space-y-4 mb-8">
+                      <div className="flex justify-between text-sm font-bold text-gray-500 uppercase tracking-widest"><span>Subtotal</span><span className="text-black">${cartTotal}</span></div>
+                      <div className="flex justify-between text-sm font-bold text-gray-500 uppercase tracking-widest"><span>Shipping</span><span className="text-green-600 uppercase">Free</span></div>
+                      <div className="flex justify-between text-sm font-bold text-gray-500 uppercase tracking-widest"><span>Tax</span><span className="text-black">${(cartTotal * 0.08).toFixed(0)}</span></div>
+                      <div className="pt-4 border-t border-gray-200 flex justify-between"><span className="text-lg font-black uppercase italic font-heading">Total</span><span className="text-2xl font-black">${(cartTotal * 1.08).toFixed(0)}</span></div>
+                   </div>
+                   <button onClick={() => setCurrentView('checkout')} className="w-full bg-black text-white py-5 font-black uppercase tracking-[0.2em] shadow-xl hover:bg-red-600 transition-all">Proceed to Checkout</button>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      case 'checkout':
+        const checkTotal = cart.reduce((acc, item) => acc + (item.price * item.quantity), 0);
+        return (
+          <div className="max-w-5xl mx-auto px-4 py-16">
+            <h1 className="text-4xl font-black font-heading mb-10 italic uppercase">Secure Checkout</h1>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-16">
+              <div className="space-y-8">
+                <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100">
+                  <h3 className="text-xl font-black font-heading uppercase mb-6 flex items-center"><span className="bg-black text-white w-8 h-8 rounded-full flex items-center justify-center mr-3 text-xs italic">1</span> Shipping Details</h3>
+                  <div className="grid grid-cols-1 gap-6">
+                    <div className="grid grid-cols-2 gap-6">
+                      <div><label className="text-[10px] font-black uppercase tracking-widest text-gray-400 block mb-2">First Name</label><input type="text" value={checkoutForm.firstName} onChange={e => setCheckoutForm({...checkoutForm, firstName: e.target.value})} className="w-full border-b-2 border-gray-100 py-3 outline-none focus:border-black transition-colors font-bold" /></div>
+                      <div><label className="text-[10px] font-black uppercase tracking-widest text-gray-400 block mb-2">Last Name</label><input type="text" value={checkoutForm.lastName} onChange={e => setCheckoutForm({...checkoutForm, lastName: e.target.value})} className="w-full border-b-2 border-gray-100 py-3 outline-none focus:border-black transition-colors font-bold" /></div>
+                    </div>
+                    <div><label className="text-[10px] font-black uppercase tracking-widest text-gray-400 block mb-2">Email Address</label><input type="email" value={checkoutForm.email} onChange={e => setCheckoutForm({...checkoutForm, email: e.target.value})} className="w-full border-b-2 border-gray-100 py-3 outline-none focus:border-black transition-colors font-bold" /></div>
+                    <div><label className="text-[10px] font-black uppercase tracking-widest text-gray-400 block mb-2">Street Address</label><input type="text" value={checkoutForm.address} onChange={e => setCheckoutForm({...checkoutForm, address: e.target.value})} className="w-full border-b-2 border-gray-100 py-3 outline-none focus:border-black transition-colors font-bold" /></div>
+                    <div className="grid grid-cols-2 gap-6">
+                      <div><label className="text-[10px] font-black uppercase tracking-widest text-gray-400 block mb-2">City</label><input type="text" value={checkoutForm.city} onChange={e => setCheckoutForm({...checkoutForm, city: e.target.value})} className="w-full border-b-2 border-gray-100 py-3 outline-none focus:border-black transition-colors font-bold" /></div>
+                      <div><label className="text-[10px] font-black uppercase tracking-widest text-gray-400 block mb-2">Zip Code</label><input type="text" value={checkoutForm.zip} onChange={e => setCheckoutForm({...checkoutForm, zip: e.target.value})} className="w-full border-b-2 border-gray-100 py-3 outline-none focus:border-black transition-colors font-bold" /></div>
+                    </div>
+                  </div>
+                </div>
+                <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100">
+                  <h3 className="text-xl font-black font-heading uppercase mb-6 flex items-center"><span className="bg-black text-white w-8 h-8 rounded-full flex items-center justify-center mr-3 text-xs italic">2</span> Payment Method</h3>
+                  <div className="p-4 border-2 border-black rounded-xl flex items-center justify-between bg-gray-50"><div className="flex items-center"><i className="fa-solid fa-credit-card mr-4 text-xl"></i><span className="font-bold text-sm">Vault Pay Express</span></div><i className="fa-solid fa-circle-check text-black"></i></div>
+                </div>
+              </div>
+              <div>
+                <div className="bg-gray-900 text-white p-8 rounded-2xl shadow-2xl sticky top-24">
+                  <h3 className="text-xl font-black font-heading uppercase italic mb-6 border-b border-white/10 pb-4">Vault Summary</h3>
+                  <div className="space-y-4 mb-8 max-h-64 overflow-y-auto pr-2 custom-scrollbar">
+                    {cart.map((item, i) => (
+                      <div key={i} className="flex justify-between items-center"><div className="flex flex-col"><span className="text-xs font-bold uppercase truncate max-w-[150px]">{item.name}</span><span className="text-[10px] text-gray-400 uppercase">Size {item.selectedSize} × {item.quantity}</span></div><span className="text-sm font-black">${item.price * item.quantity}</span></div>
+                    ))}
+                  </div>
+                  <div className="space-y-3 pt-6 border-t border-white/10 mb-8">
+                    <div className="flex justify-between text-xs font-bold uppercase text-gray-400 tracking-widest"><span>Subtotal</span><span>${checkTotal}</span></div>
+                    <div className="flex justify-between text-xs font-bold uppercase text-gray-400 tracking-widest"><span>Shipping</span><span className="text-green-400">FREE</span></div>
+                    <div className="flex justify-between text-lg font-black uppercase italic font-heading"><span>Total</span><span>${(checkTotal * 1.08).toFixed(0)}</span></div>
+                  </div>
+                  <button 
+                    onClick={handlePlaceOrder} 
+                    disabled={isPlacingOrder}
+                    className={`w-full bg-red-600 text-white py-5 font-black uppercase tracking-[0.2em] shadow-lg transition-all transform hover:scale-105 active:scale-95 flex items-center justify-center space-x-3 ${isPlacingOrder ? 'opacity-70 cursor-not-allowed bg-gray-600' : 'hover:bg-white hover:text-red-600'}`}
+                  >
+                    {isPlacingOrder ? (
+                      <><i className="fa-solid fa-circle-notch animate-spin"></i><span>Securing Order...</span></>
+                    ) : (
+                      <span>Complete Purchase</span>
+                    )}
+                  </button>
+                  <p className="text-[9px] text-gray-500 mt-6 text-center uppercase tracking-widest">Secured by Vault Defense Systems™</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      case 'order-success':
+        return (
+          <div className="max-w-2xl mx-auto px-4 py-32 text-center">
+            <div className="w-24 h-24 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-10 animate-bounce shadow-inner"><i className="fa-solid fa-check text-4xl"></i></div>
+            <h1 className="text-5xl font-black font-heading mb-6 italic uppercase">Order Secured</h1>
+            <p className="text-gray-500 mb-4 font-medium">Confirmation ID: <span className="text-black font-black font-mono tracking-tighter">{lastOrder?.id}</span></p>
+            <p className="text-gray-400 mb-12 max-w-sm mx-auto">Your grails have been verified and placed in the shipping queue. Prepare your feet for the arrival.</p>
+            <div className="space-y-4">
+              <button onClick={() => setCurrentView('shop')} className="w-full bg-black text-white py-5 font-black uppercase tracking-[0.2em] shadow-xl hover:bg-red-600 transition-all">Continue Shopping</button>
+              <button onClick={() => setCurrentView('home')} className="w-full bg-white border border-gray-200 text-black py-4 font-black uppercase tracking-widest text-xs hover:border-black transition-colors">Return Home</button>
+            </div>
+          </div>
+        );
+      case 'admin':
+        return (
+          <div className="flex bg-gray-50 min-h-screen">
+            <aside className="w-64 bg-white border-r border-gray-100 p-6 hidden lg:block">
+              <nav className="space-y-1">
+                {[
+                  { icon: 'fa-chart-pie', label: 'Overview', active: true },
+                  { icon: 'fa-box', label: 'Inventory' },
+                  { icon: 'fa-shopping-cart', label: 'Orders' },
+                  { icon: 'fa-users', label: 'Customers' },
+                  { icon: 'fa-bullhorn', label: 'Marketing' },
+                  { icon: 'fa-gear', label: 'Settings' },
+                ].map((item, i) => (
+                  <button key={i} className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-sm font-bold transition-all ${item.active ? 'bg-black text-white shadow-lg' : 'text-gray-500 hover:bg-gray-50 hover:text-black'}`}>
+                    <i className={`fa-solid ${item.icon} w-5`}></i>
+                    <span>{item.label}</span>
+                  </button>
+                ))}
+              </nav>
+            </aside>
+            <main className="flex-1 p-8 overflow-y-auto">
+              <Dashboard orders={orders} />
+            </main>
+          </div>
+        );
+      default:
+        return <Home onSelectProduct={handleSelectProduct} onNavigate={setCurrentView} />;
+    }
+  };
+
+  return (
+    <div className="min-h-screen flex flex-col">
+      <Navigation 
+        onNavigate={setCurrentView} 
+        cartCount={cart.length} 
+        wishlistCount={wishlist.length}
+        currentView={currentView} 
+      />
+      <div className="flex-1">
+        {renderView()}
+      </div>
+      <footer className="bg-black text-white pt-20 pb-10 mt-auto">
+        <div className="max-w-7xl mx-auto px-4 grid grid-cols-1 md:grid-cols-4 gap-12 mb-16">
+          <div className="md:col-span-2">
+            <h2 className="text-4xl font-black font-heading tracking-tighter mb-6 italic uppercase">JOIN THE VAULT</h2>
+            <p className="text-gray-400 mb-8 max-w-md">Subscribe to get early access to drops, exclusive discounts, and streetwear news directly to your inbox.</p>
+            <div className="flex max-w-sm">
+              <input type="email" placeholder="Email address" className="bg-white/10 border-none px-6 py-4 flex-1 text-sm focus:ring-1 focus:ring-white outline-none" />
+              <button className="bg-white text-black font-bold uppercase px-8 text-xs tracking-widest hover:bg-red-600 hover:text-white transition-colors">Join</button>
+            </div>
+          </div>
+          <div>
+            <h4 className="font-bold uppercase tracking-widest text-xs mb-6">Explore</h4>
+            <ul className="space-y-4 text-sm text-gray-400">
+              <li><button onClick={() => setCurrentView('shop')} className="hover:text-white transition-colors">New Releases</button></li>
+              <li><button className="hover:text-white transition-colors">Upcoming Drops</button></li>
+              <li><button className="hover:text-white transition-colors">Best Sellers</button></li>
+              <li><button className="hover:text-white transition-colors">Gift Cards</button></li>
+            </ul>
+          </div>
+          <div>
+            <h4 className="font-bold uppercase tracking-widest text-xs mb-6">Support</h4>
+            <ul className="space-y-4 text-sm text-gray-400">
+              <li><button className="hover:text-white transition-colors">Shipping Info</button></li>
+              <li><button className="hover:text-white transition-colors">Return Policy</button></li>
+              <li><button className="hover:text-white transition-colors">Authenticity</button></li>
+              <li><button className="hover:text-white transition-colors">Contact Us</button></li>
+            </ul>
+          </div>
+        </div>
+        <div className="max-w-7xl mx-auto px-4 pt-10 border-t border-white/10 flex flex-col md:flex-row justify-between items-center text-xs text-gray-500 font-bold uppercase tracking-widest">
+           <p>© 2024 SneakerVault. All rights reserved.</p>
+           <div className="flex space-x-8 mt-6 md:mt-0">
+             <i className="fa-brands fa-instagram text-xl cursor-pointer hover:text-white"></i>
+             <i className="fa-brands fa-twitter text-xl cursor-pointer hover:text-white"></i>
+             <i className="fa-brands fa-tiktok text-xl cursor-pointer hover:text-white"></i>
+             <i className="fa-brands fa-youtube text-xl cursor-pointer hover:text-white"></i>
+           </div>
+        </div>
+      </footer>
+    </div>
+  );
+};
+
+export default App;
