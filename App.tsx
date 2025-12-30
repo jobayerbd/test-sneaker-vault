@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import Navigation from './components/Navigation';
-import Home from './components/Storefront/Home';
-import ProductDetail from './components/Storefront/ProductDetail';
-import Dashboard from './components/Admin/Dashboard';
-import { Sneaker, CartItem, Order, OrderStatus } from './types';
-import { MOCK_SNEAKERS, MOCK_ORDERS } from './constants';
+import Navigation from './components/Navigation.tsx';
+import Home from './components/Storefront/Home.tsx';
+import ProductDetail from './components/Storefront/ProductDetail.tsx';
+import Dashboard from './components/Admin/Dashboard.tsx';
+import { Sneaker, CartItem, Order, OrderStatus } from './types.ts';
+import { MOCK_SNEAKERS, MOCK_ORDERS } from './constants.tsx';
 
 // Supabase Configuration
 const SUPABASE_URL = 'https://vwbctddmakbnvfxzrjeo.supabase.co';
@@ -143,7 +143,7 @@ const App: React.FC = () => {
       setCurrentView('order-success');
     } catch (err) {
       console.error("Checkout Sync Error:", err);
-      alert("Order placement failed. Check the SQL editor in Supabase to ensure the 'orders' table exists.");
+      alert("Order placement failed. Check Supabase 'orders' table.");
     } finally {
       setIsPlacingOrder(false);
     }
