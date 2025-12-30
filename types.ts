@@ -37,6 +37,13 @@ export interface Sneaker {
   trending: boolean;
 }
 
+export interface ShippingOption {
+  id: string;
+  name: string;
+  rate: number;
+  created_at?: string;
+}
+
 export interface OrderItem {
   sneakerId: string;
   name: string;

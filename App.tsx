@@ -4,7 +4,7 @@ import Home from './components/Storefront/Home';
 import ProductDetail from './components/Storefront/ProductDetail';
 import Dashboard from './components/Admin/Dashboard';
 import Login from './components/Admin/Login';
-import { Sneaker, CartItem, Order, OrderStatus } from './types';
+import { Sneaker, CartItem, Order, OrderStatus, ShippingOption } from './types';
 import { MOCK_SNEAKERS, MOCK_ORDERS } from './constants';
 
 // Supabase Configuration
@@ -21,6 +21,7 @@ const App: React.FC = () => {
   const [wishlist, setWishlist] = useState<Sneaker[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [sneakers, setSneakers] = useState<Sneaker[]>([]);
+  const [shippingOptions, setShippingOptions] = useState<ShippingOption[]>([]);
   const [lastOrder, setLastOrder] = useState<Order | null>(null);
   const [isPlacingOrder, setIsPlacingOrder] = useState(false);
   const [isFetchingOrders, setIsFetchingOrders] = useState(false);
@@ -82,6 +83,23 @@ const App: React.FC = () => {
     }
   }, []);
 
+  const fetchShippingOptions = useCallback(async () => {
+    try {
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/shipping_options?select=*&order=rate.asc`, {
+        headers: {
+          'apikey': SUPABASE_KEY,
+          'Authorization': `Bearer ${SUPABASE_KEY}`
+        }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setShippingOptions(data);
+      }
+    } catch (err) {
+      console.error("Failed to fetch shipping options:", err);
+    }
+  }, []);
+
   useEffect(() => {
     const session = localStorage.getItem('sv_admin_session');
     if (session === 'active') {
@@ -89,7 +107,8 @@ const App: React.FC = () => {
     }
     fetchSneakers();
     fetchOrders();
-  }, [fetchSneakers, fetchOrders]);
+    fetchShippingOptions();
+  }, [fetchSneakers, fetchOrders, fetchShippingOptions]);
 
   const handleUpdateOrderStatus = async (orderId: string, newStatus: OrderStatus) => {
     try {
@@ -167,6 +186,58 @@ const App: React.FC = () => {
     }
   };
 
+  const handleSaveShippingOption = async (option: Partial<ShippingOption>) => {
+    const isNew = !option.id;
+    const url = isNew 
+      ? `${SUPABASE_URL}/rest/v1/shipping_options` 
+      : `${SUPABASE_URL}/rest/v1/shipping_options?id=eq.${option.id}`;
+    
+    const method = isNew ? 'POST' : 'PATCH';
+
+    try {
+      const response = await fetch(url, {
+        method,
+        headers: {
+          'apikey': SUPABASE_KEY,
+          'Authorization': `Bearer ${SUPABASE_KEY}`,
+          'Content-Type': 'application/json',
+          'Prefer': 'return=representation'
+        },
+        body: JSON.stringify(option)
+      });
+
+      if (response.ok) {
+        await fetchShippingOptions();
+        return true;
+      }
+      return false;
+    } catch (err) {
+      console.error("Save shipping error:", err);
+      return false;
+    }
+  };
+
+  const handleDeleteShippingOption = async (id: string) => {
+    try {
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/shipping_options?id=eq.${id}`, {
+        method: 'DELETE',
+        headers: {
+          'apikey': SUPABASE_KEY,
+          'Authorization': `Bearer ${SUPABASE_KEY}`
+        }
+      });
+
+      if (response.ok) {
+        setShippingOptions(prev => prev.filter(o => o.id !== id));
+        return true;
+      }
+      return false;
+    } catch (err) {
+      console.error("Delete shipping error:", err);
+      return false;
+    }
+  };
+
   const handleSelectProduct = (sneaker: Sneaker) => {
     setSelectedProduct(sneaker);
     setCurrentView('pdp');
@@ -233,6 +304,7 @@ const App: React.FC = () => {
       setCurrentView('admin');
       fetchOrders();
       fetchSneakers();
+      fetchShippingOptions();
     } else {
       setCurrentView('admin-login');
     }
@@ -417,6 +489,7 @@ const App: React.FC = () => {
               setCurrentView('admin');
               fetchOrders();
               fetchSneakers();
+              fetchShippingOptions();
             }} 
           />
         );
@@ -570,10 +643,13 @@ const App: React.FC = () => {
           <Dashboard 
             sneakers={sneakers} 
             orders={orders} 
-            onRefresh={() => { fetchOrders(); fetchSneakers(); }} 
+            shippingOptions={shippingOptions}
+            onRefresh={() => { fetchOrders(); fetchSneakers(); fetchShippingOptions(); }} 
             onUpdateOrderStatus={handleUpdateOrderStatus}
             onSaveProduct={handleSaveProduct}
             onDeleteProduct={handleDeleteProduct}
+            onSaveShipping={handleSaveShippingOption}
+            onDeleteShipping={handleDeleteShippingOption}
             isRefreshing={isFetchingOrders || isFetchingSneakers} 
             onLogout={handleLogout} 
           />
