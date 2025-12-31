@@ -8,6 +8,7 @@ interface HomeProps {
   slides: HomeSlide[];
   onSelectProduct: (sneaker: Sneaker) => void;
   onNavigate: (view: any) => void;
+  onSearch: (query: string) => void;
 }
 
 const Home: React.FC<HomeProps> = ({ sneakers, slides, onSelectProduct, onNavigate }) => {

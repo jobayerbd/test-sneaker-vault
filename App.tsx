@@ -53,6 +53,8 @@ const App: React.FC = () => {
   const [isFetchingOrders, setIsFetchingOrders] = useState(false);
   const [isFetchingSneakers, setIsFetchingSneakers] = useState(false);
   const [isCartSidebarOpen, setIsCartSidebarOpen] = useState(false);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
 
   const [checkoutForm, setCheckoutForm] = useState({
@@ -471,6 +473,52 @@ const App: React.FC = () => {
 
   const handleLogout = () => { localStorage.removeItem('sv_admin_session'); setIsAdminAuthenticated(false); setCurrentView('home'); };
 
+  const handleSearch = (query: string) => {
+    setSearchQuery(query);
+    setIsSearchOpen(false);
+    setCurrentView('shop');
+  };
+
+  const SearchOverlay = () => {
+    const [localQuery, setLocalQuery] = useState('');
+    return (
+      <div className={`fixed inset-0 z-[100] bg-black/95 backdrop-blur-xl transition-all duration-500 flex flex-col p-8 md:p-24 ${isSearchOpen ? 'opacity-100' : 'opacity-0 pointer-events-none translate-y-full'}`}>
+        <button onClick={() => setIsSearchOpen(false)} className="absolute top-10 right-10 text-white text-3xl hover:rotate-90 transition-transform"><i className="fa-solid fa-xmark"></i></button>
+        <div className="max-w-4xl w-full mx-auto flex flex-col items-center">
+          <p className="text-red-600 text-[10px] md:text-xs font-black uppercase tracking-[0.5em] mb-8 italic">Archive Search Protocol</p>
+          <div className="w-full relative">
+            <input 
+              autoFocus={isSearchOpen}
+              type="text" 
+              value={localQuery}
+              onChange={(e) => setLocalQuery(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleSearch(localQuery)}
+              placeholder="ENTER ASSET NAME..." 
+              className="w-full bg-transparent border-b-4 border-white/20 focus:border-red-600 outline-none text-white text-4xl md:text-7xl font-black italic uppercase font-heading py-8 transition-colors"
+            />
+            <button 
+              onClick={() => handleSearch(localQuery)}
+              className="absolute right-0 bottom-8 text-white text-4xl hover:text-red-600 transition-colors"
+            >
+              <i className="fa-solid fa-arrow-right-long"></i>
+            </button>
+          </div>
+          <div className="w-full mt-12 grid grid-cols-2 md:grid-cols-4 gap-4">
+             {['Jordan', 'Yeezy', 'Dunk', 'Samba'].map(term => (
+               <button 
+                 key={term}
+                 onClick={() => handleSearch(term)}
+                 className="bg-white/5 border border-white/10 p-4 text-gray-400 text-[10px] font-black uppercase tracking-widest hover:bg-red-700 hover:text-white hover:border-red-700 transition-all italic"
+               >
+                 {term}
+               </button>
+             ))}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   const CartSidebar = () => {
     const total = cart.reduce((acc, item) => acc + (item.price * item.quantity), 0);
     return (
@@ -537,9 +585,9 @@ const App: React.FC = () => {
 
   const renderView = () => {
     switch (currentView) {
-      case 'home': return <Home sneakers={sneakers} slides={slides} onSelectProduct={handleSelectProduct} onNavigate={setCurrentView} />;
-      case 'shop': return <Shop sneakers={sneakers} onSelectProduct={handleSelectProduct} />;
-      case 'pdp': return selectedProduct ? <ProductDetail sneaker={selectedProduct} onAddToCart={handleAddToCart} onBack={() => setCurrentView('shop')} onToggleWishlist={toggleWishlist} isInWishlist={wishlist.some(s => s.id === selectedProduct.id)} onSelectProduct={handleSelectProduct} /> : <Home sneakers={sneakers} slides={slides} onSelectProduct={handleSelectProduct} onNavigate={setCurrentView} />;
+      case 'home': return <Home sneakers={sneakers} slides={slides} onSelectProduct={handleSelectProduct} onNavigate={setCurrentView} onSearch={handleSearch} />;
+      case 'shop': return <Shop sneakers={sneakers} onSelectProduct={handleSelectProduct} searchQuery={searchQuery} onClearSearch={() => setSearchQuery('')} />;
+      case 'pdp': return selectedProduct ? <ProductDetail sneaker={selectedProduct} onAddToCart={handleAddToCart} onBack={() => setCurrentView('shop')} onToggleWishlist={toggleWishlist} isInWishlist={wishlist.some(s => s.id === selectedProduct.id)} onSelectProduct={handleSelectProduct} /> : <Home sneakers={sneakers} slides={slides} onSelectProduct={handleSelectProduct} onNavigate={setCurrentView} onSearch={handleSearch} />;
       case 'admin-login': return <Login supabaseUrl={SUPABASE_URL} supabaseKey={SUPABASE_KEY} onLoginSuccess={() => { setIsAdminAuthenticated(true); setCurrentView('admin'); }} />;
       case 'admin': return <Dashboard sneakers={sneakers} orders={orders} brands={brands} categories={categories} paymentMethods={paymentMethods} slides={slides} shippingOptions={shippingOptions} footerConfig={footerConfig} onRefresh={() => { fetchOrders(); fetchSneakers(); fetchShippingOptions(); fetchFooterConfig(); fetchBrands(); fetchCategories(); fetchPaymentMethods(); fetchSlides(); }} onUpdateOrderStatus={handleUpdateOrderStatus} onSaveProduct={handleSaveProduct} onDeleteProduct={handleDeleteProduct} onSaveShipping={handleSaveShippingOption} onDeleteShipping={handleDeleteShippingOption} onSavePaymentMethod={handleSavePaymentMethod} onDeletePaymentMethod={handleDeletePaymentMethod} onSaveFooterConfig={handleSaveFooterConfig} onSaveBrand={handleSaveBrand} onDeleteBrand={handleDeleteBrand} onSaveCategory={handleSaveCategory} onDeleteCategory={handleDeleteCategory} onSaveSlide={handleSaveSlide} onDeleteSlide={handleDeleteSlide} isRefreshing={isFetchingOrders || isFetchingSneakers} onLogout={handleLogout} />;
       case 'checkout': return (
@@ -576,7 +624,7 @@ const App: React.FC = () => {
                   </div>
                   <div className="space-y-1">
                     <label className="text-[9px] font-black uppercase text-gray-400 px-1">Email Archive</label>
-                    <input type="email" placeholder="OPERATOR@MAIL.COM" value={checkoutForm.email} onChange={e => setCheckoutForm({...checkoutForm, email: e.target.value})} className="w-full bg-gray-50 p-4 rounded-xl outline-none font-bold text-xs focus:ring-2 ring-black/5" />
+                    <input type="email" placeholder="OPERATOR@MAIL.COM" value={checkoutForm.email} onChange={e => setCheckoutForm({...checkoutForm, email: e.target.value})} className="w-full bg-gray-50 p-4 rounded-xl font-bold text-xs outline-none focus:ring-2 ring-black/5" />
                   </div>
                 </div>
                 <div className="mt-6 space-y-1">
@@ -732,16 +780,24 @@ const App: React.FC = () => {
           </div>
         </div>
       );
-      default: return <Home sneakers={sneakers} slides={slides} onSelectProduct={handleSelectProduct} onNavigate={setCurrentView} />;
+      default: return <Home sneakers={sneakers} slides={slides} onSelectProduct={handleSelectProduct} onNavigate={setCurrentView} onSearch={handleSearch} />;
     }
   };
 
   return (
     <div className="min-h-screen flex flex-col bg-white">
       {currentView !== 'admin' && (
-        <Navigation onNavigate={(v) => v === 'admin' ? navigateToAdmin() : setCurrentView(v as View)} cartCount={cart.reduce((a,c) => a + c.quantity, 0)} wishlistCount={wishlist.length} currentView={currentView} onOpenCart={() => setIsCartSidebarOpen(true)} />
+        <Navigation 
+          onNavigate={(v) => v === 'admin' ? navigateToAdmin() : setCurrentView(v as View)} 
+          cartCount={cart.reduce((a,c) => a + c.quantity, 0)} 
+          wishlistCount={wishlist.length} 
+          currentView={currentView} 
+          onOpenCart={() => setIsCartSidebarOpen(true)} 
+          onOpenSearch={() => setIsSearchOpen(true)}
+        />
       )}
       <div className="flex-1">{renderView()}</div>
+      <SearchOverlay />
       <CartSidebar />
       {currentView !== 'admin' && currentView !== 'admin-login' && <Footer config={footerConfig} onNavigate={setCurrentView} />}
     </div>

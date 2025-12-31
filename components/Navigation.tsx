@@ -1,4 +1,5 @@
-import React from 'react';
+
+import React, { useState } from 'react';
 
 interface NavigationProps {
   onNavigate: (view: 'home' | 'shop' | 'admin' | 'cart' | 'wishlist') => void;
@@ -6,46 +7,138 @@ interface NavigationProps {
   wishlistCount: number;
   currentView: string;
   onOpenCart: () => void;
+  onOpenSearch: () => void;
 }
 
-const Navigation: React.FC<NavigationProps> = ({ onNavigate, cartCount, wishlistCount, currentView, onOpenCart }) => {
+const Navigation: React.FC<NavigationProps> = ({ onNavigate, cartCount, wishlistCount, currentView, onOpenCart, onOpenSearch }) => {
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  const navLinks = [
+    { label: 'Men', view: 'shop' as const },
+    { label: 'Women', view: 'shop' as const },
+    { label: 'Accessories', view: 'shop' as const },
+    { label: 'Drops', view: 'shop' as const },
+  ];
+
+  const handleMobileNav = (view: any) => {
+    onNavigate(view);
+    setIsMobileMenuOpen(false);
+  };
+
   return (
     <nav className="sticky top-0 z-50 bg-white border-b border-gray-100 shadow-sm">
       <div className="max-w-7xl mx-auto px-4">
         <div className="flex justify-between items-center h-16">
+          {/* Mobile Menu Button */}
+          <button 
+            onClick={() => setIsMobileMenuOpen(true)}
+            className="lg:hidden text-gray-600 hover:text-black transition-colors"
+          >
+            <i className="fa-solid fa-bars-staggered text-xl"></i>
+          </button>
+
           {/* Logo */}
           <button 
             onClick={() => onNavigate('home')}
             className="flex items-center"
           >
-            <span className="text-2xl font-black font-heading tracking-tighter italic">
+            <span className="text-xl md:text-2xl font-black font-heading tracking-tighter italic">
               SNEAKER<span className="text-red-600">VAULT</span>
             </span>
           </button>
 
           {/* Desktop Nav */}
           <div className="hidden lg:flex items-center space-x-10">
-            <button onClick={() => onNavigate('shop')} className="text-[11px] font-bold text-gray-800 uppercase tracking-widest hover:text-red-600">Men <i className="fa-solid fa-chevron-down text-[8px] ml-1"></i></button>
-            <button className="text-[11px] font-bold text-gray-800 uppercase tracking-widest hover:text-red-600">Women <i className="fa-solid fa-chevron-down text-[8px] ml-1"></i></button>
-            <button className="text-[11px] font-bold text-gray-800 uppercase tracking-widest hover:text-red-600">Accessories</button>
-            <button className="text-[11px] font-bold text-gray-800 uppercase tracking-widest hover:text-red-600">Drops</button>
+            {navLinks.map((link) => (
+              <button 
+                key={link.label}
+                onClick={() => onNavigate(link.view)} 
+                className="text-[11px] font-bold text-gray-800 uppercase tracking-widest hover:text-red-600"
+              >
+                {link.label} {link.label !== 'Accessories' && link.label !== 'Drops' && <i className="fa-solid fa-chevron-down text-[8px] ml-1"></i>}
+              </button>
+            ))}
           </div>
 
           {/* Icons */}
-          <div className="flex items-center space-x-5">
-            <button className="text-gray-600 hover:text-black"><i className="fa-solid fa-magnifying-glass text-lg"></i></button>
-            <button onClick={() => onNavigate('admin')} className="text-gray-600 hover:text-black"><i className="fa-regular fa-user text-xl"></i></button>
-            <button onClick={() => onNavigate('wishlist')} className="text-gray-600 hover:text-black relative">
-              <i className="fa-regular fa-heart text-xl"></i>
-              {wishlistCount > 0 && <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[8px] px-1 rounded-full">{wishlistCount}</span>}
+          <div className="flex items-center space-x-3 md:space-x-5">
+            <button 
+              onClick={onOpenSearch}
+              className="text-gray-600 hover:text-black transition-colors"
+            >
+              <i className="fa-solid fa-magnifying-glass text-lg"></i>
             </button>
+            <button onClick={() => onNavigate('admin')} className="text-gray-600 hover:text-black">
+              <i className="fa-regular fa-user text-xl"></i>
+            </button>
+            {/* Wishlist Button Removed as per request */}
             <button 
               onClick={onOpenCart}
-              className="flex items-center space-x-2 border border-gray-200 px-3 py-1.5 rounded-sm hover:border-black transition-colors"
+              className="flex items-center space-x-2 border border-gray-200 px-2 md:px-3 py-1.5 rounded-sm hover:border-black transition-colors"
             >
               <i className="fa-solid fa-bag-shopping text-gray-800"></i>
-              <span className="text-xs font-bold text-gray-800 italic">{cartCount} Secured</span>
+              <span className="hidden sm:inline text-xs font-bold text-gray-800 italic">{cartCount} Secured</span>
+              <span className="sm:hidden text-xs font-bold text-gray-800">{cartCount}</span>
             </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Mobile Sidebar */}
+      <div 
+        className={`fixed inset-0 bg-black/60 z-[60] transition-opacity duration-300 lg:hidden ${isMobileMenuOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`} 
+        onClick={() => setIsMobileMenuOpen(false)} 
+      />
+      <div className={`fixed left-0 top-0 h-screen w-full max-w-[280px] bg-white z-[70] transition-transform duration-500 transform lg:hidden ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+        <div className="flex flex-col h-full shadow-2xl">
+          <div className="p-8 bg-black text-white flex justify-between items-center">
+            <span className="text-xl font-black font-heading tracking-tighter italic">
+              VAULT<span className="text-red-600 text-sm ml-1 uppercase not-italic tracking-widest font-sans font-black">Menu</span>
+            </span>
+            <button onClick={() => setIsMobileMenuOpen(false)} className="hover:rotate-90 transition-transform">
+              <i className="fa-solid fa-xmark text-xl"></i>
+            </button>
+          </div>
+          
+          <div className="flex-1 overflow-y-auto p-8 space-y-8">
+            <div className="space-y-4">
+              <p className="text-red-600 text-[9px] font-black uppercase tracking-[0.4em] italic mb-6">Navigation Index</p>
+              {navLinks.map((link) => (
+                <button 
+                  key={link.label}
+                  onClick={() => handleMobileNav(link.view)}
+                  className="w-full text-left text-lg font-black uppercase italic tracking-tight hover:text-red-600 transition-colors flex justify-between items-center group"
+                >
+                  {link.label}
+                  <i className="fa-solid fa-arrow-right-long opacity-0 group-hover:opacity-100 transition-opacity text-sm"></i>
+                </button>
+              ))}
+            </div>
+
+            <div className="pt-8 border-t border-gray-100 space-y-4">
+               <p className="text-gray-400 text-[9px] font-black uppercase tracking-[0.4em] italic mb-6">User Protocol</p>
+               <button 
+                 onClick={() => handleMobileNav('admin')}
+                 className="w-full text-left text-xs font-black uppercase tracking-widest flex items-center gap-3"
+               >
+                 <i className="fa-solid fa-shield-halved text-red-600"></i>
+                 Admin Console
+               </button>
+               <button 
+                 onClick={onOpenSearch}
+                 className="w-full text-left text-xs font-black uppercase tracking-widest flex items-center gap-3"
+               >
+                 <i className="fa-solid fa-magnifying-glass text-red-600"></i>
+                 Asset Scan
+               </button>
+            </div>
+          </div>
+
+          <div className="p-8 bg-gray-50 border-t border-gray-100">
+            <p className="text-[9px] text-gray-400 font-bold uppercase tracking-widest leading-relaxed">
+              SNEAKERVAULT OS v1.0.6<br/>
+              Status: System Online
+            </p>
           </div>
         </div>
       </div>
