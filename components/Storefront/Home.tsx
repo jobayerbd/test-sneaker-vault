@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Sneaker } from '../../types';
 
@@ -14,7 +15,8 @@ const Home: React.FC<HomeProps> = ({ sneakers, onSelectProduct, onNavigate }) =>
     { title: "TRENDING NOW", data: sneakers.filter(s => s.trending).slice(0, 4) },
   ];
 
-  const ProductCard = ({ sneaker }: { sneaker: Sneaker }) => (
+  // Fix: Explicitly type ProductCard as React.FC to avoid issues with reserved 'key' prop during map()
+  const ProductCard: React.FC<{ sneaker: Sneaker }> = ({ sneaker }) => (
     <div 
       onClick={() => onSelectProduct(sneaker)}
       className="group bg-white border border-gray-100 p-0 flex flex-col cursor-pointer hover:shadow-2xl transition-all duration-300"

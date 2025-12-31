@@ -74,3 +74,12 @@ export interface CartItem extends Sneaker {
   selectedSize: string;
   quantity: number;
 }
+
+export interface FooterConfig {
+  store_name: string;
+  description: string;
+  copyright: string;
+  facebook_url: string;
+  instagram_url: string;
+  twitter_url: string;
+}

@@ -4,12 +4,22 @@ import Home from './components/Storefront/Home';
 import ProductDetail from './components/Storefront/ProductDetail';
 import Dashboard from './components/Admin/Dashboard';
 import Login from './components/Admin/Login';
-import { Sneaker, CartItem, Order, OrderStatus, ShippingOption } from './types';
+import Footer from './components/Footer';
+import { Sneaker, CartItem, Order, OrderStatus, ShippingOption, FooterConfig } from './types';
 import { MOCK_SNEAKERS, MOCK_ORDERS } from './constants';
 
 // Supabase Configuration
 const SUPABASE_URL = 'https://vwbctddmakbnvfxzrjeo.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_8WhV41Km5aj8Dhvu6tUbvA_JnyPoVxu';
+
+const DEFAULT_FOOTER: FooterConfig = {
+  store_name: "SNEAKERVAULT",
+  description: "The ultimate destination for sneaker enthusiasts. Authenticated grails, high-traffic drops, and a community built on passion.",
+  copyright: "© 2024 SNEAKERVAULT. ALL RIGHTS RESERVED. AUTHENTICATED PROTOCOL.",
+  facebook_url: "#",
+  instagram_url: "#",
+  twitter_url: "#"
+};
 
 type View = 'home' | 'shop' | 'admin' | 'cart' | 'pdp' | 'wishlist' | 'checkout' | 'order-success' | 'admin-login';
 
@@ -24,6 +34,8 @@ const App: React.FC = () => {
   const [shippingOptions, setShippingOptions] = useState<ShippingOption[]>([]);
   const [selectedShipping, setSelectedShipping] = useState<ShippingOption | null>(null);
   const [lastOrder, setLastOrder] = useState<Order | null>(null);
+  const [footerConfig, setFooterConfig] = useState<FooterConfig>(DEFAULT_FOOTER);
+  
   const [isPlacingOrder, setIsPlacingOrder] = useState(false);
   const [isFetchingOrders, setIsFetchingOrders] = useState(false);
   const [isFetchingSneakers, setIsFetchingSneakers] = useState(false);
@@ -41,19 +53,52 @@ const App: React.FC = () => {
     password: ''
   });
 
-  // Global Scroll Reset on View Change
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'auto' });
   }, [currentView]);
+
+  const fetchFooterConfig = useCallback(async () => {
+    try {
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/site_settings?key=eq.footer&select=data`, {
+        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        if (data && data[0]) setFooterConfig(data[0].data);
+      }
+    } catch (err) {
+      console.error("Failed to fetch footer config:", err);
+    }
+  }, []);
+
+  const handleSaveFooterConfig = async (config: FooterConfig) => {
+    try {
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/site_settings?key=eq.footer`, {
+        method: 'PATCH',
+        headers: {
+          'apikey': SUPABASE_KEY,
+          'Authorization': `Bearer ${SUPABASE_KEY}`,
+          'Content-Type': 'application/json',
+          'Prefer': 'return=representation'
+        },
+        body: JSON.stringify({ data: config })
+      });
+      if (response.ok) {
+        setFooterConfig(config);
+        return true;
+      }
+      return false;
+    } catch (err) {
+      console.error("Failed to save footer config:", err);
+      return false;
+    }
+  };
 
   const fetchSneakers = useCallback(async () => {
     setIsFetchingSneakers(true);
     try {
       const response = await fetch(`${SUPABASE_URL}/rest/v1/sneakers?select=*&order=name.asc`, {
-        headers: {
-          'apikey': SUPABASE_KEY,
-          'Authorization': `Bearer ${SUPABASE_KEY}`
-        }
+        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
       });
       if (response.ok) {
         const data = await response.json();
@@ -62,7 +107,6 @@ const App: React.FC = () => {
         setSneakers(MOCK_SNEAKERS);
       }
     } catch (err) {
-      console.error("Failed to fetch sneakers:", err);
       setSneakers(MOCK_SNEAKERS);
     } finally {
       setIsFetchingSneakers(false);
@@ -73,10 +117,7 @@ const App: React.FC = () => {
     setIsFetchingOrders(true);
     try {
       const response = await fetch(`${SUPABASE_URL}/rest/v1/orders?select=*&order=created_at.desc`, {
-        headers: {
-          'apikey': SUPABASE_KEY,
-          'Authorization': `Bearer ${SUPABASE_KEY}`
-        }
+        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
       });
       if (response.ok) {
         const data = await response.json();
@@ -85,7 +126,6 @@ const App: React.FC = () => {
         setOrders(MOCK_ORDERS);
       }
     } catch (err) {
-      console.error("Failed to fetch orders:", err);
       setOrders(MOCK_ORDERS);
     } finally {
       setIsFetchingOrders(false);
@@ -95,10 +135,7 @@ const App: React.FC = () => {
   const fetchShippingOptions = useCallback(async () => {
     try {
       const response = await fetch(`${SUPABASE_URL}/rest/v1/shipping_options?select=*&order=rate.asc`, {
-        headers: {
-          'apikey': SUPABASE_KEY,
-          'Authorization': `Bearer ${SUPABASE_KEY}`
-        }
+        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
       });
       if (response.ok) {
         const data = await response.json();
@@ -106,19 +143,18 @@ const App: React.FC = () => {
         if (Array.isArray(data) && data.length > 0) setSelectedShipping(data[0]);
       }
     } catch (err) {
-      console.error("Failed to fetch shipping options:", err);
+      console.error(err);
     }
   }, []);
 
   useEffect(() => {
     const session = localStorage.getItem('sv_admin_session');
-    if (session === 'active') {
-      setIsAdminAuthenticated(true);
-    }
+    if (session === 'active') setIsAdminAuthenticated(true);
     fetchSneakers();
     fetchOrders();
     fetchShippingOptions();
-  }, [fetchSneakers, fetchOrders, fetchShippingOptions]);
+    fetchFooterConfig();
+  }, [fetchSneakers, fetchOrders, fetchShippingOptions, fetchFooterConfig]);
 
   const handleUpdateOrderStatus = async (orderId: string, newStatus: OrderStatus) => {
     try {
@@ -132,26 +168,20 @@ const App: React.FC = () => {
         },
         body: JSON.stringify({ status: newStatus })
       });
-
       if (response.ok) {
         setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: newStatus } : o));
         return true;
       }
       return false;
     } catch (err) {
-      console.error("Update status error:", err);
       return false;
     }
   };
 
   const handleSaveProduct = async (productData: Partial<Sneaker>) => {
     const isNew = !productData.id;
-    const url = isNew 
-      ? `${SUPABASE_URL}/rest/v1/sneakers` 
-      : `${SUPABASE_URL}/rest/v1/sneakers?id=eq.${productData.id}`;
-    
+    const url = isNew ? `${SUPABASE_URL}/rest/v1/sneakers` : `${SUPABASE_URL}/rest/v1/sneakers?id=eq.${productData.id}`;
     const method = isNew ? 'POST' : 'PATCH';
-
     try {
       const response = await fetch(url, {
         method,
@@ -163,14 +193,12 @@ const App: React.FC = () => {
         },
         body: JSON.stringify(productData)
       });
-
       if (response.ok) {
         await fetchSneakers();
         return true;
       }
       return false;
     } catch (err) {
-      console.error("Save product error:", err);
       return false;
     }
   };
@@ -179,31 +207,22 @@ const App: React.FC = () => {
     try {
       const response = await fetch(`${SUPABASE_URL}/rest/v1/sneakers?id=eq.${id}`, {
         method: 'DELETE',
-        headers: {
-          'apikey': SUPABASE_KEY,
-          'Authorization': `Bearer ${SUPABASE_KEY}`
-        }
+        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
       });
-
       if (response.ok) {
         setSneakers(prev => prev.filter(s => s.id !== id));
         return true;
       }
       return false;
     } catch (err) {
-      console.error("Delete product error:", err);
       return false;
     }
   };
 
   const handleSaveShippingOption = async (option: Partial<ShippingOption>) => {
     const isNew = !option.id;
-    const url = isNew 
-      ? `${SUPABASE_URL}/rest/v1/shipping_options` 
-      : `${SUPABASE_URL}/rest/v1/shipping_options?id=eq.${option.id}`;
-    
+    const url = isNew ? `${SUPABASE_URL}/rest/v1/shipping_options` : `${SUPABASE_URL}/rest/v1/shipping_options?id=eq.${option.id}`;
     const method = isNew ? 'POST' : 'PATCH';
-
     try {
       const response = await fetch(url, {
         method,
@@ -215,14 +234,12 @@ const App: React.FC = () => {
         },
         body: JSON.stringify(option)
       });
-
       if (response.ok) {
         await fetchShippingOptions();
         return true;
       }
       return false;
     } catch (err) {
-      console.error("Save shipping error:", err);
       return false;
     }
   };
@@ -231,19 +248,14 @@ const App: React.FC = () => {
     try {
       const response = await fetch(`${SUPABASE_URL}/rest/v1/shipping_options?id=eq.${id}`, {
         method: 'DELETE',
-        headers: {
-          'apikey': SUPABASE_KEY,
-          'Authorization': `Bearer ${SUPABASE_KEY}`
-        }
+        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
       });
-
       if (response.ok) {
         setShippingOptions(prev => prev.filter(o => o.id !== id));
         return true;
       }
       return false;
     } catch (err) {
-      console.error("Delete shipping error:", err);
       return false;
     }
   };
@@ -257,18 +269,13 @@ const App: React.FC = () => {
   const handleAddToCart = (item: CartItem, shouldCheckout: boolean = false) => {
     setCart(prev => {
       const existingItemIndex = prev.findIndex(i => i.id === item.id && i.selectedSize === item.selectedSize);
-      
       if (existingItemIndex !== -1) {
         const newCart = [...prev];
-        newCart[existingItemIndex] = {
-          ...newCart[existingItemIndex],
-          quantity: newCart[existingItemIndex].quantity + item.quantity
-        };
+        newCart[existingItemIndex] = { ...newCart[existingItemIndex], quantity: newCart[existingItemIndex].quantity + item.quantity };
         return newCart;
       }
       return [...prev, item];
     });
-    
     if (shouldCheckout) {
       setCurrentView('checkout');
       setIsCartSidebarOpen(false);
@@ -281,9 +288,7 @@ const App: React.FC = () => {
     setCart(prev => {
       const newCart = [...prev];
       const newQuantity = newCart[index].quantity + delta;
-      if (newQuantity <= 0) {
-        return prev.filter((_, i) => i !== index);
-      }
+      if (newQuantity <= 0) return prev.filter((_, i) => i !== index);
       newCart[index] = { ...newCart[index], quantity: newQuantity };
       return newCart;
     });
@@ -292,23 +297,13 @@ const App: React.FC = () => {
   const toggleWishlist = (sneaker: Sneaker) => {
     setWishlist(prev => {
       const exists = prev.find(s => s.id === sneaker.id);
-      if (exists) {
-        return prev.filter(s => s.id !== sneaker.id);
-      }
+      if (exists) return prev.filter(s => s.id !== sneaker.id);
       return [...prev, sneaker];
     });
   };
 
-  const removeFromCart = (index: number) => {
-    setCart(prev => prev.filter((_, i) => i !== index));
-  };
-
-  const handleLogout = () => {
-    localStorage.removeItem('sv_admin_session');
-    setIsAdminAuthenticated(false);
-    setCurrentView('home');
-  };
-
+  const removeFromCart = (index: number) => { setCart(prev => prev.filter((_, i) => i !== index)); };
+  const handleLogout = () => { localStorage.removeItem('sv_admin_session'); setIsAdminAuthenticated(false); setCurrentView('home'); };
   const navigateToAdmin = () => {
     if (isAdminAuthenticated) {
       setCurrentView('admin');
@@ -321,204 +316,84 @@ const App: React.FC = () => {
   };
 
   const handlePlaceOrder = async () => {
-    // Validation: Name and Mobile Number are ALWAYS mandatory.
-    if (!checkoutForm.firstName || !checkoutForm.mobileNumber) {
-      alert("Please provide your Name and Mobile Number (Mandatory) before initiating protocol.");
-      return;
-    }
-
-    // Validation: Email is mandatory ONLY IF creating an account.
-    if (checkoutForm.createAccount && !checkoutForm.email) {
-      alert("Email address is required to initialize your vault membership.");
-      return;
-    }
-
-    if (!selectedShipping) {
-      alert("Please select a shipping method (Logistics Registry) before continuing.");
-      return;
-    }
-
+    if (!checkoutForm.firstName || !checkoutForm.mobileNumber) { alert("Please provide your Name and Mobile Number before initiating protocol."); return; }
+    if (checkoutForm.createAccount && !checkoutForm.email) { alert("Email address is required to initialize vault membership."); return; }
+    if (!selectedShipping) { alert("Please select a shipping method before continuing."); return; }
     if (isPlacingOrder) return;
     setIsPlacingOrder(true);
 
-    // Optional Account Creation
     if (checkoutForm.createAccount) {
-      if (!checkoutForm.password) {
-        alert("Please provide a security sequence (password) to initialize your vault membership.");
-        setIsPlacingOrder(false);
-        return;
-      }
+      if (!checkoutForm.password) { alert("Please provide a password."); setIsPlacingOrder(false); return; }
       try {
         await fetch(`${SUPABASE_URL}/rest/v1/customers`, {
           method: 'POST',
-          headers: {
-            'apikey': SUPABASE_KEY,
-            'Authorization': `Bearer ${SUPABASE_KEY}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            email: checkoutForm.email,
-            password: checkoutForm.password,
-            first_name: checkoutForm.firstName,
-            last_name: checkoutForm.lastName || '',
-            mobile_number: checkoutForm.mobileNumber
-          })
+          headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: checkoutForm.email, password: checkoutForm.password, first_name: checkoutForm.firstName, last_name: checkoutForm.lastName || '', mobile_number: checkoutForm.mobileNumber })
         });
-      } catch (err) {
-        console.warn("Vault membership initialization failed - subject may already exist.");
-      }
+      } catch (err) { console.warn(err); }
     }
 
     const subtotal = cart.reduce((acc, item) => acc + (item.price * item.quantity), 0);
     const total = subtotal + (selectedShipping.rate || 0);
-
     const orderId = `ORD-${Math.floor(Math.random() * 90000) + 10000}`;
-    
-    // Constructing order object with shipping and mobile columns included
     const newOrder: any = {
-      id: orderId,
-      first_name: checkoutForm.firstName,
-      last_name: checkoutForm.lastName || '',
-      email: checkoutForm.email || 'guest@sneakervault.bd',
-      mobile_number: checkoutForm.mobileNumber,
-      street_address: checkoutForm.address || '',
-      city: checkoutForm.city || '',
-      zip_code: checkoutForm.zip || '',
-      total: total,
-      status: OrderStatus.PLACED,
-      shipping_name: selectedShipping.name,
-      shipping_rate: selectedShipping.rate,
-      items: cart.map(item => ({
-        sneakerId: item.id,
-        name: item.name,
-        image: item.image,
-        size: item.selectedSize,
-        quantity: item.quantity,
-        price: item.price
-      }))
+      id: orderId, first_name: checkoutForm.firstName, last_name: checkoutForm.lastName || '', email: checkoutForm.email || 'guest@sneakervault.bd', mobile_number: checkoutForm.mobileNumber, street_address: checkoutForm.address || '', city: checkoutForm.city || '', zip_code: checkoutForm.zip || '', total, status: OrderStatus.PLACED, shipping_name: selectedShipping.name, shipping_rate: selectedShipping.rate, items: cart.map(item => ({ sneakerId: item.id, name: item.name, image: item.image, size: item.selectedSize, quantity: item.quantity, price: item.price }))
     };
 
     try {
       const response = await fetch(`${SUPABASE_URL}/rest/v1/orders`, {
         method: 'POST',
-        headers: {
-          'apikey': SUPABASE_KEY,
-          'Authorization': `Bearer ${SUPABASE_KEY}`,
-          'Content-Type': 'application/json',
-          'Prefer': 'return=representation'
-        },
+        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', 'Prefer': 'return=representation' },
         body: JSON.stringify(newOrder)
       });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        const errorMsg = errorData.message || errorData.hint || JSON.stringify(errorData);
-        console.error("Vault Rejection Details:", errorData);
-        throw new Error(errorMsg);
-      }
-
-      const responseData = await response.json();
-      const savedOrder = Array.isArray(responseData) ? responseData[0] : responseData;
-      
-      const finalOrder = { ...newOrder, ...savedOrder };
-      setOrders(prev => [finalOrder, ...prev]);
-      setLastOrder(finalOrder);
+      if (!response.ok) throw new Error("Order Rejection");
+      const savedOrder = (await response.json())[0];
+      setOrders(prev => [savedOrder, ...prev]);
+      setLastOrder(savedOrder);
       setCart([]);
       setCurrentView('order-success');
-    } catch (err: any) {
-      console.error("Order Critical Failure:", err);
-      alert(`VAULT ERROR: ${err.message || 'Could not secure order in database.'}`);
-    } finally {
-      setIsPlacingOrder(false);
-    }
+    } catch (err) { alert("ORDER ERROR"); } finally { setIsPlacingOrder(false); }
   };
 
   const CartSidebar = () => {
     const total = cart.reduce((acc, item) => acc + (item.price * item.quantity), 0);
     return (
       <>
-        {/* Overlay */}
-        <div 
-          className={`fixed inset-0 bg-black/60 z-[60] transition-opacity duration-300 ${isCartSidebarOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
-          onClick={() => setIsCartSidebarOpen(false)}
-        />
-        {/* Sidebar Drawer */}
-        <div className={`fixed right-0 top-0 h-screen w-full max-w-md bg-white z-[70] shadow-2xl transition-transform duration-500 ease-in-out transform ${isCartSidebarOpen ? 'translate-x-0' : 'translate-x-full'}`}>
+        <div className={`fixed inset-0 bg-black/60 z-[60] transition-opacity duration-300 ${isCartSidebarOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`} onClick={() => setIsCartSidebarOpen(false)} />
+        <div className={`fixed right-0 top-0 h-screen w-full max-w-md bg-white z-[70] shadow-2xl transition-transform duration-500 transform ${isCartSidebarOpen ? 'translate-x-0' : 'translate-x-full'}`}>
           <div className="flex flex-col h-full">
-            {/* Header */}
-            <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-black text-white">
-              <h2 className="text-xl font-black font-heading italic tracking-tighter uppercase">Vault Bag</h2>
-              <button onClick={() => setIsCartSidebarOpen(false)} className="w-10 h-10 flex items-center justify-center hover:bg-white/10 rounded-full transition-colors">
-                <i className="fa-solid fa-xmark text-lg"></i>
-              </button>
+            <div className="p-6 bg-black text-white flex justify-between items-center">
+              <h2 className="text-xl font-black uppercase tracking-tighter italic">Vault Bag</h2>
+              <button onClick={() => setIsCartSidebarOpen(false)} className="w-10 h-10 flex items-center justify-center hover:bg-white/10 rounded-full transition-colors"><i className="fa-solid fa-xmark"></i></button>
             </div>
-
-            {/* Item List */}
-            <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
-              {cart.length === 0 ? (
-                <div className="h-full flex flex-col items-center justify-center text-center opacity-50">
-                  <i className="fa-solid fa-bag-shopping text-6xl mb-4 text-gray-200"></i>
-                  <p className="text-xs font-black uppercase tracking-widest text-gray-400">The vault is currently empty</p>
-                </div>
-              ) : (
-                cart.map((item, idx) => (
-                  <div key={`${item.id}-${item.selectedSize}`} className="flex space-x-4 border-b border-gray-50 pb-6 group animate-in fade-in slide-in-from-right-4">
-                    <div className="w-24 h-24 bg-gray-50 rounded-xl p-2 shrink-0 border border-gray-100 shadow-sm overflow-hidden">
-                      <img src={item.image} className="w-full h-full object-contain group-hover:scale-110 transition-transform duration-500" />
+            <div className="flex-1 overflow-y-auto p-6 space-y-6">
+              {cart.length === 0 ? <div className="h-full flex flex-col items-center justify-center opacity-50"><i className="fa-solid fa-bag-shopping text-6xl mb-4 text-gray-200"></i><p className="text-xs font-black uppercase tracking-widest text-gray-400">The vault is currently empty</p></div> : cart.map((item, idx) => (
+                <div key={`${item.id}-${item.selectedSize}`} className="flex space-x-4 border-b border-gray-50 pb-6 group">
+                  <div className="w-24 h-24 bg-gray-50 rounded-xl p-2 border border-gray-100 shadow-sm overflow-hidden"><img src={item.image} className="w-full h-full object-contain" /></div>
+                  <div className="flex-1">
+                    <div className="flex justify-between items-start">
+                      <div><h4 className="text-[10px] font-black uppercase truncate w-40">{item.name}</h4><p className="text-[9px] text-red-600 font-black uppercase mt-0.5">Size: {item.selectedSize}</p></div>
+                      <button onClick={() => removeFromCart(idx)} className="text-gray-300 hover:text-red-600 p-1"><i className="fa-solid fa-trash-can text-[10px]"></i></button>
                     </div>
-                    <div className="flex-1">
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <h4 className="text-[10px] font-black uppercase truncate w-40">{item.name}</h4>
-                          <p className="text-[9px] text-red-600 font-black uppercase tracking-widest mt-0.5">Size: {item.selectedSize}</p>
-                        </div>
-                        <button onClick={() => removeFromCart(idx)} className="text-gray-300 hover:text-red-600 transition-colors p-1">
-                          <i className="fa-solid fa-trash-can text-[10px]"></i>
-                        </button>
+                    <div className="flex justify-between items-end mt-4">
+                      <div className="flex items-center border border-gray-100 rounded-lg overflow-hidden h-8 bg-gray-50">
+                        <button onClick={() => updateCartQuantity(idx, -1)} className="px-3 h-full hover:bg-white">-</button>
+                        <span className="px-3 font-black text-[10px]">{item.quantity}</span>
+                        <button onClick={() => updateCartQuantity(idx, 1)} className="px-3 h-full hover:bg-white">+</button>
                       </div>
-                      
-                      <div className="flex justify-between items-end mt-4">
-                        <div className="flex items-center border border-gray-100 rounded-lg overflow-hidden h-8 bg-gray-50">
-                          <button 
-                            onClick={() => updateCartQuantity(idx, -1)}
-                            className="px-3 h-full hover:bg-white text-gray-400 hover:text-black transition-colors"
-                          >-</button>
-                          <span className="px-3 font-black text-[10px]">{item.quantity}</span>
-                          <button 
-                            onClick={() => updateCartQuantity(idx, 1)}
-                            className="px-3 h-full hover:bg-white text-gray-400 hover:text-black transition-colors"
-                          >+</button>
-                        </div>
-                        <p className="text-sm font-black italic">{(item.price * item.quantity).toLocaleString()}৳</p>
-                      </div>
+                      <p className="text-sm font-black italic">{(item.price * item.quantity).toLocaleString()}৳</p>
                     </div>
                   </div>
-                ))
-              )}
-            </div>
-
-            {/* Footer */}
-            <div className="p-8 bg-white border-t border-gray-100 shadow-[0_-10px_40px_rgba(0,0,0,0.04)] space-y-4">
-              <div className="flex justify-between items-end mb-4">
-                <div>
-                  <span className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] block mb-1">Estimated Protocol Value</span>
-                  <span className="text-[9px] font-bold text-green-600 uppercase">Secure Shipping: Calculated at Checkout</span>
                 </div>
-                <span className="text-3xl font-black italic tracking-tighter">{total.toLocaleString()}৳</span>
+              ))}
+            </div>
+            <div className="p-8 bg-white border-t border-gray-100 space-y-4">
+              <div className="flex justify-between items-end mb-4">
+                <div><span className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-1">Total Protocol Value</span><span className="text-[9px] font-bold text-green-600 uppercase italic">Secure Shipping Applied at Checkout</span></div>
+                <span className="text-3xl font-black italic">{total.toLocaleString()}৳</span>
               </div>
-              <button 
-                onClick={() => { setCurrentView('checkout'); setIsCartSidebarOpen(false); }}
-                disabled={cart.length === 0}
-                className="w-full bg-black text-white py-5 rounded-2xl font-black uppercase tracking-[0.2em] text-xs shadow-2xl hover:bg-red-700 transition-all transform active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center"
-              >
-                Secure Checkout <i className="fa-solid fa-arrow-right-long ml-4"></i>
-              </button>
-              <button 
-                onClick={() => setIsCartSidebarOpen(false)}
-                className="w-full bg-white border-2 border-gray-100 text-black py-4 rounded-2xl font-black uppercase tracking-[0.2em] text-[10px] hover:border-black transition-all"
-              >
-                Keep Exploring
-              </button>
+              <button onClick={() => { setCurrentView('checkout'); setIsCartSidebarOpen(false); }} disabled={cart.length === 0} className="w-full bg-black text-white py-5 rounded-2xl font-black uppercase tracking-widest text-xs shadow-2xl hover:bg-red-700 active:scale-95 disabled:opacity-30 flex items-center justify-center">Secure Checkout <i className="fa-solid fa-arrow-right-long ml-4"></i></button>
+              <button onClick={() => setIsCartSidebarOpen(false)} className="w-full bg-white border-2 border-gray-100 text-black py-4 rounded-2xl font-black uppercase tracking-widest text-[10px] hover:border-black">Keep Exploring</button>
             </div>
           </div>
         </div>
@@ -528,69 +403,22 @@ const App: React.FC = () => {
 
   const renderView = () => {
     switch (currentView) {
-      case 'home':
-        return <Home sneakers={sneakers} onSelectProduct={handleSelectProduct} onNavigate={setCurrentView} />;
-      case 'pdp':
-        return selectedProduct ? (
-          <ProductDetail 
-            sneaker={selectedProduct} 
-            onAddToCart={handleAddToCart} 
-            onBack={() => setCurrentView('shop')} 
-            onToggleWishlist={toggleWishlist}
-            isInWishlist={wishlist.some(s => s.id === selectedProduct.id)}
-          />
-        ) : <Home sneakers={sneakers} onSelectProduct={handleSelectProduct} onNavigate={setCurrentView} />;
-      case 'admin-login':
-        return (
-          <Login 
-            supabaseUrl={SUPABASE_URL} 
-            supabaseKey={SUPABASE_KEY} 
-            onLoginSuccess={() => {
-              setIsAdminAuthenticated(true);
-              setCurrentView('admin');
-              fetchOrders();
-              fetchSneakers();
-              fetchShippingOptions();
-            }} 
-          />
-        );
+      case 'home': return <Home sneakers={sneakers} onSelectProduct={handleSelectProduct} onNavigate={setCurrentView} />;
+      case 'pdp': return selectedProduct ? <ProductDetail sneaker={selectedProduct} onAddToCart={handleAddToCart} onBack={() => setCurrentView('shop')} onToggleWishlist={toggleWishlist} isInWishlist={wishlist.some(s => s.id === selectedProduct.id)} /> : <Home sneakers={sneakers} onSelectProduct={handleSelectProduct} onNavigate={setCurrentView} />;
+      case 'admin-login': return <Login supabaseUrl={SUPABASE_URL} supabaseKey={SUPABASE_KEY} onLoginSuccess={() => { setIsAdminAuthenticated(true); setCurrentView('admin'); fetchOrders(); fetchSneakers(); fetchShippingOptions(); }} />;
       case 'shop':
         return (
           <div className="max-w-7xl mx-auto px-4 py-16">
             <div className="flex flex-col md:flex-row justify-between items-end mb-16 gap-4">
-              <div>
-                <h1 className="text-6xl font-black font-heading italic uppercase tracking-tighter">The Vault Collection</h1>
-                <p className="text-gray-400 font-bold uppercase tracking-[0.3em] mt-2">Authenticated Grails Only</p>
-              </div>
-              <div className="flex items-center space-x-3 text-[10px] font-black uppercase tracking-widest text-gray-500">
-                <span>Filter: Newest First</span>
-                <i className="fa-solid fa-chevron-down text-[8px]"></i>
-              </div>
+              <div><h1 className="text-6xl font-black font-heading italic uppercase tracking-tighter">The Vault Collection</h1><p className="text-gray-400 font-bold uppercase tracking-[0.3em] mt-2 italic">Authenticated Grails Only</p></div>
+              <div className="flex items-center space-x-3 text-[10px] font-black uppercase tracking-widest text-gray-500"><span>Filter: Newest First</span><i className="fa-solid fa-chevron-down text-[8px]"></i></div>
             </div>
-            
-            {isFetchingSneakers ? (
-              <div className="flex flex-col items-center justify-center py-40">
-                <i className="fa-solid fa-circle-notch animate-spin text-4xl text-red-600 mb-4"></i>
-                <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Opening Vault...</p>
-              </div>
-            ) : (
+            {isFetchingSneakers ? <div className="flex flex-col items-center py-40"><i className="fa-solid fa-circle-notch animate-spin text-4xl text-red-600 mb-4"></i><p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Opening Vault...</p></div> : (
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 md:gap-10">
                 {(sneakers || []).map(sneaker => (
-                  <div 
-                    key={sneaker.id}
-                    onClick={() => handleSelectProduct(sneaker)}
-                    className="group cursor-pointer"
-                  >
-                    <div className="aspect-[4/5] bg-white border border-gray-100 rounded-sm overflow-hidden mb-6 relative shadow-sm hover:shadow-2xl transition-all duration-500">
-                      <img src={sneaker.image} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
-                      {sneaker.is_drop && (
-                        <div className="absolute top-4 left-4 bg-red-600 text-white text-[9px] font-black px-2 py-1 uppercase tracking-widest italic animate-pulse-red">High Heat</div>
-                      )}
-                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors"></div>
-                    </div>
-                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">{sneaker.brand}</p>
-                    <h3 className="font-bold text-xs mb-1 group-hover:text-red-600 transition-colors uppercase truncate">{sneaker.name}</h3>
-                    <p className="font-black text-sm italic">{sneaker.price}৳</p>
+                  <div key={sneaker.id} onClick={() => handleSelectProduct(sneaker)} className="group cursor-pointer">
+                    <div className="aspect-[4/5] bg-white border border-gray-100 rounded-sm overflow-hidden mb-6 relative shadow-sm hover:shadow-2xl transition-all duration-500"><img src={sneaker.image} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />{sneaker.is_drop && <div className="absolute top-4 left-4 bg-red-600 text-white text-[9px] font-black px-2 py-1 uppercase italic animate-pulse-red">High Heat</div>}<div className="absolute inset-0 bg-black/0 group-hover:bg-black/5" /></div>
+                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">{sneaker.brand}</p><h3 className="font-bold text-xs mb-1 group-hover:text-red-600 transition-colors uppercase truncate">{sneaker.name}</h3><p className="font-black text-sm italic">{sneaker.price}৳</p>
                   </div>
                 ))}
               </div>
@@ -599,209 +427,108 @@ const App: React.FC = () => {
         );
       case 'order-success':
         return (
-          <div className="max-w-4xl mx-auto px-4 py-20 text-center animate-in fade-in slide-in-from-bottom-4 duration-700">
+          <div className="max-w-4xl mx-auto px-4 py-20 text-center animate-in fade-in slide-in-from-bottom-4">
             <div className="w-24 h-24 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-10 shadow-2xl animate-bounce">
               <i className="fa-solid fa-check text-white text-4xl"></i>
             </div>
             <h1 className="text-5xl font-black font-heading italic uppercase tracking-tighter mb-4">VAULT SECURED!</h1>
             <p className="text-gray-500 font-bold uppercase tracking-widest mb-12">Protocol Completed. Your grails are being prepared.</p>
-            
-            <div className="bg-white border border-gray-100 rounded-2xl shadow-xl overflow-hidden mb-12">
-               <div className="bg-black p-6 flex justify-between items-center text-white">
-                 <div className="text-left">
-                   <p className="text-[9px] font-black uppercase tracking-widest text-gray-400">Transaction ID</p>
-                   <p className="font-mono text-lg font-black">{lastOrder?.id}</p>
-                 </div>
-                 <div className="text-right">
-                   <p className="text-[9px] font-black uppercase tracking-widest text-gray-400">Protocol Value</p>
-                   <p className="text-2xl font-black italic">{lastOrder?.total?.toLocaleString() || '0'}৳</p>
-                 </div>
+            <div className="bg-white border border-gray-100 rounded-2xl shadow-xl p-10 mb-12 text-left">
+               <div className="grid grid-cols-2 gap-8 border-b pb-8 mb-8">
+                  <div><p className="text-[10px] font-black text-gray-400 uppercase">Transaction ID</p><p className="font-mono text-lg font-black">{lastOrder?.id}</p></div>
+                  <div className="text-right"><p className="text-[10px] font-black text-gray-400 uppercase">Protocol Value</p><p className="text-2xl font-black italic">{lastOrder?.total.toLocaleString()}৳</p></div>
                </div>
-               <div className="p-10 space-y-8">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                    {[
-                      { icon: 'fa-shield-check', title: 'VERIFIED', desc: 'Legitimacy confirmed by vault' },
-                      { icon: 'fa-box-open', title: 'PROCESSING', desc: 'Preparing for secure transport' },
-                      { icon: 'fa-truck-ramp-box', title: 'SHIPPING', desc: 'Arriving in 2-5 days' },
-                    ].map((step, i) => (
-                      <div key={i} className="flex flex-col items-center">
-                        <div className="w-12 h-12 bg-gray-50 rounded-xl flex items-center justify-center mb-3 text-black">
-                          <i className={`fa-solid ${step.icon} text-lg`}></i>
-                        </div>
-                        <h4 className="text-[10px] font-black uppercase tracking-widest mb-1">{step.title}</h4>
-                        <p className="text-[9px] text-gray-400 font-bold uppercase leading-tight">{step.desc}</p>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="pt-8 border-t border-gray-50 text-left">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-4 text-center">Protocol Manifest</p>
-                    <div className="space-y-4 max-h-40 overflow-y-auto pr-4 custom-scrollbar">
-                      {lastOrder?.items?.map((item, i) => (
-                        <div key={i} className="flex items-center space-x-4">
-                          <div className="w-12 h-12 bg-gray-50 rounded p-1 shrink-0"><img src={item.image} className="w-full h-full object-contain" /></div>
-                          <div className="flex-1">
-                            <p className="text-[10px] font-black uppercase truncate">{item.name}</p>
-                            <p className="text-[8px] text-gray-400 font-bold uppercase">Size: {item.size} | Qty: {item.quantity}</p>
-                          </div>
-                          <span className="text-[10px] font-black">{item.price?.toLocaleString() || '0'}৳</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
+               <div className="space-y-4">
+                  {lastOrder?.items?.map((item, i) => (
+                    <div key={i} className="flex justify-between items-center"><span className="text-xs font-bold uppercase">{item.name} (x{item.quantity})</span><span className="font-black text-xs italic">{item.price.toLocaleString()}৳</span></div>
+                  ))}
                </div>
             </div>
-
-            <div className="flex flex-col md:flex-row gap-4 justify-center">
-              <button onClick={() => setCurrentView('shop')} className="px-10 py-5 bg-black text-white font-black uppercase tracking-[0.2em] shadow-xl hover:bg-red-700 transition-all">Continue Exploring</button>
-              <button className="px-10 py-5 border-2 border-black text-black font-black uppercase tracking-[0.2em] hover:bg-black hover:text-white transition-all">Download Manifest</button>
-            </div>
+            <button onClick={() => setCurrentView('shop')} className="px-10 py-5 bg-black text-white font-black uppercase tracking-widest shadow-xl hover:bg-red-700 transition-all">Return to Archives</button>
           </div>
         );
       case 'checkout':
-        const checkSubtotal = cart.reduce((acc, item) => acc + (item.price * item.quantity), 0);
-        const checkTotal = checkSubtotal + (selectedShipping?.rate || 0);
+        const subtotal = cart.reduce((acc, item) => acc + (item.price * item.quantity), 0);
         return (
-          <div className="max-w-5xl mx-auto px-4 py-16">
-            <h1 className="text-4xl font-black font-heading mb-10 italic uppercase tracking-tighter">Secure Checkout</h1>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-16">
-              <div className="space-y-8">
-                <div className="bg-white p-8 border border-gray-100 rounded-xl shadow-sm">
-                  <h3 className="text-lg font-black font-heading uppercase mb-6 flex items-center italic">Shipping Coordinates</h3>
-                  <div className="grid grid-cols-1 gap-6">
-                    <div className="grid grid-cols-2 gap-6">
-                      <div><label className="text-[10px] font-black uppercase tracking-widest text-gray-400 block mb-2 italic">First Name*</label><input type="text" value={checkoutForm.firstName} onChange={e => setCheckoutForm({...checkoutForm, firstName: e.target.value})} className="w-full border-b-2 border-gray-100 py-3 outline-none focus:border-red-600 transition-colors font-bold text-xs" /></div>
-                      <div><label className="text-[10px] font-black uppercase tracking-widest text-gray-400 block mb-2 italic">Last Name</label><input type="text" value={checkoutForm.lastName} onChange={e => setCheckoutForm({...checkoutForm, lastName: e.target.value})} className="w-full border-b-2 border-gray-100 py-3 outline-none focus:border-red-600 transition-colors font-bold text-xs" /></div>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div><label className="text-[10px] font-black uppercase tracking-widest text-gray-400 block mb-2 italic">Mobile Number*</label><input type="tel" value={checkoutForm.mobileNumber} onChange={e => setCheckoutForm({...checkoutForm, mobileNumber: e.target.value})} className="w-full border-b-2 border-gray-100 py-3 outline-none focus:border-red-600 transition-colors font-bold text-xs" placeholder="01XXXXXXXXX" /></div>
-                      <div><label className="text-[10px] font-black uppercase tracking-widest text-gray-400 block mb-2 italic">Email Address {checkoutForm.createAccount ? '*' : '(Optional)'}</label><input type="email" value={checkoutForm.email} onChange={e => setCheckoutForm({...checkoutForm, email: e.target.value})} className="w-full border-b-2 border-gray-100 py-3 outline-none focus:border-red-600 transition-colors font-bold text-xs" /></div>
-                    </div>
-                    <div><label className="text-[10px] font-black uppercase tracking-widest text-gray-400 block mb-2 italic">Physical Location</label><input type="text" value={checkoutForm.address} onChange={e => setCheckoutForm({...checkoutForm, address: e.target.value})} className="w-full border-b-2 border-gray-100 py-3 outline-none focus:border-red-600 transition-colors font-bold text-xs" placeholder="STREET, AREA" /></div>
+          <div className="max-w-6xl mx-auto px-4 py-16">
+            <h1 className="text-4xl font-black uppercase font-heading italic mb-12">Secure Transport Registry</h1>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
+               <div className="lg:col-span-2 space-y-8">
+                  <div className="bg-white p-10 border rounded-2xl shadow-sm">
+                     <h3 className="text-lg font-black uppercase italic mb-8">Shipping Coordinates</h3>
+                     <div className="grid grid-cols-2 gap-6 mb-6">
+                        <input type="text" value={checkoutForm.firstName} onChange={e => setCheckoutForm({...checkoutForm, firstName: e.target.value})} placeholder="FIRST NAME*" className="border-b-2 py-3 outline-none focus:border-red-600 font-bold text-xs" />
+                        <input type="text" value={checkoutForm.lastName} onChange={e => setCheckoutForm({...checkoutForm, lastName: e.target.value})} placeholder="LAST NAME" className="border-b-2 py-3 outline-none focus:border-red-600 font-bold text-xs" />
+                     </div>
+                     <div className="grid grid-cols-2 gap-6 mb-6">
+                        <input type="tel" value={checkoutForm.mobileNumber} onChange={e => setCheckoutForm({...checkoutForm, mobileNumber: e.target.value})} placeholder="MOBILE NUMBER*" className="border-b-2 py-3 outline-none focus:border-red-600 font-bold text-xs" />
+                        <input type="email" value={checkoutForm.email} onChange={e => setCheckoutForm({...checkoutForm, email: e.target.value})} placeholder={checkoutForm.createAccount ? "EMAIL ADDRESS*" : "EMAIL ADDRESS (OPTIONAL)"} className="border-b-2 py-3 outline-none focus:border-red-600 font-bold text-xs" />
+                     </div>
+                     <input type="text" value={checkoutForm.address} onChange={e => setCheckoutForm({...checkoutForm, address: e.target.value})} placeholder="PHYSICAL LOCATION*" className="w-full border-b-2 py-3 outline-none focus:border-red-600 font-bold text-xs mb-8" />
+                     
+                     <div className="flex items-center mb-6">
+                        <input type="checkbox" id="createAcc" checked={checkoutForm.createAccount} onChange={e => setCheckoutForm({...checkoutForm, createAccount: e.target.checked})} className="w-4 h-4 accent-black" />
+                        <label htmlFor="createAcc" className="ml-3 text-[10px] font-black uppercase tracking-widest cursor-pointer">Initialize Vault Membership?</label>
+                     </div>
+                     {checkoutForm.createAccount && (
+                       <input type="password" value={checkoutForm.password} onChange={e => setCheckoutForm({...checkoutForm, password: e.target.value})} placeholder="SET SECURITY SEQUENCE (PASSWORD)*" className="w-full border-b-2 py-3 outline-none focus:border-red-600 font-bold text-xs mb-4" />
+                     )}
                   </div>
-
-                  {/* Account Creation Section */}
-                  <div className="mt-8 pt-8 border-t border-gray-100">
-                    <div className="flex items-center mb-4">
-                      <input 
-                        type="checkbox" 
-                        id="createAccount" 
-                        checked={checkoutForm.createAccount} 
-                        onChange={e => setCheckoutForm({...checkoutForm, createAccount: e.target.checked})}
-                        className="w-4 h-4 accent-black cursor-pointer"
-                      />
-                      <label htmlFor="createAccount" className="ml-3 text-[10px] font-black uppercase tracking-widest cursor-pointer select-none">Create a Vault Membership?</label>
-                    </div>
-                    {checkoutForm.createAccount && (
-                      <div className="animate-in fade-in slide-in-from-top-2 duration-300">
-                        <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 block mb-2 italic">Set Security Sequence (Password)*</label>
-                        <input 
-                          type="password" 
-                          value={checkoutForm.password} 
-                          onChange={e => setCheckoutForm({...checkoutForm, password: e.target.value})} 
-                          className="w-full border-b-2 border-gray-100 py-3 outline-none focus:border-red-600 transition-colors font-bold text-xs" 
-                          placeholder="••••••••"
-                        />
-                        <p className="text-[9px] text-gray-400 font-bold uppercase mt-2 italic">Save this for future vault access.</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                <div className="bg-white p-8 border border-gray-100 rounded-xl shadow-sm">
-                  <h3 className="text-lg font-black font-heading uppercase mb-6 italic">Logistics Registry</h3>
-                  <div className="space-y-3">
-                    {(shippingOptions || []).length === 0 ? (
-                      <p className="text-[10px] font-black text-gray-400 uppercase italic p-4 text-center border-2 border-dashed border-gray-100 rounded-xl">No shipping methods available in vault records.</p>
-                    ) : (
-                      shippingOptions.map((option) => (
-                        <div 
-                          key={option.id}
-                          onClick={() => setSelectedShipping(option)}
-                          className={`p-4 border-2 rounded-xl flex items-center justify-between cursor-pointer transition-all ${selectedShipping?.id === option.id ? 'border-black bg-gray-50' : 'border-gray-100 hover:border-gray-200'}`}
-                        >
-                          <div className="flex items-center">
-                            <div className={`w-4 h-4 rounded-full border-2 mr-4 flex items-center justify-center ${selectedShipping?.id === option.id ? 'border-red-600' : 'border-gray-300'}`}>
-                              {selectedShipping?.id === option.id && <div className="w-2 h-2 bg-red-600 rounded-full"></div>}
-                            </div>
-                            <div>
-                              <p className="font-black text-[10px] uppercase tracking-widest">{option.name}</p>
-                              <p className="text-[9px] text-gray-400 font-bold uppercase italic">Secure Vault Transport</p>
-                            </div>
+                  <div className="bg-white p-10 border rounded-2xl shadow-sm">
+                     <h3 className="text-lg font-black uppercase italic mb-8">Logistics Registry</h3>
+                     <div className="space-y-4">
+                        {shippingOptions.map(opt => (
+                          <div key={opt.id} onClick={() => setSelectedShipping(opt)} className={`p-4 border-2 rounded-xl flex justify-between cursor-pointer transition-all ${selectedShipping?.id === opt.id ? 'border-black bg-gray-50' : 'border-gray-100'}`}>
+                             <div className="flex items-center"><div className={`w-3 h-3 rounded-full mr-4 ${selectedShipping?.id === opt.id ? 'bg-red-600' : 'bg-gray-200'}`} /><div><p className="font-black text-[10px] uppercase">{opt.name}</p></div></div>
+                             <span className="font-black italic text-xs">{opt.rate}৳</span>
                           </div>
-                          <span className="font-black italic text-xs">{option.rate?.toLocaleString() || '0'}৳</span>
-                        </div>
-                      ))
-                    )}
+                        ))}
+                     </div>
                   </div>
-                </div>
-
-                <div className="bg-white p-8 border border-gray-100 rounded-xl shadow-sm">
-                  <h3 className="text-lg font-black font-heading uppercase mb-6 italic">Payment Protocol</h3>
-                  <div className="p-5 border-2 border-black flex items-center justify-between bg-gray-50 rounded-xl"><div className="flex items-center"><i className="fa-solid fa-truck-fast mr-4 text-xl text-red-600"></i><span className="font-black text-[10px] uppercase tracking-widest">Cash on Delivery</span></div><i className="fa-solid fa-circle-check text-black"></i></div>
-                </div>
-              </div>
-              <div className="bg-black text-white p-8 h-fit shadow-2xl rounded-2xl group">
-                <h3 className="text-xl font-black font-heading uppercase italic mb-8 border-b border-white/10 pb-4">Protocol Summary</h3>
-                <div className="space-y-4 mb-8">
-                  {cart.map((item, i) => (
-                    <div key={`${item.id}-${item.selectedSize}`} className="flex justify-between text-[10px] font-bold uppercase tracking-widest text-gray-400"><span>{item.name} ({item.selectedSize}) x{item.quantity}</span><span className="text-white">{(item.price * item.quantity).toLocaleString()}৳</span></div>
-                  ))}
-                  <div className="flex justify-between text-[10px] font-bold uppercase tracking-widest text-gray-400">
-                    <span>Shipping: {selectedShipping?.name || '---'}</span>
-                    <span className="text-white">{selectedShipping?.rate?.toLocaleString() || '0'}৳</span>
+               </div>
+               <div className="bg-black text-white p-10 rounded-2xl h-fit sticky top-24">
+                  <h3 className="text-xl font-black uppercase italic mb-8 border-b border-white/10 pb-4">Manifest Summary</h3>
+                  <div className="space-y-4 mb-8">
+                     <div className="flex justify-between text-[10px] font-bold text-gray-400 uppercase"><span>Assets Subtotal</span><span>{subtotal.toLocaleString()}৳</span></div>
+                     <div className="flex justify-between text-[10px] font-bold text-gray-400 uppercase"><span>Distribution</span><span>{selectedShipping?.rate.toLocaleString() || '0'}৳</span></div>
                   </div>
-                </div>
-                <div className="pt-6 border-t border-white/10 flex justify-between items-end">
-                   <span className="text-xs font-black uppercase italic font-heading tracking-widest text-red-600">Total Settlement</span>
-                   <span className="text-3xl font-black group-hover:scale-105 transition-transform origin-right duration-500">{checkTotal.toLocaleString()}৳</span>
-                </div>
-                <button onClick={handlePlaceOrder} disabled={isPlacingOrder} className="w-full bg-red-700 text-white py-5 rounded-xl font-black uppercase tracking-[0.2em] mt-8 hover:bg-white hover:text-red-700 transition-all shadow-xl disabled:opacity-50">
-                  {isPlacingOrder ? 'Processing...' : 'Secure My Order'}
-                </button>
-              </div>
+                  <div className="pt-6 border-t border-white/10 flex justify-between items-end">
+                     <span className="text-xs font-black uppercase italic tracking-widest text-red-600">Total Settlement</span>
+                     <span className="text-3xl font-black">{(subtotal + (selectedShipping?.rate || 0)).toLocaleString()}৳</span>
+                  </div>
+                  <button onClick={handlePlaceOrder} disabled={isPlacingOrder} className="w-full bg-red-700 text-white py-5 rounded-xl font-black uppercase tracking-widest mt-8 hover:bg-white hover:text-red-700 transition-all shadow-xl disabled:opacity-50">
+                    {isPlacingOrder ? 'Processing...' : 'Commit Protocol'}
+                  </button>
+               </div>
             </div>
           </div>
         );
       case 'admin':
-        return (
-          <Dashboard 
-            sneakers={sneakers} 
-            orders={orders} 
-            shippingOptions={shippingOptions}
-            onRefresh={() => { fetchOrders(); fetchSneakers(); fetchShippingOptions(); }} 
-            onUpdateOrderStatus={handleUpdateOrderStatus}
-            onSaveProduct={handleSaveProduct}
-            onDeleteProduct={handleDeleteProduct}
-            onSaveShipping={handleSaveShippingOption}
-            onDeleteShipping={handleDeleteShippingOption}
-            isRefreshing={isFetchingOrders || isFetchingSneakers} 
-            onLogout={handleLogout} 
-          />
-        );
-      default:
-        return <Home sneakers={sneakers} onSelectProduct={handleSelectProduct} onNavigate={setCurrentView} />;
+        return <Dashboard 
+          sneakers={sneakers} 
+          orders={orders} 
+          shippingOptions={shippingOptions} 
+          footerConfig={footerConfig}
+          onRefresh={() => { fetchOrders(); fetchSneakers(); fetchShippingOptions(); fetchFooterConfig(); }} 
+          onUpdateOrderStatus={handleUpdateOrderStatus} 
+          onSaveProduct={handleSaveProduct} 
+          onDeleteProduct={handleDeleteProduct} 
+          onSaveShipping={handleSaveShippingOption} 
+          onDeleteShipping={handleDeleteShippingOption}
+          onSaveFooterConfig={handleSaveFooterConfig}
+          isRefreshing={isFetchingOrders || isFetchingSneakers} 
+          onLogout={handleLogout} 
+        />;
+      default: return <Home sneakers={sneakers} onSelectProduct={handleSelectProduct} onNavigate={setCurrentView} />;
     }
   };
 
   return (
     <div className="min-h-screen flex flex-col bg-white">
-      {currentView !== 'admin' && (
-        <Navigation 
-          onNavigate={(view) => {
-            if (view === 'admin') navigateToAdmin();
-            else {
-               setCurrentView(view as View);
-               setIsCartSidebarOpen(false);
-            }
-          }} 
-          cartCount={cart.reduce((acc, item) => acc + item.quantity, 0)} 
-          wishlistCount={wishlist.length}
-          currentView={currentView} 
-          onOpenCart={() => setIsCartSidebarOpen(true)}
-        />
-      )}
+      {currentView !== 'admin' && <Navigation onNavigate={(view) => { if (view === 'admin') navigateToAdmin(); else { setCurrentView(view as View); setIsCartSidebarOpen(false); } }} cartCount={cart.reduce((acc, item) => acc + item.quantity, 0)} wishlistCount={wishlist.length} currentView={currentView} onOpenCart={() => setIsCartSidebarOpen(true)} />}
       <div className="flex-1">{renderView()}</div>
       <CartSidebar />
+      {currentView !== 'admin' && currentView !== 'admin-login' && <Footer config={footerConfig} onNavigate={setCurrentView} />}
     </div>
   );
 };
