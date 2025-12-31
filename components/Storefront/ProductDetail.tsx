@@ -1,8 +1,8 @@
 
 import React, { useState, useEffect } from 'react';
-import { Sneaker, CartItem } from '../../types';
-import { generateHypeDescription } from '../../services/geminiService';
-import { MOCK_SNEAKERS } from '../../constants';
+import { Sneaker, CartItem } from '../../types.ts';
+import { generateHypeDescription } from '../../services/geminiService.ts';
+import { MOCK_SNEAKERS } from '../../constants.tsx';
 
 interface ProductDetailProps {
   sneaker: Sneaker;
@@ -63,10 +63,17 @@ const ProductDetail: React.FC<ProductDetailProps> = ({
 
   const navigateToCategory = (cat: string) => {
     // We use the browser history API to trigger the category filter in App.tsx
-    const url = `/?category=${cat.toLowerCase().replace(/\s+/g, '-')}`;
-    window.history.pushState({ view: 'shop', category: cat.toLowerCase() }, '', url);
-    // Force a popstate event to trigger App.tsx routing logic
-    window.dispatchEvent(new PopStateEvent('popstate'));
+    // Constructed without leading slash to avoid SecurityError in blob/sandbox environments
+    const queryString = `?category=${cat.toLowerCase().replace(/\s+/g, '-')}`;
+    try {
+      window.history.pushState({ view: 'shop', category: cat.toLowerCase() }, '', window.location.pathname + queryString);
+      // Force a popstate event to trigger App.tsx routing logic
+      window.dispatchEvent(new PopStateEvent('popstate'));
+    } catch (e) {
+      console.warn('SneakerVault: Deep-link history blocked.', e);
+      // Fallback: manually update current location for local app state if possible, 
+      // but App.tsx handles state via the dispatchEvent if history fails
+    }
   };
 
   const relatedProducts = MOCK_SNEAKERS.filter(s => s.id !== sneaker.id).slice(0, 4);
@@ -202,7 +209,7 @@ const ProductDetail: React.FC<ProductDetailProps> = ({
                 >+</button>
               </div>
               
-              {/* Action Buttons - SIDE-BY-SIDE ON THE SAME LINE */}
+              {/* Action Buttons */}
               <div className="flex flex-row gap-2 sm:gap-4 h-16">
                 <button 
                   onClick={() => handleAction(false)}

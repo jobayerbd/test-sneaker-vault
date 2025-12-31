@@ -1,6 +1,6 @@
 
 import React, { useMemo } from 'react';
-import { Sneaker } from '../../types';
+import { Sneaker } from '../../types.ts';
 
 interface ShopProps {
   sneakers: Sneaker[];

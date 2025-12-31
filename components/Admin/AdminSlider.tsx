@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { HomeSlide } from '../../types';
+import { HomeSlide } from '../../types.ts';
 
 interface AdminSliderProps {
   slides: HomeSlide[];

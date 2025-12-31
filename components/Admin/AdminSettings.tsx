@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { ShippingOption, FooterConfig, PaymentMethod } from '../../types';
+import { ShippingOption, FooterConfig, PaymentMethod } from '../../types.ts';
 
 interface AdminSettingsProps {
   shippingOptions: ShippingOption[];
@@ -119,7 +119,7 @@ const AdminSettings: React.FC<AdminSettingsProps> = ({
               <h4 className="text-[10px] font-black uppercase mb-6 italic">Edit Distribution Layer</h4>
               <div className="space-y-4">
                 <input type="text" placeholder="METHOD NAME" value={editingShipping.name} onChange={e => setEditingShipping({...editingShipping, name: e.target.value})} className="w-full bg-white/5 p-4 rounded-xl font-bold uppercase text-xs outline-none focus:ring-1 ring-red-600" />
-                <input type="number" placeholder="RATE (৳)" value={editingShipping.rate} onChange={e => setEditingShipping({...editingShipping, rate: Number(e.target.value)})} className="w-full bg-white/5 p-4 rounded-xl font-bold text-xs outline-none focus:ring-1 ring-red-600" />
+                <input type="number" placeholder="RATE (৳)" value={editingShipping.rate} onChange={e => setEditingShipping({...editingShipping, rate: Number(e.target.value)})} className="w-full bg-gray-50 p-4 rounded-xl font-bold text-xs outline-none focus:ring-1 ring-red-600" />
                 <div className="flex gap-3">
                   <button onClick={async () => { setIsSavingShipping(true); if(await onSaveShipping(editingShipping)) setEditingShipping(null); setIsSavingShipping(false); }} className="flex-1 bg-red-700 py-3 rounded-xl font-black text-[10px] uppercase">Commit</button>
                   <button onClick={() => setEditingShipping(null)} className="flex-1 bg-white/10 py-3 rounded-xl font-black text-[10px] uppercase">Cancel</button>

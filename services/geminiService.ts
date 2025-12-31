@@ -1,3 +1,4 @@
+
 import { GoogleGenAI } from "@google/genai";
 
 /**
@@ -6,14 +7,18 @@ import { GoogleGenAI } from "@google/genai";
  */
 export const generateHypeDescription = async (sneakerName: string, colorway: string) => {
   try {
-    // Guidelines: Always use new GoogleGenAI({apiKey: process.env.API_KEY})
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const apiKey = process.env.API_KEY;
+    if (!apiKey) {
+      console.warn("SneakerVault: API_KEY missing. Falling back to static description.");
+      return "Premium quality meets iconic design in this limited edition release.";
+    }
+
+    const ai = new GoogleGenAI({ apiKey });
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: `Write a premium, hype-inducing, and professional e-commerce description for a pair of sneakers called "${sneakerName}" in the "${colorway}" colorway. Focus on craftsmanship, cultural significance, and style. Keep it under 60 words.`,
     });
     
-    // Guidelines: Access the extracted string directly via the .text property (not a method).
     return response.text || "Premium quality meets iconic design in this limited edition release.";
   } catch (error) {
     console.error("SneakerVault: Gemini Generation Error:", error);

@@ -1,6 +1,6 @@
 
-import React, { useState, useMemo } from 'react';
-import { Order, OrderStatus, Sneaker, BrandEntity, Category, ShippingOption, FooterConfig, PaymentMethod, HomeSlide, NavItem, CheckoutField } from '../../types.ts';
+import React, { useState, useMemo, useEffect } from 'react';
+import { Order, OrderStatus, Sneaker, BrandEntity, Category, ShippingOption, FooterConfig, PaymentMethod, HomeSlide, NavItem, CheckoutField, AdminSubView } from '../../types.ts';
 
 import AdminSidebar from './AdminSidebar.tsx';
 import AdminOverview from './AdminOverview.tsx';
@@ -50,8 +50,6 @@ interface DashboardProps {
   onLogout?: () => void;
 }
 
-export type AdminSubView = 'overview' | 'orders' | 'inventory' | 'settings' | 'customers' | 'order-detail' | 'product-form' | 'brands' | 'categories' | 'slider' | 'menu' | 'checkout-config' | 'home-layout';
-
 const Dashboard: React.FC<DashboardProps> = (props) => {
   const { 
     orders, sneakers, brands, categories, paymentMethods, slides, navItems, checkoutFields, shippingOptions = [], footerConfig, onRefresh, onUpdateOrderStatus, 
@@ -70,19 +68,54 @@ const Dashboard: React.FC<DashboardProps> = (props) => {
   const [editingProduct, setEditingProduct] = useState<Partial<Sneaker> | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
+  
+  // New States for Filtering & Pagination
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+
+  // Reset pagination when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [statusFilter, searchQuery, startDate, endDate]);
 
   const filteredOrders = useMemo(() => {
     let result = orders.filter(o => {
+      // Status Filter
       const matchesStatus = statusFilter === 'ALL' || o.status === statusFilter;
+      
+      // Date Filter
+      const orderDate = o.created_at ? new Date(o.created_at) : null;
+      let matchesDate = true;
+      if (orderDate) {
+        if (startDate) {
+          const start = new Date(startDate);
+          start.setHours(0, 0, 0, 0);
+          matchesDate = matchesDate && orderDate >= start;
+        }
+        if (endDate) {
+          const end = new Date(endDate);
+          end.setHours(23, 59, 59, 999);
+          matchesDate = matchesDate && orderDate <= end;
+        }
+      }
+
+      // Search Filter
       const fullName = `${o.first_name} ${o.last_name}`.toLowerCase();
-      return matchesStatus && (
-        o.id.toLowerCase().includes(searchQuery.toLowerCase()) || 
-        fullName.includes(searchQuery.toLowerCase()) || 
-        o.email.toLowerCase().includes(searchQuery.toLowerCase())
-      );
+      const matchesSearch = o.id.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                           fullName.includes(searchQuery.toLowerCase()) || 
+                           o.email.toLowerCase().includes(searchQuery.toLowerCase());
+                           
+      return matchesStatus && matchesDate && matchesSearch;
     });
     return result.sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
-  }, [orders, statusFilter, searchQuery]);
+  }, [orders, statusFilter, searchQuery, startDate, endDate]);
+
+  const totalPages = Math.ceil(filteredOrders.length / itemsPerPage);
+  const paginatedOrders = useMemo(() => {
+    return filteredOrders.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+  }, [filteredOrders, currentPage]);
 
   const handleSelectOrder = (order: Order) => {
     setSelectedOrder(order);
@@ -111,7 +144,24 @@ const Dashboard: React.FC<DashboardProps> = (props) => {
       case 'product-form':
         return editingProduct ? <AdminProductForm product={editingProduct} brands={brands} categories={categories} onSave={async (data) => { const s = await onSaveProduct(data); if(s) setSubView('inventory'); return s; }} onCancel={() => setSubView('inventory')} /> : null;
       case 'orders': 
-        return <AdminOrders orders={filteredOrders} statusFilter={statusFilter} onStatusFilterChange={setStatusFilter} searchQuery={searchQuery} onSearchChange={setSearchQuery} onSelectOrder={handleSelectOrder} />;
+        return (
+          <AdminOrders 
+            orders={paginatedOrders} 
+            statusFilter={statusFilter} 
+            onStatusFilterChange={setStatusFilter} 
+            searchQuery={searchQuery} 
+            onSearchChange={setSearchQuery} 
+            onSelectOrder={handleSelectOrder}
+            startDate={startDate}
+            onStartDateChange={setStartDate}
+            endDate={endDate}
+            onEndDateChange={setEndDate}
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={setCurrentPage}
+            totalItems={filteredOrders.length}
+          />
+        );
       case 'order-detail':
         return selectedOrder ? <AdminOrderDetail order={selectedOrder} onBack={() => setSubView('orders')} onUpdateStatus={onUpdateOrderStatus} /> : null;
       case 'home-layout':

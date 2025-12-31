@@ -1,6 +1,6 @@
 
 import React, { useRef, useState } from 'react';
-import { Sneaker, BrandEntity, Category, SneakerVariant } from '../../types';
+import { Sneaker, BrandEntity, Category, SneakerVariant } from '../../types.ts';
 
 interface AdminProductFormProps {
   product: Partial<Sneaker>;

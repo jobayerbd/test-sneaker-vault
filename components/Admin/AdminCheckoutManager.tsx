@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { CheckoutField } from '../../types';
+import { CheckoutField } from '../../types.ts';
 
 interface AdminCheckoutManagerProps {
   fields: CheckoutField[];

@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { BrandEntity } from '../../types';
+import { BrandEntity } from '../../types.ts';
 
 interface AdminBrandsProps {
   brands: BrandEntity[];

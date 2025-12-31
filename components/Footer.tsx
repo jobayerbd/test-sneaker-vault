@@ -1,5 +1,6 @@
+
 import React from 'react';
-import { FooterConfig } from '../types';
+import { FooterConfig } from '../types.ts';
 
 interface FooterProps {
   config: FooterConfig;

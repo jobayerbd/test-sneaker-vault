@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Sneaker } from '../../types';
+import { Sneaker } from '../../types.ts';
 
 interface AdminInventoryProps {
   sneakers: Sneaker[];

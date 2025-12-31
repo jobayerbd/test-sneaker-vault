@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { AdminSubView } from './Dashboard';
+import { AdminSubView } from '../../types.ts';
 
 interface AdminSidebarProps {
   currentView: AdminSubView;

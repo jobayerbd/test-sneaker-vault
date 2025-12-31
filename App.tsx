@@ -63,6 +63,17 @@ const App: React.FC = () => {
 
   const pixelInitialized = useRef(false);
 
+  /**
+   * Safe wrapper for History API pushState to avoid SecurityError in sandboxed environments.
+   */
+  const safePushState = (state: any, title: string, url: string) => {
+    try {
+      window.history.pushState(state, title, url);
+    } catch (e) {
+      console.warn('SneakerVault: History pushState blocked by browser security policy. This is expected in some preview environments.', e);
+    }
+  };
+
   // 1. Initial Data Fetch & Pixel Init
   useEffect(() => {
     fetchSneakers(); fetchOrders(); fetchShippingOptions(); fetchFooterConfig(); 
@@ -137,7 +148,7 @@ const App: React.FC = () => {
         currency: 'BDT',
         content_category: selectedProduct.category || 'Sneakers'
       });
-      console.log(`[PIXEL-SYNC] Tracked: ${selectedProduct.name} on ${window.location.search}`);
+      console.log(`[PIXEL-SYNC] Tracked: ${selectedProduct.name}`);
     } else if (currentView === 'checkout') {
       trackFBPixel('InitiateCheckout', {
         num_items: cart.length,
@@ -145,28 +156,27 @@ const App: React.FC = () => {
         currency: 'BDT'
       });
     }
-  }, [selectedProduct?.id, currentView, window.location.search]);
+  }, [selectedProduct?.id, currentView, footerConfig.fb_pixel_id]);
 
   const handleNavigate = (view: View, params: string = '') => {
     setCurrentView(view);
-    const newUrl = view === 'home' ? '/' : `/?view=${view}${params ? '&' + params : ''}`;
-    window.history.pushState({ view }, '', newUrl);
+    const queryString = view === 'home' ? '' : `?view=${view}${params ? '&' + params : ''}`;
+    safePushState({ view }, '', window.location.pathname + queryString);
   };
 
   const handleSelectProduct = (sneaker: Sneaker) => {
     setSelectedProduct(sneaker);
     setCurrentView('pdp');
     setIsCartSidebarOpen(false);
-    // Use slug if available, fallback to id
     const slug = sneaker.slug || sneaker.id;
-    window.history.pushState({ view: 'pdp', slug }, '', `/?product=${slug}`);
+    safePushState({ view: 'pdp', slug }, '', `${window.location.pathname}?product=${slug}`);
   };
 
   const handleSelectCategory = (slug: string | null) => {
     setSelectedCategory(slug);
     setCurrentView('shop');
-    const url = slug ? `/?category=${slug}` : `/?view=shop`;
-    window.history.pushState({ view: 'shop', category: slug }, '', url);
+    const queryString = slug ? `?category=${slug}` : `?view=shop`;
+    safePushState({ view: 'shop', category: slug }, '', window.location.pathname + queryString);
   };
 
   const fetchSneakers = useCallback(async () => {

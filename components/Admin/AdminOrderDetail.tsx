@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Order, OrderStatus, TimelineEvent } from '../../types';
+import { Order, OrderStatus, TimelineEvent } from '../../types.ts';
 
 interface AdminOrderDetailProps {
   order: Order;

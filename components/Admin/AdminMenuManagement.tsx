@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { NavItem } from '../../types';
+import { NavItem } from '../../types.ts';
 
 interface AdminMenuManagementProps {
   navItems: NavItem[];

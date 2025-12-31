@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Cell } from 'recharts';
-import { Order, Sneaker } from '../../types';
+import { Order, Sneaker } from '../../types.ts';
 
 const CHART_DATA = [
   { name: 'Mon', sales: 4000, traffic: 2400 },
@@ -27,10 +27,10 @@ const AdminOverview: React.FC<AdminOverviewProps> = ({ orders, sneakers, isRefre
   const avgOrderValue = orders.length > 0 ? Math.round(totalRevenue / orders.length) : 0;
 
   const kpis = [
-    { label: 'Total Revenue', value: `${totalRevenue.toLocaleString()}৳`, icon: 'fa-dollar-sign', color: 'text-green-600' },
-    { label: 'Avg Order Value', value: `${avgOrderValue.toLocaleString()}৳`, icon: 'fa-chart-line', color: 'text-blue-600' },
-    { label: 'Total Orders', value: orders.length, icon: 'fa-shopping-bag', color: 'text-red-600' },
-    { label: 'SKU Count', value: sneakers.length, icon: 'fa-box', color: 'text-amber-600' }
+    { label: 'Total Revenue', value: `${totalRevenue.toLocaleString()}৳`, icon: 'fa-solid fa-dollar-sign', color: 'text-green-600' },
+    { label: 'Avg Order Value', value: `${avgOrderValue.toLocaleString()}৳`, icon: 'fa-solid fa-chart-line', color: 'text-blue-600' },
+    { label: 'Total Orders', value: orders.length, icon: 'fa-solid fa-shopping-bag', color: 'text-red-600' },
+    { label: 'SKU Count', value: sneakers.length, icon: 'fa-solid fa-box', color: 'text-amber-600' }
   ];
 
   return (
@@ -53,7 +53,7 @@ const AdminOverview: React.FC<AdminOverviewProps> = ({ orders, sneakers, isRefre
         {kpis.map((kpi, idx) => (
           <div key={idx} className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
             <div className={`p-3 rounded-lg bg-gray-50 ${kpi.color} w-fit mb-4`}>
-              <i className={`fa-solid ${kpi.icon}`}></i>
+              <i className={kpi.icon}></i>
             </div>
             <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">{kpi.label}</p>
             <h3 className="text-2xl font-black">{kpi.value}</h3>
@@ -64,27 +64,31 @@ const AdminOverview: React.FC<AdminOverviewProps> = ({ orders, sneakers, isRefre
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         <div className="bg-white p-8 rounded-2xl border border-gray-100 shadow-sm h-[350px]">
           <h3 className="text-sm font-black uppercase tracking-widest mb-8 italic">Sales Velocity</h3>
-          <ResponsiveContainer width="100%" height="80%">
-            <AreaChart data={CHART_DATA}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f1f1" />
-              <XAxis dataKey="name" hide />
-              <YAxis hide />
-              <Tooltip />
-              <Area type="monotone" dataKey="sales" stroke="#ef4444" fill="#fee2e2" strokeWidth={3} />
-            </AreaChart>
-          </ResponsiveContainer>
+          <div className="h-full">
+            <ResponsiveContainer width="100%" height="80%">
+              <AreaChart data={CHART_DATA}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f1f1" />
+                <XAxis dataKey="name" hide />
+                <YAxis hide />
+                <Tooltip />
+                <Area type="monotone" dataKey="sales" stroke="#ef4444" fill="#fee2e2" strokeWidth={3} />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
         </div>
         <div className="bg-white p-8 rounded-2xl border border-gray-100 shadow-sm h-[350px]">
           <h3 className="text-sm font-black uppercase tracking-widest mb-8 italic">Traffic Distribution</h3>
-          <ResponsiveContainer width="100%" height="80%">
-            <BarChart data={CHART_DATA}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f1f1" />
-              <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 10, fontWeight: 800}} />
-              <Bar dataKey="traffic" radius={[4, 4, 0, 0]} barSize={20}>
-                {CHART_DATA.map((_, index) => <Cell key={index} fill={COLORS[index % COLORS.length]} />)}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
+          <div className="h-full">
+            <ResponsiveContainer width="100%" height="80%">
+              <BarChart data={CHART_DATA}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f1f1" />
+                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 10, fontWeight: 800}} />
+                <Bar dataKey="traffic" radius={[4, 4, 0, 0]} barSize={20}>
+                  {CHART_DATA.map((_, index) => <Cell key={index} fill={COLORS[index % COLORS.length]} />)}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
         </div>
       </div>
     </div>
