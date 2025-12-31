@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { NavItem } from '../types.ts';
+import { NavItem, SiteIdentity } from '../types.ts';
 
 interface NavigationProps {
   onNavigate: (view: any) => void;
@@ -10,9 +10,10 @@ interface NavigationProps {
   onOpenCart: () => void;
   onOpenSearch: () => void;
   navItems: NavItem[];
+  siteIdentity: SiteIdentity;
 }
 
-const Navigation: React.FC<NavigationProps> = ({ onNavigate, cartCount, wishlistCount, currentView, onOpenCart, onOpenSearch, navItems }) => {
+const Navigation: React.FC<NavigationProps> = ({ onNavigate, cartCount, wishlistCount, currentView, onOpenCart, onOpenSearch, navItems, siteIdentity }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const activeNavItems = navItems.filter(i => i.active).sort((a, b) => a.order - b.order);
@@ -39,9 +40,13 @@ const Navigation: React.FC<NavigationProps> = ({ onNavigate, cartCount, wishlist
             onClick={() => onNavigate('home')}
             className="flex items-center"
           >
-            <span className="text-xl md:text-2xl font-black font-heading tracking-tighter italic">
-              SNEAKER<span className="text-red-600">VAULT</span>
-            </span>
+            {siteIdentity.logo_url ? (
+              <img src={siteIdentity.logo_url} alt={siteIdentity.title} className="h-8 md:h-10 w-auto object-contain" />
+            ) : (
+              <span className="text-xl md:text-2xl font-black font-heading tracking-tighter italic">
+                {siteIdentity.title.toUpperCase().split('VAULT')[0]}<span className="text-red-600">VAULT</span>
+              </span>
+            )}
           </button>
 
           {/* Desktop Nav */}
@@ -89,7 +94,11 @@ const Navigation: React.FC<NavigationProps> = ({ onNavigate, cartCount, wishlist
         <div className="flex flex-col h-full shadow-2xl">
           <div className="p-8 bg-black text-white flex justify-between items-center">
             <span className="text-xl font-black font-heading tracking-tighter italic">
-              VAULT<span className="text-red-600 text-sm ml-1 uppercase not-italic tracking-widest font-sans font-black">Menu</span>
+              {siteIdentity.logo_url ? (
+                 <img src={siteIdentity.logo_url} alt={siteIdentity.title} className="h-6 w-auto brightness-0 invert" />
+              ) : (
+                <>VAULT<span className="text-red-600 text-sm ml-1 uppercase not-italic tracking-widest font-sans font-black">Menu</span></>
+              )}
             </span>
             <button onClick={() => setIsMobileMenuOpen(false)} className="hover:rotate-90 transition-transform">
               <i className="fa-solid fa-xmark text-xl"></i>
@@ -132,7 +141,7 @@ const Navigation: React.FC<NavigationProps> = ({ onNavigate, cartCount, wishlist
 
           <div className="p-8 bg-gray-50 border-t border-gray-100">
             <p className="text-[9px] text-gray-400 font-bold uppercase tracking-widest leading-relaxed">
-              SNEAKERVAULT OS v2.0<br/>
+              {siteIdentity.title.toUpperCase()} OS v2.0<br/>
               Status: System Online
             </p>
           </div>

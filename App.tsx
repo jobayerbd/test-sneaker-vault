@@ -988,6 +988,7 @@ const App: React.FC = () => {
           onOpenCart={() => setIsCartSidebarOpen(true)} 
           onOpenSearch={() => setIsSearchOpen(true)}
           navItems={navItems}
+          siteIdentity={siteIdentity}
         />
       )}
       <div className="flex-1">{renderView()}</div>
