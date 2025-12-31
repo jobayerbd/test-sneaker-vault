@@ -61,6 +61,14 @@ const ProductDetail: React.FC<ProductDetailProps> = ({
     onAddToCart(cartItem, directToCheckout);
   };
 
+  const navigateToCategory = (cat: string) => {
+    // We use the browser history API to trigger the category filter in App.tsx
+    const url = `/?category=${cat.toLowerCase().replace(/\s+/g, '-')}`;
+    window.history.pushState({ view: 'shop', category: cat.toLowerCase() }, '', url);
+    // Force a popstate event to trigger App.tsx routing logic
+    window.dispatchEvent(new PopStateEvent('popstate'));
+  };
+
   const relatedProducts = MOCK_SNEAKERS.filter(s => s.id !== sneaker.id).slice(0, 4);
 
   return (
@@ -218,10 +226,25 @@ const ProductDetail: React.FC<ProductDetailProps> = ({
                 <div className="flex items-center"><i className="fa-solid fa-shield-check text-red-600 mr-2"></i> Authenticated</div>
                 <div className="flex items-center"><i className="fa-solid fa-rotate text-red-600 mr-2"></i> Easy Return</div>
               </div>
-              <p className="text-[9px] text-gray-400 uppercase font-black tracking-widest leading-relaxed">
-                ID: SV_{sneaker.id}_PRT <br />
-                CATEGORIES: {sneaker.category || 'GENERAL'}, {sneaker.brand || 'VAULT'}, SEASON_24
-              </p>
+              <div className="text-[9px] text-gray-400 uppercase font-black tracking-widest leading-relaxed">
+                <p className="mb-1">ID: SV_{sneaker.id}_PRT</p>
+                <div className="flex flex-wrap items-center gap-x-2">
+                  <span>CATEGORIES:</span>
+                  {(sneaker.categories || [sneaker.category || 'GENERAL']).map((cat, idx) => (
+                    <button 
+                      key={idx} 
+                      onClick={() => navigateToCategory(cat)}
+                      className="text-red-600 hover:text-black transition-colors underline underline-offset-2"
+                    >
+                      {cat.toUpperCase()}
+                    </button>
+                  ))}
+                  <span className="text-gray-200">|</span>
+                  <span>{sneaker.brand || 'VAULT'}</span>
+                  <span className="text-gray-200">|</span>
+                  <span>SEASON_24</span>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -244,12 +267,12 @@ const ProductDetail: React.FC<ProductDetailProps> = ({
           <div className="max-w-3xl mx-auto min-h-[200px]">
             {activeTab === 'DESCRIPTION' && (
               <div className="animate-in fade-in slide-in-from-top-4">
-                <p className="text-xs text-gray-500 leading-8 text-center italic font-medium">
+                <p className="text-xs text-gray-500 leading-8 text-center italic font-medium whitespace-pre-wrap">
                   {loadingAi ? (
                     <span className="flex items-center justify-center gap-2">
                       <i className="fa-solid fa-circle-notch animate-spin"></i> Analyzing asset aesthetics...
                     </span>
-                  ) : aiDescription}
+                  ) : (sneaker.description || aiDescription)}
                 </p>
               </div>
             )}

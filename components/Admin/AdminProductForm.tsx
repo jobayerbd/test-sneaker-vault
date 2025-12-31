@@ -16,6 +16,7 @@ const AdminProductForm: React.FC<AdminProductFormProps> = ({
   const [editingProduct, setEditingProduct] = useState<Partial<Sneaker>>({
     variants: [],
     gallery: [],
+    categories: [],
     ...initialProduct
   });
   const [isSaving, setIsSaving] = useState(false);
@@ -45,6 +46,15 @@ const AdminProductForm: React.FC<AdminProductFormProps> = ({
     const newVariants = [...(editingProduct.variants || [])];
     newVariants[index] = { ...newVariants[index], [field]: value };
     setEditingProduct({ ...editingProduct, variants: newVariants });
+  };
+
+  const handleCategoryToggle = (catName: string) => {
+    const currentCats = editingProduct.categories || [];
+    if (currentCats.includes(catName)) {
+      setEditingProduct({ ...editingProduct, categories: currentCats.filter(c => c !== catName) });
+    } else {
+      setEditingProduct({ ...editingProduct, categories: [...currentCats, catName] });
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -83,19 +93,28 @@ const AdminProductForm: React.FC<AdminProductFormProps> = ({
                 <label className="text-[10px] font-black uppercase text-gray-400 block mb-2 px-1">Asset Title*</label>
                 <input type="text" required value={editingProduct.name} onChange={e => setEditingProduct({...editingProduct, name: e.target.value})} className="w-full bg-gray-50 p-4 rounded-xl font-bold uppercase text-xs outline-none border-2 border-transparent focus:border-black transition-all" />
               </div>
-              <div>
+              <div className="col-span-2 md:col-span-1">
                 <label className="text-[10px] font-black uppercase text-gray-400 block mb-2 px-1">Brand Protocol (Optional)</label>
                 <select value={editingProduct.brand || ''} onChange={e => setEditingProduct({...editingProduct, brand: e.target.value})} className="w-full bg-gray-50 p-4 rounded-xl font-bold uppercase text-xs outline-none border-2 border-transparent focus:border-black appearance-none cursor-pointer">
                   <option value="">NO BRAND</option>
                   {brands.map(b => <option key={b.id} value={b.name}>{b.name.toUpperCase()}</option>)}
                 </select>
               </div>
-              <div>
-                <label className="text-[10px] font-black uppercase text-gray-400 block mb-2 px-1">Category Designation</label>
-                <select value={editingProduct.category || ''} onChange={e => setEditingProduct({...editingProduct, category: e.target.value})} className="w-full bg-gray-50 p-4 rounded-xl font-bold uppercase text-xs outline-none border-2 border-transparent focus:border-black appearance-none cursor-pointer">
-                  <option value="">NO CATEGORY</option>
-                  {categories.map(c => <option key={c.id} value={c.name}>{c.name.toUpperCase()}</option>)}
-                </select>
+              <div className="col-span-2">
+                <label className="text-[10px] font-black uppercase text-gray-400 block mb-4 px-1 italic">Category Registry (Select Multiple)</label>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 bg-gray-50 p-6 rounded-2xl border border-gray-100">
+                  {categories.map(c => (
+                    <label key={c.id} className="flex items-center gap-3 cursor-pointer group">
+                      <input 
+                        type="checkbox" 
+                        checked={editingProduct.categories?.includes(c.name)} 
+                        onChange={() => handleCategoryToggle(c.name)}
+                        className="w-5 h-5 rounded border-gray-200 text-red-600 focus:ring-red-600" 
+                      />
+                      <span className="text-[10px] font-black uppercase tracking-widest text-gray-600 group-hover:text-black transition-colors">{c.name}</span>
+                    </label>
+                  ))}
+                </div>
               </div>
             </div>
 
@@ -112,6 +131,17 @@ const AdminProductForm: React.FC<AdminProductFormProps> = ({
                 <label className="text-[10px] font-black uppercase text-gray-400 block mb-2 px-1">Fit Intelligence</label>
                 <input type="text" value={editingProduct.fit_score} onChange={e => setEditingProduct({...editingProduct, fit_score: e.target.value})} placeholder="e.g. True to Size" className="w-full bg-gray-50 p-4 rounded-xl font-bold text-xs outline-none border-2 border-transparent focus:border-black" />
               </div>
+            </div>
+
+            <div className="col-span-2">
+              <label className="text-[10px] font-black uppercase text-gray-400 block mb-2 px-1">Asset Description & Hype Strategy</label>
+              <textarea 
+                rows={6} 
+                value={editingProduct.description} 
+                onChange={e => setEditingProduct({...editingProduct, description: e.target.value})} 
+                placeholder="ENTER PRODUCT STORY AND CRAFTSMANSHIP DETAILS..."
+                className="w-full bg-gray-50 p-4 rounded-xl font-medium text-xs outline-none border-2 border-transparent focus:border-black transition-all resize-none leading-relaxed" 
+              />
             </div>
           </section>
 

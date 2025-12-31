@@ -74,6 +74,7 @@ export interface Sneaker {
   slug?: string;
   brand?: string;
   category?: string;
+  categories?: string[];
   price: number;
   original_price?: number;
   image: string;

@@ -22,12 +22,17 @@ const Shop: React.FC<ShopProps> = ({
   const filteredSneakers = useMemo(() => {
     let results = sneakers;
     
-    // Apply Category Filter
+    // Apply Category Filter (Handles both single and multiple categories)
     if (categoryFilter) {
-      results = results.filter(s => 
-        (s.category && s.category.toLowerCase() === categoryFilter.toLowerCase()) ||
-        (s.brand && s.brand.toLowerCase() === categoryFilter.toLowerCase())
-      );
+      results = results.filter(s => {
+        const productCats = (s.categories || [s.category]).map(c => c?.toLowerCase());
+        const target = categoryFilter.toLowerCase();
+        
+        return (
+          productCats.some(c => c === target || c?.replace(/\s+/g, '-') === target) ||
+          (s.brand && s.brand.toLowerCase() === target)
+        );
+      });
     }
 
     // Apply Search Filter
@@ -37,6 +42,7 @@ const Shop: React.FC<ShopProps> = ({
         s.name.toLowerCase().includes(query) || 
         (s.brand && s.brand.toLowerCase().includes(query)) ||
         (s.colorway && s.colorway.toLowerCase().includes(query)) ||
+        (s.categories && s.categories.some(c => c.toLowerCase().includes(query))) ||
         (s.category && s.category.toLowerCase().includes(query))
       );
     }
@@ -47,7 +53,11 @@ const Shop: React.FC<ShopProps> = ({
   const categories = useMemo(() => {
     const cats = new Set<string>();
     sneakers.forEach(s => {
-      if (s.category) cats.add(s.category);
+      if (s.categories) {
+        s.categories.forEach(c => cats.add(c));
+      } else if (s.category) {
+        cats.add(s.category);
+      }
     });
     return Array.from(cats);
   }, [sneakers]);
