@@ -82,4 +82,5 @@ export interface FooterConfig {
   facebook_url: string;
   instagram_url: string;
   twitter_url: string;
+  fb_pixel_id?: string;
 }

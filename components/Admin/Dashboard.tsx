@@ -299,7 +299,7 @@ const Dashboard: React.FC<DashboardProps> = ({
 
   const [footerForm, setFooterForm] = useState<FooterConfig>({ ...footerConfig });
 
-  const totalRevenue = useMemo(() => orders.reduce((acc, o) => acc + (Number(o.total) || 0), [orders]), [orders]);
+  const totalRevenue = useMemo(() => orders.reduce((acc, o) => acc + (Number(o.total) || 0), 0), [orders]);
   const avgOrderValue = useMemo(() => orders.length > 0 ? Math.round(totalRevenue / orders.length) : 0, [totalRevenue, orders.length]);
 
   const filteredOrders = useMemo(() => {
@@ -570,6 +570,10 @@ const Dashboard: React.FC<DashboardProps> = ({
                         <label className="text-[10px] font-black uppercase text-gray-400 block mb-2">Twitter</label>
                         <input type="text" value={footerForm.twitter_url} onChange={e => setFooterForm({...footerForm, twitter_url: e.target.value})} className="w-full bg-gray-50 p-3 rounded-lg text-[9px] font-bold" />
                       </div>
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-black uppercase text-gray-400 block mb-2">Facebook Pixel ID</label>
+                      <input type="text" value={footerForm.fb_pixel_id || ''} onChange={e => setFooterForm({...footerForm, fb_pixel_id: e.target.value})} placeholder="e.g. 1234567890" className="w-full bg-gray-50 border-2 border-transparent focus:border-black p-4 rounded-xl outline-none font-bold text-xs" />
                     </div>
                     <div>
                       <label className="text-[10px] font-black uppercase text-gray-400 block mb-2">Copyright Registry</label>

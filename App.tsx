@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import Navigation from './components/Navigation';
 import Home from './components/Storefront/Home';
@@ -18,7 +19,15 @@ const DEFAULT_FOOTER: FooterConfig = {
   copyright: "© 2024 SNEAKERVAULT. ALL RIGHTS RESERVED. AUTHENTICATED PROTOCOL.",
   facebook_url: "#",
   instagram_url: "#",
-  twitter_url: "#"
+  twitter_url: "#",
+  fb_pixel_id: ""
+};
+
+// FB Pixel Tracking Helper
+const trackFBPixel = (event: string, params?: any) => {
+  if (typeof window !== 'undefined' && (window as any).fbq) {
+    (window as any).fbq('track', event, params);
+  }
 };
 
 type View = 'home' | 'shop' | 'admin' | 'cart' | 'pdp' | 'wishlist' | 'checkout' | 'order-success' | 'admin-login';
@@ -53,9 +62,44 @@ const App: React.FC = () => {
     password: ''
   });
 
+  // Track PageView on view change
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'auto' });
+    trackFBPixel('PageView');
+
+    if (currentView === 'checkout') {
+      trackFBPixel('InitiateCheckout');
+    }
   }, [currentView]);
+
+  // FB Pixel Script Management
+  useEffect(() => {
+    if (!footerConfig.fb_pixel_id) return;
+
+    const pixelId = footerConfig.fb_pixel_id.trim();
+    if (!pixelId) return;
+
+    const f = window as any;
+    if (f.fbq) return;
+
+    // Fix: cast 'n' to any to allow dynamic property assignment for FB pixel initialization
+    const n: any = f.fbq = function() {
+      n.callMethod ? n.callMethod.apply(n, arguments) : n.queue.push(arguments);
+    };
+    if (!f._fbq) f._fbq = n;
+    n.push = n;
+    n.loaded = !0;
+    n.version = '2.0';
+    n.queue = [];
+    const t = document.createElement('script');
+    t.async = !0;
+    t.src = 'https://connect.facebook.net/en_US/fbevents.js';
+    const s = document.getElementsByTagName('script')[0];
+    if (s && s.parentNode) s.parentNode.insertBefore(t, s);
+
+    f.fbq('init', pixelId);
+    f.fbq('track', 'PageView');
+  }, [footerConfig.fb_pixel_id]);
 
   const fetchFooterConfig = useCallback(async () => {
     try {
@@ -264,6 +308,13 @@ const App: React.FC = () => {
     setSelectedProduct(sneaker);
     setCurrentView('pdp');
     setIsCartSidebarOpen(false);
+    trackFBPixel('ViewContent', {
+      content_name: sneaker.name,
+      content_ids: [sneaker.id],
+      content_type: 'product',
+      value: sneaker.price,
+      currency: 'BDT'
+    });
   };
 
   const handleAddToCart = (item: CartItem, shouldCheckout: boolean = false) => {
@@ -276,6 +327,15 @@ const App: React.FC = () => {
       }
       return [...prev, item];
     });
+
+    trackFBPixel('AddToCart', {
+      content_name: item.name,
+      content_ids: [item.id],
+      content_type: 'product',
+      value: item.price * item.quantity,
+      currency: 'BDT'
+    });
+
     if (shouldCheckout) {
       setCurrentView('checkout');
       setIsCartSidebarOpen(false);
@@ -298,6 +358,13 @@ const App: React.FC = () => {
     setWishlist(prev => {
       const exists = prev.find(s => s.id === sneaker.id);
       if (exists) return prev.filter(s => s.id !== sneaker.id);
+      trackFBPixel('AddToWishlist', {
+        content_name: sneaker.name,
+        content_ids: [sneaker.id],
+        content_type: 'product',
+        value: sneaker.price,
+        currency: 'BDT'
+      });
       return [...prev, sneaker];
     });
   };
@@ -348,6 +415,14 @@ const App: React.FC = () => {
       });
       if (!response.ok) throw new Error("Order Rejection");
       const savedOrder = (await response.json())[0];
+      
+      trackFBPixel('Purchase', {
+        value: total,
+        currency: 'BDT',
+        content_ids: cart.map(i => i.id),
+        content_type: 'product'
+      });
+
       setOrders(prev => [savedOrder, ...prev]);
       setLastOrder(savedOrder);
       setCart([]);
@@ -405,7 +480,7 @@ const App: React.FC = () => {
     switch (currentView) {
       case 'home': return <Home sneakers={sneakers} onSelectProduct={handleSelectProduct} onNavigate={setCurrentView} />;
       case 'pdp': return selectedProduct ? <ProductDetail sneaker={selectedProduct} onAddToCart={handleAddToCart} onBack={() => setCurrentView('shop')} onToggleWishlist={toggleWishlist} isInWishlist={wishlist.some(s => s.id === selectedProduct.id)} /> : <Home sneakers={sneakers} onSelectProduct={handleSelectProduct} onNavigate={setCurrentView} />;
-      case 'admin-login': return <Login supabaseUrl={SUPABASE_URL} supabaseKey={SUPABASE_KEY} onLoginSuccess={() => { setIsAdminAuthenticated(true); setCurrentView('admin'); fetchOrders(); fetchSneakers(); fetchShippingOptions(); }} />;
+      case 'admin-login': return <Login supabaseUrl={SUPABASE_URL} supabaseKey={SUPABASE_KEY} onLoginSuccess={() => { setIsAdminAuthenticated(true); setCurrentView('admin'); fetchOrders(); fetchSneakers(); fetchShippingOptions(); fetchFooterConfig(); }} />;
       case 'shop':
         return (
           <div className="max-w-7xl mx-auto px-4 py-16">
