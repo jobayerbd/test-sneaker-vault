@@ -61,6 +61,7 @@ const App: React.FC = () => {
 
   const [checkoutForm, setCheckoutForm] = useState<Record<string, any>>({});
 
+  // Global Pixel Initializer
   useEffect(() => {
     const pixelId = footerConfig.fb_pixel_id?.trim();
     if (!pixelId) return;
@@ -71,9 +72,11 @@ const App: React.FC = () => {
       const t = document.createElement('script'); t.async = !0; t.src = 'https://connect.facebook.net/en_US/fbevents.js';
       const s = document.getElementsByTagName('script')[0]; if (s && s.parentNode) s.parentNode.insertBefore(t, s);
     }
-    f.fbq('init', pixelId); f.fbq('track', 'PageView');
+    f.fbq('init', pixelId);
+    f.fbq('track', 'PageView');
   }, [footerConfig.fb_pixel_id]);
 
+  // View Change Observer
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'auto' });
     trackFBPixel('PageView');
@@ -86,11 +89,14 @@ const App: React.FC = () => {
         currency: 'BDT'
       });
     }
-  }, [currentView, cart]);
+  }, [currentView]);
 
-  // Reactive Pixel Tracking for Product Navigation
+  // Dedicated Product Tracker (Detects every change in selectedProduct)
   useEffect(() => {
     if (currentView === 'pdp' && selectedProduct) {
+      // Force a PageView reset for the new product to refresh parameters in FB's end
+      trackFBPixel('PageView');
+      
       trackFBPixel('ViewContent', {
         content_ids: [selectedProduct.id],
         content_name: selectedProduct.name,
@@ -99,8 +105,10 @@ const App: React.FC = () => {
         currency: 'BDT',
         content_category: selectedProduct.category || 'Sneakers'
       });
+      
+      console.log(`SneakerVault: FB ViewContent fired for product ID: ${selectedProduct.id}`);
     }
-  }, [selectedProduct, currentView]);
+  }, [selectedProduct?.id, currentView]);
 
   const fetchSneakers = useCallback(async () => {
     setIsFetchingSneakers(true);
@@ -287,7 +295,6 @@ const App: React.FC = () => {
   const handlePlaceOrder = async () => {
     setCheckoutError(null);
     
-    // Validate Required Dynamic Fields
     const enabledFields = checkoutFields.filter(f => f.enabled);
     for (const field of enabledFields) {
       if (field.required && !checkoutForm[field.field_key]) {
@@ -429,20 +436,9 @@ const App: React.FC = () => {
           'Prefer': 'return=representation'
         }
       });
-      
-      if (response.ok || response.status === 204) { 
-        await fetchNavItems(); 
-        return true; 
-      }
+      if (response.ok || response.status === 204) { await fetchNavItems(); return true; }
       return false;
-    } catch (err) { 
-      return false; 
-    }
-  };
-
-  const navigateToAdmin = () => {
-    if (isAdminAuthenticated) setCurrentView('admin');
-    else setCurrentView('admin-login');
+    } catch (err) { return false; }
   };
 
   const handleSelectProduct = (sneaker: Sneaker) => { 
@@ -595,6 +591,15 @@ const App: React.FC = () => {
 
   const handleLogout = () => { localStorage.removeItem('sv_admin_session'); setIsAdminAuthenticated(false); setCurrentView('home'); };
 
+  // Fix: added missing navigateToAdmin function to handle conditional navigation to the admin dashboard or login page
+  const navigateToAdmin = () => {
+    if (isAdminAuthenticated) {
+      setCurrentView('admin');
+    } else {
+      setCurrentView('admin-login');
+    }
+  };
+
   const handleSearch = (query: string) => {
     setSearchQuery(query);
     setIsSearchOpen(false);
@@ -624,17 +629,6 @@ const App: React.FC = () => {
             >
               <i className="fa-solid fa-arrow-right-long"></i>
             </button>
-          </div>
-          <div className="w-full mt-12 grid grid-cols-2 md:grid-cols-4 gap-4">
-             {['Jordan', 'Yeezy', 'Dunk', 'Samba'].map(term => (
-               <button 
-                 key={term}
-                 onClick={() => handleSearch(term)}
-                 className="bg-white/5 border border-white/10 p-4 text-gray-400 text-[10px] font-black uppercase tracking-widest hover:bg-red-700 hover:text-white hover:border-red-700 transition-all italic"
-               >
-                 {term}
-               </button>
-             ))}
           </div>
         </div>
       </div>
@@ -681,12 +675,6 @@ const App: React.FC = () => {
                   </div>
                 </div>
               ))}
-              {cart.length === 0 && (
-                <div className="flex flex-col items-center justify-center h-full text-center py-20">
-                   <i className="fa-solid fa-bag-shopping text-gray-100 text-7xl mb-6"></i>
-                   <p className="text-gray-400 font-bold uppercase tracking-widest italic">Vault bag is empty</p>
-                </div>
-              )}
             </div>
             <div className="p-8 bg-white border-t border-gray-100">
                <div className="flex justify-between mb-2"><span className="text-[10px] font-black uppercase text-gray-400">Inventory Value</span><span className="text-sm font-black italic">{total.toLocaleString()}৳</span></div>
@@ -719,14 +707,12 @@ const App: React.FC = () => {
             <div className="w-16 h-1 bg-red-600 mb-2"></div>
             <p className="text-gray-400 text-[10px] font-black uppercase tracking-[0.3em]">Finalizing secured transaction protocols</p>
           </div>
-
           {checkoutError && (
             <div className="max-w-4xl mx-auto mb-10 bg-red-600 text-white p-6 rounded-2xl flex items-center justify-center gap-4 animate-in slide-in-from-bottom-4 duration-300 shadow-2xl">
               <i className="fa-solid fa-triangle-exclamation text-2xl animate-pulse"></i>
               <span className="text-[11px] font-black uppercase tracking-[0.2em] italic">{checkoutError}</span>
             </div>
           )}
-
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
             <div className="lg:col-span-2 space-y-8">
               <div className="bg-white p-10 border border-gray-100 rounded-3xl shadow-sm">
@@ -734,9 +720,7 @@ const App: React.FC = () => {
                 <div className="grid grid-cols-2 gap-6">
                   {checkoutFields.filter(f => f.enabled).sort((a,b) => a.order - b.order).map((field) => (
                     <div key={field.id} className={`${field.width === 'half' ? 'col-span-1' : 'col-span-2'} space-y-1`}>
-                      <label className="text-[9px] font-black uppercase text-gray-400 px-1">
-                        {field.label} {field.required && '*'}
-                      </label>
+                      <label className="text-[9px] font-black uppercase text-gray-400 px-1">{field.label} {field.required && '*'}</label>
                       <input 
                         type={field.type} 
                         placeholder={field.placeholder.toUpperCase()} 
@@ -751,7 +735,6 @@ const App: React.FC = () => {
                   ))}
                 </div>
               </div>
-
               <div className="bg-white p-10 border border-gray-100 rounded-3xl shadow-sm">
                 <h3 className="text-xs font-black uppercase italic mb-8 border-b pb-4 tracking-widest">Logistics Hub</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -770,7 +753,6 @@ const App: React.FC = () => {
                   ))}
                 </div>
               </div>
-
               <div className="bg-white p-10 border border-gray-100 rounded-3xl shadow-sm">
                 <h3 className="text-xs font-black uppercase italic mb-8 border-b pb-4 tracking-widest">Payment Gateway Matrix</h3>
                 <div className="space-y-4">
@@ -784,15 +766,12 @@ const App: React.FC = () => {
                          <span className="font-black text-xs uppercase tracking-widest">{pm.name}</span>
                          {selectedPayment?.id === pm.id && <i className="fa-solid fa-circle-check text-red-600"></i>}
                       </div>
-                      {pm.details && (
-                        <p className="text-[10px] text-gray-500 font-medium italic leading-relaxed whitespace-pre-line">{pm.details}</p>
-                      )}
+                      {pm.details && <p className="text-[10px] text-gray-500 font-medium italic leading-relaxed whitespace-pre-line">{pm.details}</p>}
                     </div>
                   ))}
                 </div>
               </div>
             </div>
-
             <div className="bg-black text-white p-10 rounded-3xl h-fit shadow-2xl sticky top-24">
               <h3 className="text-xl font-black uppercase italic border-b border-white/10 pb-6 mb-8 tracking-tighter font-heading">Settlement Summary</h3>
               <div className="space-y-4 mb-8">
@@ -832,13 +811,11 @@ const App: React.FC = () => {
                <p className="text-[10px] font-black uppercase tracking-widest text-black">Registry Order ID: <span className="text-red-600">{lastOrder?.id}</span></p>
             </div>
           </div>
-
           <div className="bg-white border border-gray-100 rounded-3xl overflow-hidden shadow-2xl max-w-2xl mx-auto">
             <div className="bg-black p-8 text-white flex justify-between items-center">
               <h3 className="text-sm font-black uppercase italic tracking-widest font-heading">Order Manifest</h3>
               <span className="text-[9px] font-black uppercase text-gray-500 tracking-widest">Secured Archive</span>
             </div>
-            
             <div className="p-8 space-y-6">
               {lastOrder?.items?.map((item, idx) => (
                 <div key={idx} className="flex gap-6 items-center border-b border-gray-50 pb-6 last:border-0 last:pb-0">
@@ -849,13 +826,10 @@ const App: React.FC = () => {
                     <h4 className="font-black text-[11px] uppercase tracking-tight mb-1">{item.name}</h4>
                     <p className="text-[9px] text-red-600 font-black italic uppercase tracking-widest">Size Index: {item.size} | Qty: {item.quantity}</p>
                   </div>
-                  <div className="text-right">
-                    <p className="text-sm font-black italic">{(item.price * item.quantity).toLocaleString()}৳</p>
-                  </div>
+                  <div className="text-right"><p className="text-sm font-black italic">{(item.price * item.quantity).toLocaleString()}৳</p></div>
                 </div>
               ))}
             </div>
-
             <div className="bg-gray-50 p-8 border-t border-gray-100">
               <div className="space-y-3">
                 <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-gray-400">
@@ -872,30 +846,20 @@ const App: React.FC = () => {
                 </div>
               </div>
             </div>
-
             <div className="p-8 border-t border-gray-100 bg-white grid grid-cols-2 gap-8">
                <div className="space-y-2">
                  <h5 className="text-[9px] font-black uppercase text-gray-400 tracking-widest italic">Shipping Coordinates</h5>
-                 <p className="text-[10px] font-bold text-black uppercase leading-relaxed">
-                   {lastOrder?.first_name} {lastOrder?.last_name}<br/>
-                   {lastOrder?.street_address}<br/>
-                   {lastOrder?.city}, {lastOrder?.zip_code}
-                 </p>
+                 <p className="text-[10px] font-bold text-black uppercase leading-relaxed">{lastOrder?.first_name} {lastOrder?.last_name}<br/>{lastOrder?.street_address}<br/>{lastOrder?.city}, {lastOrder?.zip_code}</p>
                </div>
                <div className="space-y-2">
                  <h5 className="text-[9px] font-black uppercase text-gray-400 tracking-widest italic">Payment Matrix</h5>
                  <p className="text-[10px] font-bold text-black uppercase">{lastOrder?.payment_method}</p>
-                 <div className="inline-block px-2 py-1 bg-green-50 text-green-700 border border-green-100 text-[8px] font-black uppercase rounded mt-2">
-                   Secured & Confirmed
-                 </div>
+                 <div className="inline-block px-2 py-1 bg-green-50 text-green-700 border border-green-100 text-[8px] font-black uppercase rounded mt-2">Secured & Confirmed</div>
                </div>
             </div>
           </div>
-
           <div className="text-center mt-16">
-            <button onClick={() => setCurrentView('shop')} className="bg-black text-white px-12 py-5 rounded-2xl font-black uppercase tracking-[0.3em] text-[10px] shadow-2xl hover:bg-red-700 transition-all active:scale-95">
-              Continue Exploration
-            </button>
+            <button onClick={() => setCurrentView('shop')} className="bg-black text-white px-12 py-5 rounded-2xl font-black uppercase tracking-[0.3em] text-[10px] shadow-2xl hover:bg-red-700 transition-all active:scale-95">Continue Exploration</button>
           </div>
         </div>
       );
