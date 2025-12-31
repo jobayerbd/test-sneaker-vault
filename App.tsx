@@ -88,6 +88,20 @@ const App: React.FC = () => {
     }
   }, [currentView, cart]);
 
+  // Reactive Pixel Tracking for Product Navigation
+  useEffect(() => {
+    if (currentView === 'pdp' && selectedProduct) {
+      trackFBPixel('ViewContent', {
+        content_ids: [selectedProduct.id],
+        content_name: selectedProduct.name,
+        content_type: 'product',
+        value: selectedProduct.price,
+        currency: 'BDT',
+        content_category: selectedProduct.category || 'Sneakers'
+      });
+    }
+  }, [selectedProduct, currentView]);
+
   const fetchSneakers = useCallback(async () => {
     setIsFetchingSneakers(true);
     try {
@@ -435,7 +449,6 @@ const App: React.FC = () => {
     setSelectedProduct(sneaker); 
     setCurrentView('pdp'); 
     setIsCartSidebarOpen(false); 
-    trackFBPixel('ViewContent', { content_ids: [sneaker.id], content_name: sneaker.name, content_type: 'product', value: sneaker.price, currency: 'BDT' });
   };
   
   const handleSaveProduct = async (data: any): Promise<boolean> => {
