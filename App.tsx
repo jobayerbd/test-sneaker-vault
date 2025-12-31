@@ -22,11 +22,13 @@ const DEFAULT_FOOTER: FooterConfig = {
   fb_pixel_id: ""
 };
 
-// FB Pixel Tracking Helper - Pushes to the global fbq queue
+// Global Tracking Helper
 const trackFBPixel = (event: string, params?: any) => {
   const f = window as any;
   if (f.fbq) {
     f.fbq('track', event, params);
+  } else {
+    console.warn("Meta Pixel: fbq not initialized yet.");
   }
 };
 
@@ -62,14 +64,16 @@ const App: React.FC = () => {
     password: ''
   });
 
-  // FB Pixel Script and Initialization Management
+  // 1. Meta Pixel Script Injection & Initialization
   useEffect(() => {
     const pixelId = footerConfig.fb_pixel_id?.trim();
     if (!pixelId) return;
 
     const f = window as any;
+    const b = document;
+    const e = 'script';
+    const v = 'https://connect.facebook.net/en_US/fbevents.js';
     
-    // Standard Pixel Boilerplate if not already initialized
     if (!f.fbq) {
       f.fbq = function() {
         f.fbq.callMethod ? f.fbq.callMethod.apply(f.fbq, arguments) : f.fbq.queue.push(arguments);
@@ -79,28 +83,30 @@ const App: React.FC = () => {
       f.fbq.loaded = !0;
       f.fbq.version = '2.0';
       f.fbq.queue = [];
-      const t = document.createElement('script');
+      const t = b.createElement(e) as HTMLScriptElement;
       t.async = !0;
-      t.src = 'https://connect.facebook.net/en_US/fbevents.js';
-      const s = document.getElementsByTagName('script')[0];
+      t.src = v;
+      const s = b.getElementsByTagName(e)[0];
       if (s && s.parentNode) s.parentNode.insertBefore(t, s);
     }
 
-    // Always call init with the current ID to ensure events are tracked to the correct pixel
     f.fbq('init', pixelId);
-    // Track initial PageView for this specific pixel ID
     f.fbq('track', 'PageView');
   }, [footerConfig.fb_pixel_id]);
 
-  // Track PageView on view change (Navigation events for SPA)
+  // 2. Navigation Tracking (SPA PageViews)
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'auto' });
     trackFBPixel('PageView');
 
     if (currentView === 'checkout') {
-      trackFBPixel('InitiateCheckout');
+      trackFBPixel('InitiateCheckout', {
+        num_items: cart.length,
+        value: cart.reduce((acc, i) => acc + (i.price * i.quantity), 0),
+        currency: 'BDT'
+      });
     }
-  }, [currentView]);
+  }, [currentView, cart.length]);
 
   const fetchFooterConfig = useCallback(async () => {
     try {
