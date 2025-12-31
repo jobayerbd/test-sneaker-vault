@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { Order, OrderStatus, Sneaker, BrandEntity, Category, ShippingOption, FooterConfig, PaymentMethod, HomeSlide, NavItem, CheckoutField, AdminSubView } from '../../types.ts';
+import { Order, OrderStatus, Sneaker, BrandEntity, Category, ShippingOption, FooterConfig, PaymentMethod, HomeSlide, NavItem, CheckoutField, AdminSubView, SiteIdentity } from '../../types.ts';
 
 import AdminSidebar from './AdminSidebar.tsx';
 import AdminOverview from './AdminOverview.tsx';
@@ -15,6 +15,7 @@ import AdminSlider from './AdminSlider.tsx';
 import AdminMenuManagement from './AdminMenuManagement.tsx';
 import AdminCheckoutManager from './AdminCheckoutManager.tsx';
 import AdminHomeManagement from './AdminHomeManagement.tsx';
+import AdminIdentity from './AdminIdentity.tsx';
 
 interface DashboardProps {
   orders: Order[];
@@ -27,6 +28,7 @@ interface DashboardProps {
   checkoutFields: CheckoutField[];
   shippingOptions?: ShippingOption[];
   footerConfig: FooterConfig;
+  siteIdentity: SiteIdentity;
   onRefresh?: () => void;
   onUpdateOrderStatus: (orderId: string, newStatus: OrderStatus) => Promise<boolean>;
   onSaveProduct: (productData: Partial<Sneaker>) => Promise<boolean>;
@@ -36,6 +38,7 @@ interface DashboardProps {
   onSavePaymentMethod: (method: Partial<PaymentMethod>) => Promise<boolean>;
   onDeletePaymentMethod: (id: string) => Promise<boolean>;
   onSaveFooterConfig: (config: FooterConfig) => Promise<boolean>;
+  onSaveIdentity: (config: SiteIdentity) => Promise<boolean>;
   onSaveBrand: (brand: Partial<BrandEntity>) => Promise<boolean>;
   onDeleteBrand: (id: string) => Promise<boolean>;
   onSaveCategory: (category: Partial<Category>) => Promise<boolean>;
@@ -52,10 +55,10 @@ interface DashboardProps {
 
 const Dashboard: React.FC<DashboardProps> = (props) => {
   const { 
-    orders, sneakers, brands, categories, paymentMethods, slides, navItems, checkoutFields, shippingOptions = [], footerConfig, onRefresh, onUpdateOrderStatus, 
+    orders, sneakers, brands, categories, paymentMethods, slides, navItems, checkoutFields, shippingOptions = [], footerConfig, siteIdentity, onRefresh, onUpdateOrderStatus, 
     onSaveProduct, onDeleteProduct, onSaveShipping, onDeleteShipping, 
     onSavePaymentMethod, onDeletePaymentMethod,
-    onSaveFooterConfig, 
+    onSaveFooterConfig, onSaveIdentity,
     onSaveBrand, onDeleteBrand, onSaveCategory, onDeleteCategory,
     onSaveSlide, onDeleteSlide,
     onSaveNavItem, onDeleteNavItem,
@@ -176,6 +179,8 @@ const Dashboard: React.FC<DashboardProps> = (props) => {
         return <AdminMenuManagement navItems={navItems} onSave={onSaveNavItem} onDelete={onDeleteNavItem} />;
       case 'checkout-config':
         return <AdminCheckoutManager fields={checkoutFields} onSave={onSaveCheckoutField} onDelete={onDeleteCheckoutField} />;
+      case 'identity':
+        return <AdminIdentity identity={siteIdentity} onSave={onSaveIdentity} />;
       case 'settings':
         return <AdminSettings shippingOptions={shippingOptions} paymentMethods={paymentMethods} footerConfig={footerConfig} onSaveShipping={onSaveShipping} onDeleteShipping={onDeleteShipping} onSavePaymentMethod={onSavePaymentMethod} onDeletePaymentMethod={onDeletePaymentMethod} onSaveFooterConfig={onSaveFooterConfig} />;
       default:

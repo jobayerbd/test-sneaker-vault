@@ -16,7 +16,7 @@ export enum OrderStatus {
   RETURNED = 'Returned'
 }
 
-export type AdminSubView = 'overview' | 'orders' | 'inventory' | 'settings' | 'customers' | 'order-detail' | 'product-form' | 'brands' | 'categories' | 'slider' | 'menu' | 'checkout-config' | 'home-layout';
+export type AdminSubView = 'overview' | 'orders' | 'inventory' | 'settings' | 'customers' | 'order-detail' | 'product-form' | 'brands' | 'categories' | 'slider' | 'menu' | 'checkout-config' | 'home-layout' | 'identity';
 
 export interface NavItem {
   id: string;
@@ -150,4 +150,11 @@ export interface FooterConfig {
   instagram_url: string;
   twitter_url: string;
   fb_pixel_id?: string;
+}
+
+export interface SiteIdentity {
+  title: string;
+  tagline: string;
+  logo_url: string;
+  favicon_url: string;
 }

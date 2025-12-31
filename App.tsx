@@ -7,7 +7,7 @@ import ProductDetail from './components/Storefront/ProductDetail.tsx';
 import Dashboard from './components/Admin/Dashboard.tsx';
 import Login from './components/Admin/Login.tsx';
 import Footer from './components/Footer.tsx';
-import { Sneaker, CartItem, Order, OrderStatus, ShippingOption, FooterConfig, TimelineEvent, BrandEntity, Category, PaymentMethod, HomeSlide, NavItem, CheckoutField } from './types.ts';
+import { Sneaker, CartItem, Order, OrderStatus, ShippingOption, FooterConfig, TimelineEvent, BrandEntity, Category, PaymentMethod, HomeSlide, NavItem, CheckoutField, SiteIdentity } from './types.ts';
 
 const SUPABASE_URL = 'https://vwbctddmakbnvfxzrjeo.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_8WhV41Km5aj8Dhvu6tUbvA_JnyPoVxu';
@@ -20,6 +20,13 @@ const DEFAULT_FOOTER: FooterConfig = {
   instagram_url: "#",
   twitter_url: "#",
   fb_pixel_id: ""
+};
+
+const DEFAULT_IDENTITY: SiteIdentity = {
+  title: "SneakerVault",
+  tagline: "Premium Footwear Protocol",
+  logo_url: "",
+  favicon_url: ""
 };
 
 const trackFBPixel = (event: string, params?: any) => {
@@ -52,6 +59,7 @@ const App: React.FC = () => {
   const [selectedPayment, setSelectedPayment] = useState<PaymentMethod | null>(null);
   const [lastOrder, setLastOrder] = useState<Order | null>(null);
   const [footerConfig, setFooterConfig] = useState<FooterConfig>(DEFAULT_FOOTER);
+  const [siteIdentity, setSiteIdentity] = useState<SiteIdentity>(DEFAULT_IDENTITY);
   
   const [isPlacingOrder, setIsPlacingOrder] = useState(false);
   const [isFetchingSneakers, setIsFetchingSneakers] = useState(false);
@@ -78,9 +86,18 @@ const App: React.FC = () => {
   useEffect(() => {
     fetchSneakers(); fetchOrders(); fetchShippingOptions(); fetchFooterConfig(); 
     fetchBrands(); fetchCategories(); fetchPaymentMethods(); fetchSlides(); 
-    fetchNavItems(); fetchCheckoutFields();
+    fetchNavItems(); fetchCheckoutFields(); fetchSiteIdentity();
     if (localStorage.getItem('sv_admin_session') === 'active') setIsAdminAuthenticated(true);
   }, []);
+
+  // Sync Identity with Browser Metadata
+  useEffect(() => {
+    document.title = siteIdentity.title + (siteIdentity.tagline ? ` - ${siteIdentity.tagline}` : '');
+    const link = document.querySelector("link[rel~='icon']") as HTMLLinkElement;
+    if (link && siteIdentity.favicon_url) {
+      link.href = siteIdentity.favicon_url;
+    }
+  }, [siteIdentity]);
 
   // 2. Pixel Script Inserter
   useEffect(() => {
@@ -277,6 +294,18 @@ const App: React.FC = () => {
       if (response.ok) {
         const data = await response.json();
         if (data[0]) setFooterConfig(data[0].data);
+      }
+    } catch (err) {}
+  }, []);
+
+  const fetchSiteIdentity = useCallback(async () => {
+    try {
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/site_settings?key=eq.identity&select=data`, {
+        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        if (data[0]) setSiteIdentity(data[0].data);
       }
     } catch (err) {}
   }, []);
@@ -631,6 +660,18 @@ const App: React.FC = () => {
     } catch (err) { return false; }
   };
 
+  const handleSaveIdentity = async (config: SiteIdentity): Promise<boolean> => {
+    try {
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/site_settings?key=eq.identity`, {
+        method: 'PATCH',
+        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ data: config })
+      });
+      if (response.ok) { setSiteIdentity(config); return true; }
+      return false;
+    } catch (err) { return false; }
+  };
+
   const handleLogout = () => { 
     localStorage.removeItem('sv_admin_session'); 
     setIsAdminAuthenticated(false); 
@@ -741,7 +782,7 @@ const App: React.FC = () => {
       case 'shop': return <Shop sneakers={sneakers} onSelectProduct={handleSelectProduct} searchQuery={searchQuery} onClearSearch={() => setSearchQuery('')} categoryFilter={selectedCategory} onCategoryChange={handleSelectCategory} />;
       case 'pdp': return selectedProduct ? <ProductDetail sneaker={selectedProduct} onAddToCart={handleAddToCart} onBack={() => handleNavigate('shop')} onToggleWishlist={toggleWishlist} isInWishlist={wishlist.some(s => s.id === selectedProduct.id)} onSelectProduct={handleSelectProduct} /> : <Home sneakers={sneakers} slides={slides} onSelectProduct={handleSelectProduct} onNavigate={handleNavigate} onSearch={handleSearch} />;
       case 'admin-login': return <Login supabaseUrl={SUPABASE_URL} supabaseKey={SUPABASE_KEY} onLoginSuccess={() => { setIsAdminAuthenticated(true); handleNavigate('admin'); }} />;
-      case 'admin': return <Dashboard sneakers={sneakers} orders={orders} brands={brands} categories={categories} paymentMethods={paymentMethods} slides={slides} navItems={navItems} checkoutFields={checkoutFields} shippingOptions={shippingOptions} footerConfig={footerConfig} onRefresh={() => { fetchOrders(); fetchSneakers(); fetchShippingOptions(); fetchFooterConfig(); fetchBrands(); fetchCategories(); fetchPaymentMethods(); fetchSlides(); fetchNavItems(); fetchCheckoutFields(); }} onUpdateOrderStatus={handleUpdateOrderStatus} onSaveProduct={handleSaveProduct} onDeleteProduct={handleDeleteProduct} onSaveShipping={handleSaveShippingOption} onDeleteShipping={handleDeleteShippingOption} onSavePaymentMethod={handleSavePaymentMethod} onDeletePaymentMethod={handleDeletePaymentMethod} onSaveFooterConfig={handleSaveFooterConfig} onSaveBrand={handleSaveBrand} onDeleteBrand={handleDeleteBrand} onSaveCategory={handleSaveCategoryData} onDeleteCategory={handleDeleteCategoryData} onSaveSlide={handleSaveSlide} onDeleteSlide={handleDeleteSlide} onSaveNavItem={handleSaveNavItem} onDeleteNavItem={handleDeleteNavItem} onSaveCheckoutField={handleSaveCheckoutField} onDeleteCheckoutField={handleDeleteCheckoutField} isRefreshing={isFetchingSneakers} onLogout={handleLogout} />;
+      case 'admin': return <Dashboard sneakers={sneakers} orders={orders} brands={brands} categories={categories} paymentMethods={paymentMethods} slides={slides} navItems={navItems} checkoutFields={checkoutFields} shippingOptions={shippingOptions} footerConfig={footerConfig} siteIdentity={siteIdentity} onRefresh={() => { fetchOrders(); fetchSneakers(); fetchShippingOptions(); fetchFooterConfig(); fetchBrands(); fetchCategories(); fetchPaymentMethods(); fetchSlides(); fetchNavItems(); fetchCheckoutFields(); fetchSiteIdentity(); }} onUpdateOrderStatus={handleUpdateOrderStatus} onSaveProduct={handleSaveProduct} onDeleteProduct={handleDeleteProduct} onSaveShipping={handleSaveShippingOption} onDeleteShipping={handleDeleteShippingOption} onSavePaymentMethod={handleSavePaymentMethod} onDeletePaymentMethod={handleDeletePaymentMethod} onSaveFooterConfig={handleSaveFooterConfig} onSaveIdentity={handleSaveIdentity} onSaveBrand={handleSaveBrand} onDeleteBrand={handleDeleteBrand} onSaveCategory={handleSaveCategoryData} onDeleteCategory={handleDeleteCategoryData} onSaveSlide={handleSaveSlide} onDeleteSlide={handleDeleteSlide} onSaveNavItem={handleSaveNavItem} onDeleteNavItem={handleDeleteNavItem} onSaveCheckoutField={handleSaveCheckoutField} onDeleteCheckoutField={handleDeleteCheckoutField} isRefreshing={isFetchingSneakers} onLogout={handleLogout} />;
       case 'checkout': return (
         <div className="max-w-6xl mx-auto px-4 py-16 animate-in fade-in duration-500">
           <div className="flex flex-col items-center mb-12 text-center">
@@ -833,7 +874,7 @@ const App: React.FC = () => {
               <button 
                 onClick={handlePlaceOrder} 
                 disabled={isPlacingOrder || cart.length === 0} 
-                className="w-full bg-red-700 py-6 rounded-2xl font-black uppercase tracking-[0.3em] text-[10px] shadow-2xl hover:bg-white hover:text-black transition-all active:scale-95 flex items-center justify-center gap-3"
+                className="w-full bg-red-700 py-6 rounded-2xl font-black uppercase tracking-[0.3em] text-[10px] shadow-2xl hover:bg-white hover:text-black transition-all transform active:scale-95 flex items-center justify-center gap-3"
               >
                 {isPlacingOrder ? <i className="fa-solid fa-circle-notch animate-spin"></i> : <><i className="fa-solid fa-lock text-sm"></i> Commit Order Protocol</>}
               </button>
@@ -928,7 +969,7 @@ const App: React.FC = () => {
             </div>
           </div>
           <div className="text-center mt-16">
-            <button onClick={() => handleNavigate('shop')} className="bg-black text-white px-12 py-5 rounded-2xl font-black uppercase tracking-[0.3em] text-[10px] shadow-2xl hover:bg-red-700 transition-all active:scale-95">Continue Exploration</button>
+            <button onClick={() => handleNavigate('shop')} className="bg-black text-white px-12 py-5 rounded-2xl font-black uppercase tracking-[0.3em] text-[10px] shadow-2xl hover:bg-red-700 transition-all transform active:scale-95">Continue Exploration</button>
           </div>
         </div>
       );
