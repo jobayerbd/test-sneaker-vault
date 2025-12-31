@@ -64,7 +64,7 @@ const App: React.FC = () => {
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
   const [checkoutForm, setCheckoutForm] = useState<Record<string, any>>({});
 
-  // 1. Initialize Pixel Script
+  // 1. Pixel Initialization
   useEffect(() => {
     const pixelId = footerConfig.fb_pixel_id?.trim();
     if (!pixelId) return;
@@ -79,14 +79,46 @@ const App: React.FC = () => {
     f.fbq('track', 'PageView');
   }, [footerConfig.fb_pixel_id]);
 
-  // 2. Track General View Changes (Except PDP which is handled separately)
+  // 2. URL Change & History Navigation Handler (Popstate)
+  useEffect(() => {
+    const handlePopState = () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const productId = urlParams.get('p');
+      const view = urlParams.get('v') as View || 'home';
+
+      if (productId && sneakers.length > 0) {
+        const product = sneakers.find(s => s.id === productId);
+        if (product) {
+          setSelectedProduct(product);
+          setCurrentView('pdp');
+          return;
+        }
+      }
+      setCurrentView(view);
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [sneakers]);
+
+  // 3. Pixel Tracker - Triggers on every Product ID or View change
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'auto' });
-    if (currentView !== 'pdp') {
-      trackFBPixel('PageView');
-    }
     
-    if (currentView === 'checkout') {
+    // Always trigger a fresh PageView for every view change to reset FB's context
+    trackFBPixel('PageView');
+
+    if (currentView === 'pdp' && selectedProduct) {
+      trackFBPixel('ViewContent', {
+        content_ids: [String(selectedProduct.id)],
+        content_name: selectedProduct.name,
+        content_type: 'product',
+        value: selectedProduct.price,
+        currency: 'BDT',
+        content_category: selectedProduct.category || 'Sneakers'
+      });
+      console.log(`[PIXEL] Product Event Sent: ${selectedProduct.name}`);
+    } else if (currentView === 'checkout') {
       trackFBPixel('InitiateCheckout', {
         content_category: 'Sneakers',
         num_items: cart.length,
@@ -94,28 +126,22 @@ const App: React.FC = () => {
         currency: 'BDT'
       });
     }
-  }, [currentView]);
+  }, [selectedProduct?.id, currentView]);
 
-  // 3. SECURED PRODUCT TRACKER: Fires every time the Product ID or View changes
-  useEffect(() => {
-    if (currentView === 'pdp' && selectedProduct?.id) {
-      // Step A: Send PageView to reset the "URL" context in SPA
-      trackFBPixel('PageView');
-      
-      // Step B: Send the actual ViewContent with updated product data
-      trackFBPixel('ViewContent', {
-        content_ids: [String(selectedProduct.id)],
-        content_name: selectedProduct.name,
-        content_type: 'product',
-        value: selectedProduct.price,
-        currency: 'BDT',
-        content_category: selectedProduct.category || 'Sneakers',
-        brand: selectedProduct.brand || 'SneakerVault'
-      });
-      
-      console.log(`[PIXEL-LOG] Event fired for: ${selectedProduct.name} (ID: ${selectedProduct.id})`);
-    }
-  }, [selectedProduct?.id, currentView]); // Dependency on specific ID ensures it fires when changing products
+  const handleNavigate = (view: View) => {
+    setCurrentView(view);
+    const newUrl = view === 'home' ? '/' : `/?v=${view}`;
+    window.history.pushState({ view }, '', newUrl);
+  };
+
+  const handleSelectProduct = (sneaker: Sneaker) => {
+    setSelectedProduct(sneaker);
+    setCurrentView('pdp');
+    setIsCartSidebarOpen(false);
+    // Force a real URL update to help Pixel distinguish between product pages
+    const productUrl = `/?v=pdp&p=${sneaker.id}`;
+    window.history.pushState({ view: 'pdp', productId: sneaker.id }, '', productUrl);
+  };
 
   const fetchSneakers = useCallback(async () => {
     setIsFetchingSneakers(true);
@@ -243,7 +269,7 @@ const App: React.FC = () => {
     });
 
     if (shouldCheckout) {
-      setCurrentView('checkout');
+      handleNavigate('checkout');
       setIsCartSidebarOpen(false);
     } else {
       setIsCartSidebarOpen(true);
@@ -347,7 +373,7 @@ const App: React.FC = () => {
         setOrders(prev => [saved, ...prev]);
         setLastOrder(saved);
         setCart([]);
-        setCurrentView('order-success');
+        handleNavigate('order-success');
       } else {
         setCheckoutError("SERVER ERROR: VAULT CONNECTION TIMEOUT");
       }
@@ -434,12 +460,6 @@ const App: React.FC = () => {
     } catch (err) { return false; }
   };
 
-  const handleSelectProduct = (sneaker: Sneaker) => { 
-    setSelectedProduct(sneaker); 
-    setCurrentView('pdp'); 
-    setIsCartSidebarOpen(false); 
-  };
-  
   const handleSaveProduct = async (data: any): Promise<boolean> => {
     const isUpdate = !!data.id;
     const url = isUpdate ? `${SUPABASE_URL}/rest/v1/sneakers?id=eq.${data.id}` : `${SUPABASE_URL}/rest/v1/sneakers`;
@@ -582,17 +602,21 @@ const App: React.FC = () => {
     } catch (err) { return false; }
   };
 
-  const handleLogout = () => { localStorage.removeItem('sv_admin_session'); setIsAdminAuthenticated(false); setCurrentView('home'); };
+  const handleLogout = () => { 
+    localStorage.removeItem('sv_admin_session'); 
+    setIsAdminAuthenticated(false); 
+    handleNavigate('home'); 
+  };
 
   const navigateToAdmin = () => {
-    if (isAdminAuthenticated) setCurrentView('admin');
-    else setCurrentView('admin-login');
+    if (isAdminAuthenticated) handleNavigate('admin');
+    else handleNavigate('admin-login');
   };
 
   const handleSearch = (query: string) => {
     setSearchQuery(query);
     setIsSearchOpen(false);
-    setCurrentView('shop');
+    handleNavigate('shop');
   };
 
   const SearchOverlay = () => {
@@ -670,7 +694,7 @@ const App: React.FC = () => {
                <div className="flex justify-between mb-6 pt-2 border-t border-gray-50"><span className="text-sm font-black uppercase">Final Settlement</span><span className="text-2xl font-black text-red-700">{total.toLocaleString()}৳</span></div>
                <button 
                  disabled={cart.length === 0}
-                 onClick={() => { setCurrentView('checkout'); setIsCartSidebarOpen(false); }} 
+                 onClick={() => { handleNavigate('checkout'); setIsCartSidebarOpen(false); }} 
                  className="w-full bg-black text-white py-5 rounded-xl font-black uppercase tracking-[0.2em] text-xs shadow-xl hover:bg-red-700 transition-all active:scale-95 disabled:opacity-30"
                >
                  Initialize Checkout
@@ -684,10 +708,10 @@ const App: React.FC = () => {
 
   const renderView = () => {
     switch (currentView) {
-      case 'home': return <Home sneakers={sneakers} slides={slides} onSelectProduct={handleSelectProduct} onNavigate={setCurrentView} onSearch={handleSearch} />;
+      case 'home': return <Home sneakers={sneakers} slides={slides} onSelectProduct={handleSelectProduct} onNavigate={handleNavigate} onSearch={handleSearch} />;
       case 'shop': return <Shop sneakers={sneakers} onSelectProduct={handleSelectProduct} searchQuery={searchQuery} onClearSearch={() => setSearchQuery('')} />;
-      case 'pdp': return selectedProduct ? <ProductDetail sneaker={selectedProduct} onAddToCart={handleAddToCart} onBack={() => setCurrentView('shop')} onToggleWishlist={toggleWishlist} isInWishlist={wishlist.some(s => s.id === selectedProduct.id)} onSelectProduct={handleSelectProduct} /> : <Home sneakers={sneakers} slides={slides} onSelectProduct={handleSelectProduct} onNavigate={setCurrentView} onSearch={handleSearch} />;
-      case 'admin-login': return <Login supabaseUrl={SUPABASE_URL} supabaseKey={SUPABASE_KEY} onLoginSuccess={() => { setIsAdminAuthenticated(true); setCurrentView('admin'); }} />;
+      case 'pdp': return selectedProduct ? <ProductDetail sneaker={selectedProduct} onAddToCart={handleAddToCart} onBack={() => handleNavigate('shop')} onToggleWishlist={toggleWishlist} isInWishlist={wishlist.some(s => s.id === selectedProduct.id)} onSelectProduct={handleSelectProduct} /> : <Home sneakers={sneakers} slides={slides} onSelectProduct={handleSelectProduct} onNavigate={handleNavigate} onSearch={handleSearch} />;
+      case 'admin-login': return <Login supabaseUrl={SUPABASE_URL} supabaseKey={SUPABASE_KEY} onLoginSuccess={() => { setIsAdminAuthenticated(true); handleNavigate('admin'); }} />;
       case 'admin': return <Dashboard sneakers={sneakers} orders={orders} brands={brands} categories={categories} paymentMethods={paymentMethods} slides={slides} navItems={navItems} checkoutFields={checkoutFields} shippingOptions={shippingOptions} footerConfig={footerConfig} onRefresh={() => { fetchOrders(); fetchSneakers(); fetchShippingOptions(); fetchFooterConfig(); fetchBrands(); fetchCategories(); fetchPaymentMethods(); fetchSlides(); fetchNavItems(); fetchCheckoutFields(); }} onUpdateOrderStatus={handleUpdateOrderStatus} onSaveProduct={handleSaveProduct} onDeleteProduct={handleDeleteProduct} onSaveShipping={handleSaveShippingOption} onDeleteShipping={handleDeleteShippingOption} onSavePaymentMethod={handleSavePaymentMethod} onDeletePaymentMethod={handleDeletePaymentMethod} onSaveFooterConfig={handleSaveFooterConfig} onSaveBrand={handleSaveBrand} onDeleteBrand={handleDeleteBrand} onSaveCategory={handleSaveCategory} onDeleteCategory={handleDeleteCategory} onSaveSlide={handleSaveSlide} onDeleteSlide={handleDeleteSlide} onSaveNavItem={handleSaveNavItem} onDeleteNavItem={handleDeleteNavItem} onSaveCheckoutField={handleSaveCheckoutField} onDeleteCheckoutField={handleDeleteCheckoutField} isRefreshing={isFetchingOrders || isFetchingSneakers} onLogout={handleLogout} />;
       case 'checkout': return (
         <div className="max-w-6xl mx-auto px-4 py-16 animate-in fade-in duration-500">
@@ -848,11 +872,11 @@ const App: React.FC = () => {
             </div>
           </div>
           <div className="text-center mt-16">
-            <button onClick={() => setCurrentView('shop')} className="bg-black text-white px-12 py-5 rounded-2xl font-black uppercase tracking-[0.3em] text-[10px] shadow-2xl hover:bg-red-700 transition-all active:scale-95">Continue Exploration</button>
+            <button onClick={() => handleNavigate('shop')} className="bg-black text-white px-12 py-5 rounded-2xl font-black uppercase tracking-[0.3em] text-[10px] shadow-2xl hover:bg-red-700 transition-all active:scale-95">Continue Exploration</button>
           </div>
         </div>
       );
-      default: return <Home sneakers={sneakers} slides={slides} onSelectProduct={handleSelectProduct} onNavigate={setCurrentView} onSearch={handleSearch} />;
+      default: return <Home sneakers={sneakers} slides={slides} onSelectProduct={handleSelectProduct} onNavigate={handleNavigate} onSearch={handleSearch} />;
     }
   };
 
@@ -860,7 +884,7 @@ const App: React.FC = () => {
     <div className="min-h-screen flex flex-col bg-white">
       {currentView !== 'admin' && (
         <Navigation 
-          onNavigate={(v) => v === 'admin' ? navigateToAdmin() : setCurrentView(v as View)} 
+          onNavigate={(v) => v === 'admin' ? navigateToAdmin() : handleNavigate(v as View)} 
           cartCount={cart.reduce((a,c) => a + c.quantity, 0)} 
           wishlistCount={wishlist.length} 
           currentView={currentView} 
@@ -872,7 +896,7 @@ const App: React.FC = () => {
       <div className="flex-1">{renderView()}</div>
       <SearchOverlay />
       <CartSidebar />
-      {currentView !== 'admin' && currentView !== 'admin-login' && <Footer config={footerConfig} onNavigate={setCurrentView} />}
+      {currentView !== 'admin' && currentView !== 'admin-login' && <Footer config={footerConfig} onNavigate={handleNavigate} />}
     </div>
   );
 };
