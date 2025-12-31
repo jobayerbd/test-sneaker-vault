@@ -853,10 +853,48 @@ const App: React.FC = () => {
                <p className="text-[10px] font-black uppercase tracking-widest text-black">Registry Order ID: <span className="text-red-600">{lastOrder?.id}</span></p>
             </div>
           </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+            {/* Subject Coordinates Details */}
+            <div className="bg-white border border-gray-100 rounded-3xl p-8 shadow-xl">
+               <h3 className="text-xs font-black uppercase italic tracking-widest border-b border-gray-50 pb-4 mb-6">Subject Details</h3>
+               <div className="space-y-4">
+                  <div className="flex flex-col">
+                    <span className="text-[9px] font-black uppercase text-gray-400 mb-1">Full Name</span>
+                    <span className="text-xs font-bold uppercase">{lastOrder?.first_name} {lastOrder?.last_name}</span>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-[9px] font-black uppercase text-gray-400 mb-1">Contact Sequence</span>
+                    <span className="text-xs font-bold uppercase">{lastOrder?.mobile_number}</span>
+                    <span className="text-[10px] font-medium lowercase text-gray-500">{lastOrder?.email}</span>
+                  </div>
+               </div>
+            </div>
+
+            {/* Logistics Route Details */}
+            <div className="bg-white border border-gray-100 rounded-3xl p-8 shadow-xl">
+               <h3 className="text-xs font-black uppercase italic tracking-widest border-b border-gray-50 pb-4 mb-6">Logistics Route</h3>
+               <div className="space-y-4">
+                  <div className="flex flex-col">
+                    <span className="text-[9px] font-black uppercase text-gray-400 mb-1">Destination Address</span>
+                    <span className="text-xs font-bold uppercase">{lastOrder?.street_address}</span>
+                    <span className="text-xs font-bold uppercase">{lastOrder?.city}, {lastOrder?.zip_code}</span>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-[9px] font-black uppercase text-gray-400 mb-1">Transit Protocol</span>
+                    <span className="text-xs font-bold uppercase">{lastOrder?.shipping_name}</span>
+                  </div>
+               </div>
+            </div>
+          </div>
+
           <div className="bg-white border border-gray-100 rounded-3xl overflow-hidden shadow-2xl max-w-2xl mx-auto">
             <div className="bg-black p-8 text-white flex justify-between items-center">
               <h3 className="text-sm font-black uppercase italic tracking-widest font-heading">Order Manifest</h3>
-              <span className="text-[9px] font-black uppercase text-gray-500 tracking-widest">Secured Archive</span>
+              <div className="text-right">
+                <span className="text-[9px] font-black uppercase text-gray-500 tracking-widest block">Payment Gateway</span>
+                <span className="text-[10px] font-black uppercase text-red-600 italic">{lastOrder?.payment_method}</span>
+              </div>
             </div>
             <div className="p-8 space-y-6">
               {lastOrder?.items?.map((item, idx) => (

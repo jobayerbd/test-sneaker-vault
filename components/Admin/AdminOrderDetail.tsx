@@ -24,6 +24,8 @@ const AdminOrderDetail: React.FC<AdminOrderDetailProps> = ({ order: initialOrder
   const [pendingStatus, setPendingStatus] = useState<OrderStatus>(initialOrder.status);
   const [isUpdating, setIsUpdating] = useState(false);
 
+  const subtotal = order.items?.reduce((acc, item) => acc + (item.price * item.quantity), 0) || 0;
+
   const handleUpdate = async () => {
     setIsUpdating(true);
     const success = await onUpdateStatus(order.id, pendingStatus);
@@ -63,20 +65,44 @@ const AdminOrderDetail: React.FC<AdminOrderDetailProps> = ({ order: initialOrder
         <div className="lg:col-span-2 space-y-8">
           {/* Items Manifest */}
           <div className="bg-white rounded-3xl border border-gray-100 shadow-xl p-10">
-            <h3 className="text-sm font-black italic uppercase font-heading mb-8 border-b pb-4">Secure Manifest Detail</h3>
+            <div className="flex justify-between items-center mb-8 border-b pb-4">
+              <h3 className="text-sm font-black italic uppercase font-heading">Secure Manifest Detail</h3>
+              <span className="text-[9px] font-black uppercase text-gray-400">Registry ID: {order.id}</span>
+            </div>
             <div className="space-y-6">
               {order.items?.map((item, i) => (
-                <div key={i} className="flex gap-6 items-center">
-                  <div className="w-20 h-20 border rounded-xl p-1 shrink-0">
+                <div key={i} className="flex gap-6 items-center border-b border-gray-50 pb-6 last:border-0 last:pb-0">
+                  <div className="w-20 h-20 border rounded-xl p-1 shrink-0 bg-gray-50">
                     <img src={item.image} className="w-full h-full object-contain" alt={item.name} />
                   </div>
                   <div className="flex-1">
                     <h4 className="font-bold text-xs uppercase">{item.name}</h4>
-                    <p className="text-[10px] text-gray-400 font-black">SIZE: {item.size} | QTY: {item.quantity}</p>
+                    <p className="text-[10px] text-red-600 font-black italic mt-1 uppercase tracking-widest">
+                      SIZE Index: {item.size} | QTY: {item.quantity}
+                    </p>
                   </div>
-                  <p className="font-black italic text-sm">{item.price.toLocaleString()}৳</p>
+                  <div className="text-right">
+                    <p className="font-black italic text-sm">{item.price.toLocaleString()}৳</p>
+                    <p className="text-[9px] font-bold text-gray-300 uppercase italic">Unit Price</p>
+                  </div>
                 </div>
               ))}
+            </div>
+
+            {/* Financial Settlement Breakdown */}
+            <div className="mt-10 pt-10 border-t-2 border-dashed border-gray-100 space-y-3">
+              <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-gray-400">
+                <span>Subtotal Protocol</span>
+                <span>{subtotal.toLocaleString()}৳</span>
+              </div>
+              <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-gray-400">
+                <span>Logistics Fee ({order.shipping_name || 'Standard'})</span>
+                <span>{(order.shipping_rate || 0).toLocaleString()}৳</span>
+              </div>
+              <div className="flex justify-between items-center pt-6 mt-4 border-t border-gray-200">
+                <span className="text-xs font-black uppercase tracking-widest italic">Final Settlement Value</span>
+                <span className="text-3xl font-black text-red-700">{order.total.toLocaleString()}৳</span>
+              </div>
             </div>
           </div>
           
@@ -108,15 +134,19 @@ const AdminOrderDetail: React.FC<AdminOrderDetailProps> = ({ order: initialOrder
           </div>
         </div>
 
-        {/* Intelligence Controls */}
+        {/* Intelligence Controls & Data */}
         <div className="space-y-8">
           <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-xl">
             <h3 className="text-[10px] font-black uppercase text-red-600 mb-6 italic tracking-widest">Protocol Intelligence</h3>
             <div className="space-y-4">
+              <div className="bg-gray-50 p-4 rounded-xl border border-gray-100">
+                <p className="text-[9px] font-black uppercase text-gray-400 mb-1">Current Status</p>
+                <p className="text-xs font-black uppercase italic text-black">{order.status}</p>
+              </div>
               <select 
                 value={pendingStatus} 
                 onChange={e => setPendingStatus(e.target.value as OrderStatus)} 
-                className="w-full bg-gray-50 p-4 rounded-xl font-black uppercase text-xs outline-none border-2 border-transparent focus:border-black"
+                className="w-full bg-white border-2 border-gray-100 p-4 rounded-xl font-black uppercase text-xs outline-none focus:border-black transition-all"
               >
                 {Object.values(OrderStatus).map(s => <option key={s} value={s}>{s.toUpperCase()}</option>)}
               </select>
@@ -125,19 +155,46 @@ const AdminOrderDetail: React.FC<AdminOrderDetailProps> = ({ order: initialOrder
                 onClick={handleUpdate} 
                 className="w-full bg-black text-white py-4 rounded-xl font-black uppercase text-[10px] tracking-widest disabled:opacity-30 hover:bg-red-700 transition-all flex items-center justify-center gap-2"
               >
-                {isUpdating ? <i className="fa-solid fa-circle-notch animate-spin"></i> : <><i className="fa-solid fa-check-double"></i> Commit Status</>}
+                {isUpdating ? <i className="fa-solid fa-circle-notch animate-spin"></i> : <><i className="fa-solid fa-check-double"></i> Commit Status Update</>}
               </button>
             </div>
           </div>
-          <div className="bg-black text-white p-8 rounded-3xl shadow-2xl">
-            <h3 className="text-[10px] font-black uppercase text-red-600 mb-6 italic tracking-widest">Subject Coordinates</h3>
-            <div className="space-y-3 text-xs font-bold uppercase">
-              <p className="text-gray-400">{order.first_name} {order.last_name}</p>
-              <p className="text-gray-400">{order.email}</p>
-              <p className="text-gray-400">{order.mobile_number}</p>
-              <div className="pt-4 mt-4 border-t border-white/10 italic text-[10px] text-white">
-                {order.street_address}<br/>{order.city}, {order.zip_code}
+
+          <div className="bg-black text-white p-8 rounded-3xl shadow-2xl space-y-8">
+            <div>
+              <h3 className="text-[10px] font-black uppercase text-red-600 mb-4 italic tracking-widest">Subject Coordinates</h3>
+              <div className="space-y-4 text-xs font-bold uppercase">
+                <div className="border-l-2 border-red-600 pl-4">
+                  <p className="text-gray-400 text-[9px] mb-1">Identity</p>
+                  <p className="text-white">{order.first_name} {order.last_name}</p>
+                </div>
+                <div className="border-l-2 border-red-600 pl-4">
+                  <p className="text-gray-400 text-[9px] mb-1">Contact Sequence</p>
+                  <p className="text-white">{order.mobile_number}</p>
+                  <p className="text-[10px] font-medium lowercase text-gray-500 mt-1">{order.email}</p>
+                </div>
+                <div className="border-l-2 border-red-600 pl-4">
+                  <p className="text-gray-400 text-[9px] mb-1">Destination Parameters</p>
+                  <p className="text-white italic leading-relaxed">
+                    {order.street_address}<br/>
+                    {order.city}, {order.zip_code}
+                  </p>
+                </div>
               </div>
+            </div>
+
+            <div className="pt-8 border-t border-white/10">
+               <h3 className="text-[10px] font-black uppercase text-red-600 mb-4 italic tracking-widest">Transaction Protocols</h3>
+               <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-white/5 p-4 rounded-xl">
+                    <p className="text-[8px] font-black uppercase text-gray-500 mb-1">Gateway</p>
+                    <p className="text-[10px] font-black uppercase text-white truncate">{order.payment_method || 'N/A'}</p>
+                  </div>
+                  <div className="bg-white/5 p-4 rounded-xl">
+                    <p className="text-[8px] font-black uppercase text-gray-500 mb-1">Logistics</p>
+                    <p className="text-[10px] font-black uppercase text-white truncate">{order.shipping_name || 'N/A'}</p>
+                  </div>
+               </div>
             </div>
           </div>
         </div>
