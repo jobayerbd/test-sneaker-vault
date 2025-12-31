@@ -25,7 +25,11 @@ const DEFAULT_FOOTER: FooterConfig = {
 const trackFBPixel = (event: string, params?: any) => {
   const f = window as any;
   if (f.fbq) {
-    f.fbq('track', event, params);
+    if (params) {
+      f.fbq('track', event, params);
+    } else {
+      f.fbq('track', event);
+    }
   }
 };
 
@@ -58,10 +62,9 @@ const App: React.FC = () => {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
-
   const [checkoutForm, setCheckoutForm] = useState<Record<string, any>>({});
 
-  // Global Pixel Initializer
+  // 1. Initialize Pixel Script
   useEffect(() => {
     const pixelId = footerConfig.fb_pixel_id?.trim();
     if (!pixelId) return;
@@ -76,10 +79,12 @@ const App: React.FC = () => {
     f.fbq('track', 'PageView');
   }, [footerConfig.fb_pixel_id]);
 
-  // View Change Observer
+  // 2. Track General View Changes (Except PDP which is handled separately)
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'auto' });
-    trackFBPixel('PageView');
+    if (currentView !== 'pdp') {
+      trackFBPixel('PageView');
+    }
     
     if (currentView === 'checkout') {
       trackFBPixel('InitiateCheckout', {
@@ -91,24 +96,26 @@ const App: React.FC = () => {
     }
   }, [currentView]);
 
-  // Dedicated Product Tracker (Detects every change in selectedProduct)
+  // 3. SECURED PRODUCT TRACKER: Fires every time the Product ID or View changes
   useEffect(() => {
-    if (currentView === 'pdp' && selectedProduct) {
-      // Force a PageView reset for the new product to refresh parameters in FB's end
+    if (currentView === 'pdp' && selectedProduct?.id) {
+      // Step A: Send PageView to reset the "URL" context in SPA
       trackFBPixel('PageView');
       
+      // Step B: Send the actual ViewContent with updated product data
       trackFBPixel('ViewContent', {
-        content_ids: [selectedProduct.id],
+        content_ids: [String(selectedProduct.id)],
         content_name: selectedProduct.name,
         content_type: 'product',
         value: selectedProduct.price,
         currency: 'BDT',
-        content_category: selectedProduct.category || 'Sneakers'
+        content_category: selectedProduct.category || 'Sneakers',
+        brand: selectedProduct.brand || 'SneakerVault'
       });
       
-      console.log(`SneakerVault: FB ViewContent fired for product ID: ${selectedProduct.id}`);
+      console.log(`[PIXEL-LOG] Event fired for: ${selectedProduct.name} (ID: ${selectedProduct.id})`);
     }
-  }, [selectedProduct?.id, currentView]);
+  }, [selectedProduct?.id, currentView]); // Dependency on specific ID ensures it fires when changing products
 
   const fetchSneakers = useCallback(async () => {
     setIsFetchingSneakers(true);
@@ -116,10 +123,7 @@ const App: React.FC = () => {
       const response = await fetch(`${SUPABASE_URL}/rest/v1/sneakers?select=*&order=name.asc`, {
         headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
       });
-      if (response.ok) {
-        const data = await response.json();
-        setSneakers(data);
-      }
+      if (response.ok) setSneakers(await response.json());
     } finally { setIsFetchingSneakers(false); }
   }, []);
 
@@ -168,10 +172,7 @@ const App: React.FC = () => {
       const response = await fetch(`${SUPABASE_URL}/rest/v1/site_navigation?select=*&order=order.asc`, {
         headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
       });
-      if (response.ok) {
-        const data = await response.json();
-        setNavItems(data);
-      }
+      if (response.ok) setNavItems(await response.json());
     } catch (err) {}
   }, []);
 
@@ -180,10 +181,7 @@ const App: React.FC = () => {
       const response = await fetch(`${SUPABASE_URL}/rest/v1/checkout_fields?select=*&order=order.asc`, {
         headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
       });
-      if (response.ok) {
-        const data = await response.json();
-        setCheckoutFields(data);
-      }
+      if (response.ok) setCheckoutFields(await response.json());
     } catch (err) {}
   }, []);
 
@@ -237,7 +235,7 @@ const App: React.FC = () => {
     });
     
     trackFBPixel('AddToCart', { 
-      content_ids: [item.id], 
+      content_ids: [String(item.id)], 
       content_name: item.name, 
       content_type: 'product',
       value: item.price, 
@@ -258,7 +256,7 @@ const App: React.FC = () => {
       if (exists) return prev.filter(s => s.id !== sneaker.id);
       
       trackFBPixel('AddToWishlist', {
-        content_ids: [sneaker.id],
+        content_ids: [String(sneaker.id)],
         content_name: sneaker.name,
         content_type: 'product',
         value: sneaker.price,
@@ -294,7 +292,6 @@ const App: React.FC = () => {
 
   const handlePlaceOrder = async () => {
     setCheckoutError(null);
-    
     const enabledFields = checkoutFields.filter(f => f.enabled);
     for (const field of enabledFields) {
       if (field.required && !checkoutForm[field.field_key]) {
@@ -346,7 +343,7 @@ const App: React.FC = () => {
       });
       if (response.ok) {
         const saved = (await response.json())[0];
-        trackFBPixel('Purchase', { value: total, currency: 'BDT', content_ids: cart.map(item => item.id), content_type: 'product', num_items: cart.length });
+        trackFBPixel('Purchase', { value: total, currency: 'BDT', content_ids: cart.map(item => String(item.id)), content_type: 'product', num_items: cart.length });
         setOrders(prev => [saved, ...prev]);
         setLastOrder(saved);
         setCart([]);
@@ -430,11 +427,7 @@ const App: React.FC = () => {
     try {
       const response = await fetch(`${SUPABASE_URL}/rest/v1/site_navigation?id=eq.${id}`, {
         method: 'DELETE',
-        headers: { 
-          'apikey': SUPABASE_KEY, 
-          'Authorization': `Bearer ${SUPABASE_KEY}`,
-          'Prefer': 'return=representation'
-        }
+        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Prefer': 'return=representation' }
       });
       if (response.ok || response.status === 204) { await fetchNavItems(); return true; }
       return false;
@@ -591,13 +584,9 @@ const App: React.FC = () => {
 
   const handleLogout = () => { localStorage.removeItem('sv_admin_session'); setIsAdminAuthenticated(false); setCurrentView('home'); };
 
-  // Fix: added missing navigateToAdmin function to handle conditional navigation to the admin dashboard or login page
   const navigateToAdmin = () => {
-    if (isAdminAuthenticated) {
-      setCurrentView('admin');
-    } else {
-      setCurrentView('admin-login');
-    }
+    if (isAdminAuthenticated) setCurrentView('admin');
+    else setCurrentView('admin-login');
   };
 
   const handleSearch = (query: string) => {
