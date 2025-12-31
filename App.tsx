@@ -7,7 +7,7 @@ import ProductDetail from './components/Storefront/ProductDetail';
 import Dashboard from './components/Admin/Dashboard';
 import Login from './components/Admin/Login';
 import Footer from './components/Footer';
-import { Sneaker, CartItem, Order, OrderStatus, ShippingOption, FooterConfig, TimelineEvent, BrandEntity, Category, PaymentMethod, HomeSlide, NavItem } from './types';
+import { Sneaker, CartItem, Order, OrderStatus, ShippingOption, FooterConfig, TimelineEvent, BrandEntity, Category, PaymentMethod, HomeSlide, NavItem, CheckoutField } from './types';
 
 const SUPABASE_URL = 'https://vwbctddmakbnvfxzrjeo.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_8WhV41Km5aj8Dhvu6tUbvA_JnyPoVxu';
@@ -44,6 +44,7 @@ const App: React.FC = () => {
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [slides, setSlides] = useState<HomeSlide[]>([]);
   const [navItems, setNavItems] = useState<NavItem[]>([]);
+  const [checkoutFields, setCheckoutFields] = useState<CheckoutField[]>([]);
   const [shippingOptions, setShippingOptions] = useState<ShippingOption[]>([]);
   const [selectedShipping, setSelectedShipping] = useState<ShippingOption | null>(null);
   const [selectedPayment, setSelectedPayment] = useState<PaymentMethod | null>(null);
@@ -58,9 +59,7 @@ const App: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
 
-  const [checkoutForm, setCheckoutForm] = useState({
-    firstName: '', lastName: '', email: '', mobileNumber: '', address: '', city: '', zip: '', createAccount: false, password: ''
-  });
+  const [checkoutForm, setCheckoutForm] = useState<Record<string, any>>({});
 
   useEffect(() => {
     const pixelId = footerConfig.fb_pixel_id?.trim();
@@ -151,9 +150,19 @@ const App: React.FC = () => {
         const data = await response.json();
         setNavItems(data);
       }
-    } catch (err) {
-      console.error("SneakerVault: Error fetching nav items:", err);
-    }
+    } catch (err) {}
+  }, []);
+
+  const fetchCheckoutFields = useCallback(async () => {
+    try {
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/checkout_fields?select=*&order=order.asc`, {
+        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setCheckoutFields(data);
+      }
+    } catch (err) {}
   }, []);
 
   const fetchOrders = useCallback(async () => {
@@ -193,8 +202,8 @@ const App: React.FC = () => {
 
   useEffect(() => {
     if (localStorage.getItem('sv_admin_session') === 'active') setIsAdminAuthenticated(true);
-    fetchSneakers(); fetchOrders(); fetchShippingOptions(); fetchFooterConfig(); fetchBrands(); fetchCategories(); fetchPaymentMethods(); fetchSlides(); fetchNavItems();
-  }, [fetchSneakers, fetchOrders, fetchShippingOptions, fetchFooterConfig, fetchBrands, fetchCategories, fetchPaymentMethods, fetchSlides, fetchNavItems]);
+    fetchSneakers(); fetchOrders(); fetchShippingOptions(); fetchFooterConfig(); fetchBrands(); fetchCategories(); fetchPaymentMethods(); fetchSlides(); fetchNavItems(); fetchCheckoutFields();
+  }, [fetchSneakers, fetchOrders, fetchShippingOptions, fetchFooterConfig, fetchBrands, fetchCategories, fetchPaymentMethods, fetchSlides, fetchNavItems, fetchCheckoutFields]);
 
   const handleAddToCart = (item: CartItem, shouldCheckout: boolean = false) => {
     setCart(prev => {
@@ -263,16 +272,23 @@ const App: React.FC = () => {
 
   const handlePlaceOrder = async () => {
     setCheckoutError(null);
-    if (!checkoutForm.firstName || !checkoutForm.mobileNumber || !checkoutForm.address) { 
-      setCheckoutError("REGISTRY ERROR: CORE FIELDS (NAME, MOBILE, ADDRESS) ARE MISSING");
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-      return; 
+    
+    // Validate Required Dynamic Fields
+    const enabledFields = checkoutFields.filter(f => f.enabled);
+    for (const field of enabledFields) {
+      if (field.required && !checkoutForm[field.field_key]) {
+        setCheckoutError(`REGISTRY ERROR: [${field.label.toUpperCase()}] IS MANDATORY`);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        return;
+      }
     }
+
     if (!selectedShipping || !selectedPayment) { 
       setCheckoutError("LOGISTICS ERROR: PROTOCOL NOT INITIALIZED");
       window.scrollTo({ top: 0, behavior: 'smooth' });
       return; 
     }
+    
     setIsPlacingOrder(true);
     const subtotal = cart.reduce((acc, item) => acc + (item.price * item.quantity), 0);
     const total = subtotal + selectedShipping.rate;
@@ -282,9 +298,25 @@ const App: React.FC = () => {
       timestamp: new Date().toISOString(),
       note: 'Order protocol initiated and secured.'
     }];
+    
     const newOrder = {
-      id: orderId, first_name: checkoutForm.firstName, last_name: checkoutForm.lastName, email: checkoutForm.email || 'guest@sneakervault.bd', mobile_number: checkoutForm.mobileNumber, street_address: checkoutForm.address, city: checkoutForm.city, zip_code: checkoutForm.zip, total, status: OrderStatus.PLACED, timeline: initialTimeline, shipping_name: selectedShipping.name, shipping_rate: selectedShipping.rate, payment_method: selectedPayment.name, items: cart.map(item => ({ sneakerId: item.id, name: item.name, image: item.image, size: item.selectedSize, quantity: item.quantity, price: item.price }))
+      id: orderId, 
+      first_name: checkoutForm.first_name || 'Guest', 
+      last_name: checkoutForm.last_name || '', 
+      email: checkoutForm.email || 'guest@sneakervault.bd', 
+      mobile_number: checkoutForm.mobile_number || '', 
+      street_address: checkoutForm.street_address || '', 
+      city: checkoutForm.city || '', 
+      zip_code: checkoutForm.zip_code || '', 
+      total, 
+      status: OrderStatus.PLACED, 
+      timeline: initialTimeline, 
+      shipping_name: selectedShipping.name, 
+      shipping_rate: selectedShipping.rate, 
+      payment_method: selectedPayment.name, 
+      items: cart.map(item => ({ sneakerId: item.id, name: item.name, image: item.image, size: item.selectedSize, quantity: item.quantity, price: item.price }))
     };
+    
     try {
       const response = await fetch(`${SUPABASE_URL}/rest/v1/orders`, {
         method: 'POST',
@@ -304,6 +336,32 @@ const App: React.FC = () => {
     } catch (err) { 
       setCheckoutError("CRITICAL SYSTEM ERROR: TRANSACTION FAILED");
     } finally { setIsPlacingOrder(false); }
+  };
+
+  const handleSaveCheckoutField = async (data: Partial<CheckoutField>): Promise<boolean> => {
+    const isUpdate = !!data.id;
+    const url = isUpdate ? `${SUPABASE_URL}/rest/v1/checkout_fields?id=eq.${data.id}` : `${SUPABASE_URL}/rest/v1/checkout_fields`;
+    const method = isUpdate ? 'PATCH' : 'POST';
+    try {
+      const response = await fetch(url, {
+        method,
+        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+      if (response.ok) { fetchCheckoutFields(); return true; }
+      return false;
+    } catch (err) { return false; }
+  };
+
+  const handleDeleteCheckoutField = async (id: string): Promise<boolean> => {
+    try {
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/checkout_fields?id=eq.${id}`, {
+        method: 'DELETE',
+        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Prefer': 'return=representation' }
+      });
+      if (response.ok || response.status === 204) { await fetchCheckoutFields(); return true; }
+      return false;
+    } catch (err) { return false; }
   };
 
   const handleSaveSlide = async (data: Partial<HomeSlide>): Promise<boolean> => {
@@ -362,12 +420,8 @@ const App: React.FC = () => {
         await fetchNavItems(); 
         return true; 
       }
-      
-      const errData = await response.json();
-      console.error("SneakerVault: Deletion failed:", errData);
       return false;
     } catch (err) { 
-      console.error("SneakerVault: Network Error during deletion:", err);
       return false; 
     }
   };
@@ -644,7 +698,7 @@ const App: React.FC = () => {
       case 'shop': return <Shop sneakers={sneakers} onSelectProduct={handleSelectProduct} searchQuery={searchQuery} onClearSearch={() => setSearchQuery('')} />;
       case 'pdp': return selectedProduct ? <ProductDetail sneaker={selectedProduct} onAddToCart={handleAddToCart} onBack={() => setCurrentView('shop')} onToggleWishlist={toggleWishlist} isInWishlist={wishlist.some(s => s.id === selectedProduct.id)} onSelectProduct={handleSelectProduct} /> : <Home sneakers={sneakers} slides={slides} onSelectProduct={handleSelectProduct} onNavigate={setCurrentView} onSearch={handleSearch} />;
       case 'admin-login': return <Login supabaseUrl={SUPABASE_URL} supabaseKey={SUPABASE_KEY} onLoginSuccess={() => { setIsAdminAuthenticated(true); setCurrentView('admin'); }} />;
-      case 'admin': return <Dashboard sneakers={sneakers} orders={orders} brands={brands} categories={categories} paymentMethods={paymentMethods} slides={slides} navItems={navItems} shippingOptions={shippingOptions} footerConfig={footerConfig} onRefresh={() => { fetchOrders(); fetchSneakers(); fetchShippingOptions(); fetchFooterConfig(); fetchBrands(); fetchCategories(); fetchPaymentMethods(); fetchSlides(); fetchNavItems(); }} onUpdateOrderStatus={handleUpdateOrderStatus} onSaveProduct={handleSaveProduct} onDeleteProduct={handleDeleteProduct} onSaveShipping={handleSaveShippingOption} onDeleteShipping={handleDeleteShippingOption} onSavePaymentMethod={handleSavePaymentMethod} onDeletePaymentMethod={handleDeletePaymentMethod} onSaveFooterConfig={handleSaveFooterConfig} onSaveBrand={handleSaveBrand} onDeleteBrand={handleDeleteBrand} onSaveCategory={handleSaveCategory} onDeleteCategory={handleDeleteCategory} onSaveSlide={handleSaveSlide} onDeleteSlide={handleDeleteSlide} onSaveNavItem={handleSaveNavItem} onDeleteNavItem={handleDeleteNavItem} isRefreshing={isFetchingOrders || isFetchingSneakers} onLogout={handleLogout} />;
+      case 'admin': return <Dashboard sneakers={sneakers} orders={orders} brands={brands} categories={categories} paymentMethods={paymentMethods} slides={slides} navItems={navItems} checkoutFields={checkoutFields} shippingOptions={shippingOptions} footerConfig={footerConfig} onRefresh={() => { fetchOrders(); fetchSneakers(); fetchShippingOptions(); fetchFooterConfig(); fetchBrands(); fetchCategories(); fetchPaymentMethods(); fetchSlides(); fetchNavItems(); fetchCheckoutFields(); }} onUpdateOrderStatus={handleUpdateOrderStatus} onSaveProduct={handleSaveProduct} onDeleteProduct={handleDeleteProduct} onSaveShipping={handleSaveShippingOption} onDeleteShipping={handleDeleteShippingOption} onSavePaymentMethod={handleSavePaymentMethod} onDeletePaymentMethod={handleDeletePaymentMethod} onSaveFooterConfig={handleSaveFooterConfig} onSaveBrand={handleSaveBrand} onDeleteBrand={handleDeleteBrand} onSaveCategory={handleSaveCategory} onDeleteCategory={handleDeleteCategory} onSaveSlide={handleSaveSlide} onDeleteSlide={handleDeleteSlide} onSaveNavItem={handleSaveNavItem} onDeleteNavItem={handleDeleteNavItem} onSaveCheckoutField={handleSaveCheckoutField} onDeleteCheckoutField={handleDeleteCheckoutField} isRefreshing={isFetchingOrders || isFetchingSneakers} onLogout={handleLogout} />;
       case 'checkout': return (
         <div className="max-w-6xl mx-auto px-4 py-16 animate-in fade-in duration-500">
           <div className="flex flex-col items-center mb-12 text-center">
@@ -654,7 +708,7 @@ const App: React.FC = () => {
           </div>
 
           {checkoutError && (
-            <div className="max-w-4xl mx-auto mb-10 bg-red-600 text-white p-6 rounded-2xl flex items-center justify-center gap-4 animate-in slide-in-from-bottom-4 duration-500 shadow-2xl">
+            <div className="max-w-4xl mx-auto mb-10 bg-red-600 text-white p-6 rounded-2xl flex items-center justify-center gap-4 animate-in slide-in-from-bottom-4 duration-300 shadow-2xl">
               <i className="fa-solid fa-triangle-exclamation text-2xl animate-pulse"></i>
               <span className="text-[11px] font-black uppercase tracking-[0.2em] italic">{checkoutError}</span>
             </div>
@@ -665,26 +719,23 @@ const App: React.FC = () => {
               <div className="bg-white p-10 border border-gray-100 rounded-3xl shadow-sm">
                 <h3 className="text-xs font-black uppercase italic mb-8 border-b pb-4 tracking-widest">Subject Coordinates</h3>
                 <div className="grid grid-cols-2 gap-6">
-                  <div className="space-y-1">
-                    <label className="text-[9px] font-black uppercase text-gray-400 px-1">First Name*</label>
-                    <input type="text" placeholder="GIVEN NAME" value={checkoutForm.firstName} onChange={e => { setCheckoutForm({...checkoutForm, firstName: e.target.value}); setCheckoutError(null); }} className="w-full bg-gray-50 p-4 rounded-xl outline-none font-bold text-xs focus:ring-2 ring-black/5" />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[9px] font-black uppercase text-gray-400 px-1">Last Name</label>
-                    <input type="text" placeholder="SURNAME" value={checkoutForm.lastName} onChange={e => setCheckoutForm({...checkoutForm, lastName: e.target.value})} className="w-full bg-gray-50 p-4 rounded-xl outline-none font-bold text-xs focus:ring-2 ring-black/5" />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[9px] font-black uppercase text-gray-400 px-1">Mobile Access*</label>
-                    <input type="tel" placeholder="+880" value={checkoutForm.mobileNumber} onChange={e => { setCheckoutForm({...checkoutForm, mobileNumber: e.target.value}); setCheckoutError(null); }} className="w-full bg-gray-50 p-4 rounded-xl outline-none font-bold text-xs focus:ring-2 ring-black/5" />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[9px] font-black uppercase text-gray-400 px-1">Email Archive</label>
-                    <input type="email" placeholder="OPERATOR@MAIL.COM" value={checkoutForm.email} onChange={e => setCheckoutForm({...checkoutForm, email: e.target.value})} className="w-full bg-gray-50 p-4 rounded-xl font-bold text-xs outline-none focus:ring-2 ring-black/5" />
-                  </div>
-                </div>
-                <div className="mt-6 space-y-1">
-                  <label className="text-[9px] font-black uppercase text-gray-400 px-1">Sector/Address*</label>
-                  <input type="text" placeholder="STREET, BLOCK, AREA" value={checkoutForm.address} onChange={e => { setCheckoutForm({...checkoutForm, address: e.target.value}); setCheckoutError(null); }} className="w-full bg-gray-50 p-4 rounded-xl outline-none font-bold text-xs focus:ring-2 ring-black/5" />
+                  {checkoutFields.filter(f => f.enabled).sort((a,b) => a.order - b.order).map((field) => (
+                    <div key={field.id} className={`${field.width === 'half' ? 'col-span-1' : 'col-span-2'} space-y-1`}>
+                      <label className="text-[9px] font-black uppercase text-gray-400 px-1">
+                        {field.label} {field.required && '*'}
+                      </label>
+                      <input 
+                        type={field.type} 
+                        placeholder={field.placeholder.toUpperCase()} 
+                        value={checkoutForm[field.field_key] || ''} 
+                        onChange={e => {
+                          setCheckoutForm({ ...checkoutForm, [field.field_key]: e.target.value });
+                          setCheckoutError(null);
+                        }} 
+                        className="w-full bg-gray-50 p-4 rounded-xl outline-none font-bold text-xs focus:ring-2 ring-black/5" 
+                      />
+                    </div>
+                  ))}
                 </div>
               </div>
 

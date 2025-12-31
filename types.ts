@@ -24,6 +24,18 @@ export interface NavItem {
   active: boolean;
 }
 
+export interface CheckoutField {
+  id: string;
+  field_key: string;
+  label: string;
+  placeholder: string;
+  type: string;
+  required: boolean;
+  enabled: boolean;
+  width: 'full' | 'half';
+  order: number;
+}
+
 export interface TimelineEvent {
   status: OrderStatus;
   timestamp: string;
