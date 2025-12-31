@@ -147,8 +147,13 @@ const App: React.FC = () => {
       const response = await fetch(`${SUPABASE_URL}/rest/v1/site_navigation?select=*&order=order.asc`, {
         headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
       });
-      if (response.ok) setNavItems(await response.json());
-    } catch (err) {}
+      if (response.ok) {
+        const data = await response.json();
+        setNavItems(data);
+      }
+    } catch (err) {
+      console.error("SneakerVault: Error fetching nav items:", err);
+    }
   }, []);
 
   const fetchOrders = useCallback(async () => {
@@ -346,11 +351,25 @@ const App: React.FC = () => {
     try {
       const response = await fetch(`${SUPABASE_URL}/rest/v1/site_navigation?id=eq.${id}`, {
         method: 'DELETE',
-        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
+        headers: { 
+          'apikey': SUPABASE_KEY, 
+          'Authorization': `Bearer ${SUPABASE_KEY}`,
+          'Prefer': 'return=representation'
+        }
       });
-      if (response.ok) { fetchNavItems(); return true; }
+      
+      if (response.ok || response.status === 204) { 
+        await fetchNavItems(); 
+        return true; 
+      }
+      
+      const errData = await response.json();
+      console.error("SneakerVault: Deletion failed:", errData);
       return false;
-    } catch (err) { return false; }
+    } catch (err) { 
+      console.error("SneakerVault: Network Error during deletion:", err);
+      return false; 
+    }
   };
 
   const navigateToAdmin = () => {

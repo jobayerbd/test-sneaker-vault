@@ -11,6 +11,7 @@ interface AdminMenuManagementProps {
 const AdminMenuManagement: React.FC<AdminMenuManagementProps> = ({ navItems, onSave, onDelete }) => {
   const [editing, setEditing] = useState<Partial<NavItem> | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const sortedItems = [...navItems].sort((a, b) => a.order - b.order);
 
@@ -18,8 +19,21 @@ const AdminMenuManagement: React.FC<AdminMenuManagementProps> = ({ navItems, onS
     e.preventDefault();
     if (!editing?.label) return;
     setIsSaving(true);
-    if (await onSave(editing)) setEditing(null);
+    const success = await onSave(editing);
+    if (success) setEditing(null);
+    else alert("VAULT ERROR: Synchronization failed. Review network connectivity.");
     setIsSaving(false);
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('PROTOCOL ALERT: Are you sure you want to permanently erase this navigation asset?')) return;
+    
+    setDeletingId(id);
+    const success = await onDelete(id);
+    if (!success) {
+      alert("VAULT ERROR: Erase protocol failed. Record remains in archives.");
+    }
+    setDeletingId(null);
   };
 
   const handleMove = async (item: NavItem, direction: 'up' | 'down') => {
@@ -43,8 +57,9 @@ const AdminMenuManagement: React.FC<AdminMenuManagementProps> = ({ navItems, onS
           <p className="text-gray-500 text-xs font-bold uppercase tracking-widest mt-1">Cross-Platform Navigation Directives</p>
         </div>
         <button 
+          disabled={!!deletingId}
           onClick={() => setEditing({ label: '', target_view: 'shop', order: navItems.length + 1, active: true })} 
-          className="bg-black text-white px-8 py-4 rounded-xl font-black uppercase text-[10px] tracking-widest shadow-xl hover:bg-red-700 transition-all"
+          className="bg-black text-white px-8 py-4 rounded-xl font-black uppercase text-[10px] tracking-widest shadow-xl hover:bg-red-700 transition-all disabled:opacity-50"
         >
           Add Nav Item
         </button>
@@ -54,11 +69,11 @@ const AdminMenuManagement: React.FC<AdminMenuManagementProps> = ({ navItems, onS
         <div className="lg:col-span-2 space-y-4">
           <h3 className="text-[10px] font-black uppercase text-gray-400 tracking-widest italic mb-2">Live Navigation Tree</h3>
           {sortedItems.map((item, idx) => (
-            <div key={item.id} className="bg-white border border-gray-100 p-6 rounded-3xl shadow-sm flex items-center justify-between group hover:shadow-md transition-all">
+            <div key={item.id} className={`bg-white border border-gray-100 p-6 rounded-3xl shadow-sm flex items-center justify-between group hover:shadow-md transition-all ${deletingId === item.id ? 'opacity-50 grayscale' : ''}`}>
               <div className="flex items-center gap-6">
                  <div className="flex flex-col gap-1">
-                    <button disabled={idx === 0} onClick={() => handleMove(item, 'up')} className="p-1 text-gray-300 hover:text-black disabled:opacity-0 transition-all"><i className="fa-solid fa-caret-up"></i></button>
-                    <button disabled={idx === sortedItems.length - 1} onClick={() => handleMove(item, 'down')} className="p-1 text-gray-300 hover:text-black disabled:opacity-0 transition-all"><i className="fa-solid fa-caret-down"></i></button>
+                    <button disabled={idx === 0 || !!deletingId} onClick={() => handleMove(item, 'up')} className="p-1 text-gray-300 hover:text-black disabled:opacity-0 transition-all"><i className="fa-solid fa-caret-up"></i></button>
+                    <button disabled={idx === sortedItems.length - 1 || !!deletingId} onClick={() => handleMove(item, 'down')} className="p-1 text-gray-300 hover:text-black disabled:opacity-0 transition-all"><i className="fa-solid fa-caret-down"></i></button>
                  </div>
                  <div>
                     <div className="flex items-center gap-2">
@@ -69,11 +84,19 @@ const AdminMenuManagement: React.FC<AdminMenuManagementProps> = ({ navItems, onS
                  </div>
               </div>
               <div className="flex gap-2">
-                <button onClick={() => setEditing(item)} className="p-3 bg-gray-50 hover:bg-black hover:text-white rounded-xl transition-all">
+                <button 
+                  disabled={!!deletingId}
+                  onClick={() => setEditing(item)} 
+                  className="p-3 bg-gray-50 hover:bg-black hover:text-white rounded-xl transition-all disabled:opacity-30"
+                >
                   <i className="fa-solid fa-pen"></i>
                 </button>
-                <button onClick={() => { if(confirm('Delete nav item?')) onDelete(item.id) }} className="p-3 bg-gray-50 hover:bg-red-600 hover:text-white rounded-xl transition-all">
-                  <i className="fa-solid fa-trash"></i>
+                <button 
+                  disabled={!!deletingId}
+                  onClick={() => handleDelete(item.id)} 
+                  className="p-3 bg-gray-50 hover:bg-red-600 hover:text-white rounded-xl transition-all disabled:opacity-30 flex items-center justify-center min-w-[42px]"
+                >
+                  {deletingId === item.id ? <i className="fa-solid fa-circle-notch animate-spin text-xs"></i> : <i className="fa-solid fa-trash text-xs"></i>}
                 </button>
               </div>
             </div>
