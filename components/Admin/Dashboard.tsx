@@ -1,19 +1,20 @@
 
 import React, { useState, useMemo } from 'react';
-import { Order, OrderStatus, Sneaker, BrandEntity, Category, ShippingOption, FooterConfig, PaymentMethod, HomeSlide, NavItem, CheckoutField } from '../../types';
+import { Order, OrderStatus, Sneaker, BrandEntity, Category, ShippingOption, FooterConfig, PaymentMethod, HomeSlide, NavItem, CheckoutField } from '../../types.ts';
 
-import AdminSidebar from './AdminSidebar';
-import AdminOverview from './AdminOverview';
-import AdminInventory from './AdminInventory';
-import AdminOrders from './AdminOrders';
-import AdminOrderDetail from './AdminOrderDetail';
-import AdminProductForm from './AdminProductForm';
-import AdminSettings from './AdminSettings';
-import AdminBrands from './AdminBrands';
-import AdminCategories from './AdminCategories';
-import AdminSlider from './AdminSlider';
-import AdminMenuManagement from './AdminMenuManagement';
-import AdminCheckoutManager from './AdminCheckoutManager';
+import AdminSidebar from './AdminSidebar.tsx';
+import AdminOverview from './AdminOverview.tsx';
+import AdminInventory from './AdminInventory.tsx';
+import AdminOrders from './AdminOrders.tsx';
+import AdminOrderDetail from './AdminOrderDetail.tsx';
+import AdminProductForm from './AdminProductForm.tsx';
+import AdminSettings from './AdminSettings.tsx';
+import AdminBrands from './AdminBrands.tsx';
+import AdminCategories from './AdminCategories.tsx';
+import AdminSlider from './AdminSlider.tsx';
+import AdminMenuManagement from './AdminMenuManagement.tsx';
+import AdminCheckoutManager from './AdminCheckoutManager.tsx';
+import AdminHomeManagement from './AdminHomeManagement.tsx';
 
 interface DashboardProps {
   orders: Order[];
@@ -49,7 +50,7 @@ interface DashboardProps {
   onLogout?: () => void;
 }
 
-type AdminSubView = 'overview' | 'orders' | 'inventory' | 'settings' | 'customers' | 'order-detail' | 'product-form' | 'brands' | 'categories' | 'slider' | 'menu' | 'checkout-config';
+export type AdminSubView = 'overview' | 'orders' | 'inventory' | 'settings' | 'customers' | 'order-detail' | 'product-form' | 'brands' | 'categories' | 'slider' | 'menu' | 'checkout-config' | 'home-layout';
 
 const Dashboard: React.FC<DashboardProps> = (props) => {
   const { 
@@ -95,7 +96,7 @@ const Dashboard: React.FC<DashboardProps> = (props) => {
 
   const handleAddProduct = () => {
     setEditingProduct({ 
-      name: '', brand: '', category: '', price: 0, image: '', gallery: [], variants: [], 
+      name: '', brand: '', category: '', categories: [], price: 0, image: '', gallery: [], variants: [], 
       description: '', colorway: '', is_drop: false, trending: false 
     });
     setSubView('product-form');
@@ -113,6 +114,8 @@ const Dashboard: React.FC<DashboardProps> = (props) => {
         return <AdminOrders orders={filteredOrders} statusFilter={statusFilter} onStatusFilterChange={setStatusFilter} searchQuery={searchQuery} onSearchChange={setSearchQuery} onSelectOrder={handleSelectOrder} />;
       case 'order-detail':
         return selectedOrder ? <AdminOrderDetail order={selectedOrder} onBack={() => setSubView('orders')} onUpdateStatus={onUpdateOrderStatus} /> : null;
+      case 'home-layout':
+        return <AdminHomeManagement sneakers={sneakers} onUpdateProduct={onSaveProduct} />;
       case 'brands':
         return <AdminBrands brands={brands} onSave={onSaveBrand} onDelete={onDeleteBrand} />;
       case 'categories':

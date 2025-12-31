@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { HomeSlide } from '../../types';
+import { HomeSlide } from '../../types.ts';
 
 interface HeroSliderProps {
   slides: HomeSlide[];
@@ -52,7 +52,7 @@ const HeroSlider: React.FC<HeroSliderProps> = ({ slides, onNavigate }) => {
               Vault Directive: {idx + 1}/{activeSlides.length}
             </p>
             <h2 className={`text-white text-3xl md:text-7xl lg:text-8xl font-black font-heading leading-none drop-shadow-2xl italic uppercase transition-all duration-700 delay-500 ${idx === current ? 'translate-y-0 opacity-100' : 'translate-y-8 opacity-0'}`}>
-              {slide.headline.split('\n').map((line, i) => (
+              {slide.headline.replace(/\\n/g, '\n').split('\n').map((line, i) => (
                 <React.Fragment key={i}>{line}<br/></React.Fragment>
               ))}
             </h2>

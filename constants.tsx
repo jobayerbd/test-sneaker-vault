@@ -1,5 +1,5 @@
 
-import { Brand, Sneaker, OrderStatus, Order } from './types';
+import { Brand, Sneaker, OrderStatus, Order } from './types.ts';
 
 export const MOCK_SNEAKERS: Sneaker[] = [
   {
@@ -7,7 +7,6 @@ export const MOCK_SNEAKERS: Sneaker[] = [
     name: 'Air Jordan 1 Retro High OG "Chicago"',
     brand: Brand.JORDAN,
     price: 180,
-    // Fix: changed originalPrice to original_price to match Sneaker interface
     original_price: 180,
     image: 'https://picsum.photos/seed/jordan1/800/800',
     gallery: [
@@ -16,9 +15,7 @@ export const MOCK_SNEAKERS: Sneaker[] = [
       'https://picsum.photos/seed/jordan1-3/800/800'
     ],
     description: 'The shoe that started it all. The Air Jordan 1 High "Chicago" returns in its original glory.',
-    // Fix: changed releaseDate to release_date to match Sneaker interface
     release_date: '2024-12-01',
-    // Fix: changed isDrop to is_drop to match Sneaker interface
     is_drop: true,
     colorway: 'Red/White/Black',
     variants: [
@@ -27,9 +24,9 @@ export const MOCK_SNEAKERS: Sneaker[] = [
       { size: '10', stock: 12 },
       { size: '11', stock: 0 }
     ],
-    // Fix: changed fitScore to fit_score to match Sneaker interface
     fit_score: 'True to Size',
-    trending: true
+    trending: true,
+    created_at: '2024-01-01T00:00:00Z'
   },
   {
     id: '2',
@@ -39,18 +36,16 @@ export const MOCK_SNEAKERS: Sneaker[] = [
     image: 'https://picsum.photos/seed/yeezy/800/800',
     gallery: ['https://picsum.photos/seed/yeezy-1/800/800'],
     description: 'Iconic Zebra pattern on a primeknit upper with responsive Boost cushioning.',
-    // Fix: changed releaseDate to release_date to match Sneaker interface
     release_date: '2024-11-20',
-    // Fix: changed isDrop to is_drop to match Sneaker interface
     is_drop: false,
     colorway: 'White/Black/Red',
     variants: [
       { size: '9', stock: 10 },
       { size: '10', stock: 5 }
     ],
-    // Fix: changed fitScore to fit_score to match Sneaker interface
     fit_score: 'Runs Small (Order 0.5 size up)',
-    trending: true
+    trending: true,
+    created_at: '2024-01-02T00:00:00Z'
   },
   {
     id: '3',
@@ -60,18 +55,16 @@ export const MOCK_SNEAKERS: Sneaker[] = [
     image: 'https://picsum.photos/seed/dunk/800/800',
     gallery: ['https://picsum.photos/seed/dunk-1/800/800'],
     description: 'The versatile daily driver. Classic monochrome leather construction.',
-    // Fix: changed releaseDate to release_date to match Sneaker interface
     release_date: '2024-10-15',
-    // Fix: changed isDrop to is_drop to match Sneaker interface
     is_drop: false,
     colorway: 'White/Black',
     variants: [
       { size: '8', stock: 20 },
       { size: '12', stock: 15 }
     ],
-    // Fix: changed fitScore to fit_score to match Sneaker interface
     fit_score: 'True to Size',
-    trending: true
+    trending: true,
+    created_at: '2024-01-03T00:00:00Z'
   },
   {
     id: '4',
@@ -81,17 +74,15 @@ export const MOCK_SNEAKERS: Sneaker[] = [
     image: 'https://picsum.photos/seed/nb2002/800/800',
     gallery: ['https://picsum.photos/seed/nb2002-1/800/800'],
     description: 'Deconstructed aesthetics meet modern comfort. Rain Cloud colorway.',
-    // Fix: changed releaseDate to release_date to match Sneaker interface
     release_date: '2025-01-10',
-    // Fix: changed isDrop to is_drop to match Sneaker interface
     is_drop: true,
     colorway: 'Rain Cloud',
     variants: [
       { size: '10', stock: 4 }
     ],
-    // Fix: changed fitScore to fit_score to match Sneaker interface
     fit_score: 'True to Size',
-    trending: false
+    trending: false,
+    created_at: '2024-01-04T00:00:00Z'
   },
   {
     id: '5',
@@ -101,23 +92,20 @@ export const MOCK_SNEAKERS: Sneaker[] = [
     image: 'https://picsum.photos/seed/samba/800/800',
     gallery: ['https://picsum.photos/seed/samba-1/800/800'],
     description: 'The terrace classic reborn. Timeless style for every wardrobe.',
-    // Fix: changed releaseDate to release_date to match Sneaker interface
     release_date: '2024-05-10',
-    // Fix: changed isDrop to is_drop to match Sneaker interface
     is_drop: false,
     colorway: 'Core Black/Cloud White',
     variants: [
       { size: '9', stock: 30 },
       { size: '10', stock: 25 }
     ],
-    // Fix: changed fitScore to fit_score to match Sneaker interface
     fit_score: 'True to Size',
-    trending: true
+    trending: true,
+    created_at: '2024-01-05T00:00:00Z'
   }
 ];
 
 export const MOCK_ORDERS: Order[] = [
-  // Fix: added missing 'timeline' property and kept existing corrections
   { id: 'ORD-001', first_name: 'John', last_name: 'Doe', email: 'john@example.com', created_at: '2024-10-25', status: OrderStatus.DELIVERED, total: 360, street_address: '123 Sneaker St', city: 'NY', zip_code: '10001', items: [], timeline: [] },
   { id: 'ORD-002', first_name: 'Jane', last_name: 'Smith', email: 'jane@example.com', created_at: '2024-11-01', status: OrderStatus.SHIPPED, total: 110, street_address: '456 Hype Ave', city: 'LA', zip_code: '90001', items: [], timeline: [] },
   { id: 'ORD-003', first_name: 'Mike', last_name: 'Hype', email: 'mike@hype.com', created_at: '2024-11-05', status: OrderStatus.PROCESSING, total: 540, street_address: '789 Vault Blvd', city: 'CHI', zip_code: '60601', items: [], timeline: [] },

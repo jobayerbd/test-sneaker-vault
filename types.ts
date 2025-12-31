@@ -86,6 +86,7 @@ export interface Sneaker {
   variants: SneakerVariant[];
   fit_score: string;
   trending: boolean;
+  created_at?: string;
 }
 
 export interface ShippingOption {

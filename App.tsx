@@ -1,13 +1,13 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import Navigation from './components/Navigation';
-import Home from './components/Storefront/Home';
-import Shop from './components/Storefront/Shop';
-import ProductDetail from './components/Storefront/ProductDetail';
-import Dashboard from './components/Admin/Dashboard';
-import Login from './components/Admin/Login';
-import Footer from './components/Footer';
-import { Sneaker, CartItem, Order, OrderStatus, ShippingOption, FooterConfig, TimelineEvent, BrandEntity, Category, PaymentMethod, HomeSlide, NavItem, CheckoutField } from './types';
+import Navigation from './components/Navigation.tsx';
+import Home from './components/Storefront/Home.tsx';
+import Shop from './components/Storefront/Shop.tsx';
+import ProductDetail from './components/Storefront/ProductDetail.tsx';
+import Dashboard from './components/Admin/Dashboard.tsx';
+import Login from './components/Admin/Login.tsx';
+import Footer from './components/Footer.tsx';
+import { Sneaker, CartItem, Order, OrderStatus, ShippingOption, FooterConfig, TimelineEvent, BrandEntity, Category, PaymentMethod, HomeSlide, NavItem, CheckoutField } from './types.ts';
 
 const SUPABASE_URL = 'https://vwbctddmakbnvfxzrjeo.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_8WhV41Km5aj8Dhvu6tUbvA_JnyPoVxu';
@@ -809,7 +809,7 @@ const App: React.FC = () => {
               <div className="space-y-4 mb-8">
                 <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-gray-500">
                   <span>Subtotal Value</span>
-                  <span>{cart.reduce((a,c)=>a+(c.price*c.quantity),0).toLocaleString()}৳</span>
+                  <span>{cart.reduce((acc, item) => acc + (item.price * item.quantity), 0).toLocaleString()}৳</span>
                 </div>
                 <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-gray-500">
                   <span>Logistics Fee</span>
@@ -817,7 +817,7 @@ const App: React.FC = () => {
                 </div>
                 <div className="flex justify-between items-end pt-6 border-t border-white/10">
                   <span className="text-xs font-black uppercase tracking-[0.2em] italic">Final Settlement</span>
-                  <span className="text-3xl font-black text-red-600">{(cart.reduce((a,c)=>a+(c.price*c.quantity),0) + (selectedShipping?.rate||0)).toLocaleString()}৳</span>
+                  <span className="text-3xl font-black text-red-600">{(cart.reduce((acc, item) => acc + (item.price * item.quantity), 0) + (selectedShipping?.rate||0)).toLocaleString()}৳</span>
                 </div>
               </div>
               <button 
@@ -866,7 +866,7 @@ const App: React.FC = () => {
               <div className="space-y-3">
                 <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-gray-400">
                   <span>Subtotal Protocol</span>
-                  <span>{lastOrder?.items?.reduce((a,c)=>a+(c.price*c.quantity),0).toLocaleString()}৳</span>
+                  <span>{lastOrder?.items?.reduce((acc, item) => acc + (item.price * item.quantity), 0).toLocaleString()}৳</span>
                 </div>
                 <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-gray-400">
                   <span>Logistics Fee ({lastOrder?.shipping_name})</span>
