@@ -1,3 +1,4 @@
+
 export enum Brand {
   NIKE = 'Nike',
   ADIDAS = 'Adidas',
@@ -13,6 +14,12 @@ export enum OrderStatus {
   SHIPPED = 'Shipped',
   DELIVERED = 'Delivered',
   RETURNED = 'Returned'
+}
+
+export interface TimelineEvent {
+  status: OrderStatus;
+  timestamp: string;
+  note: string;
 }
 
 export interface SneakerVariant {
@@ -65,6 +72,7 @@ export interface Order {
   status: OrderStatus;
   total: number;
   items: OrderItem[];
+  timeline: TimelineEvent[];
   shipping_name?: string;
   shipping_rate?: number;
   created_at?: string;

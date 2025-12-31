@@ -117,9 +117,9 @@ export const MOCK_SNEAKERS: Sneaker[] = [
 ];
 
 export const MOCK_ORDERS: Order[] = [
-  // Fix: changed date to created_at and removed extra fields carrier/trackingNumber to match Order interface strictly
-  { id: 'ORD-001', first_name: 'John', last_name: 'Doe', email: 'john@example.com', created_at: '2024-10-25', status: OrderStatus.DELIVERED, total: 360, street_address: '123 Sneaker St', city: 'NY', zip_code: '10001', items: [] },
-  { id: 'ORD-002', first_name: 'Jane', last_name: 'Smith', email: 'jane@example.com', created_at: '2024-11-01', status: OrderStatus.SHIPPED, total: 110, street_address: '456 Hype Ave', city: 'LA', zip_code: '90001', items: [] },
-  { id: 'ORD-003', first_name: 'Mike', last_name: 'Hype', email: 'mike@hype.com', created_at: '2024-11-05', status: OrderStatus.PROCESSING, total: 540, street_address: '789 Vault Blvd', city: 'CHI', zip_code: '60601', items: [] },
-  { id: 'ORD-004', first_name: 'Sarah', last_name: 'Collector', email: 'sarah@sneakers.com', created_at: '2024-11-07', status: OrderStatus.PLACED, total: 230, street_address: '101 Grail Way', city: 'MIA', zip_code: '33101', items: [] }
+  // Fix: added missing 'timeline' property and kept existing corrections
+  { id: 'ORD-001', first_name: 'John', last_name: 'Doe', email: 'john@example.com', created_at: '2024-10-25', status: OrderStatus.DELIVERED, total: 360, street_address: '123 Sneaker St', city: 'NY', zip_code: '10001', items: [], timeline: [] },
+  { id: 'ORD-002', first_name: 'Jane', last_name: 'Smith', email: 'jane@example.com', created_at: '2024-11-01', status: OrderStatus.SHIPPED, total: 110, street_address: '456 Hype Ave', city: 'LA', zip_code: '90001', items: [], timeline: [] },
+  { id: 'ORD-003', first_name: 'Mike', last_name: 'Hype', email: 'mike@hype.com', created_at: '2024-11-05', status: OrderStatus.PROCESSING, total: 540, street_address: '789 Vault Blvd', city: 'CHI', zip_code: '60601', items: [], timeline: [] },
+  { id: 'ORD-004', first_name: 'Sarah', last_name: 'Collector', email: 'sarah@sneakers.com', created_at: '2024-11-07', status: OrderStatus.PLACED, total: 230, street_address: '101 Grail Way', city: 'MIA', zip_code: '33101', items: [], timeline: [] }
 ];
