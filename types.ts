@@ -50,12 +50,14 @@ export interface SneakerVariant {
 export interface BrandEntity {
   id: string;
   name: string;
+  slug?: string;
   created_at?: string;
 }
 
 export interface Category {
   id: string;
   name: string;
+  slug?: string;
   created_at?: string;
 }
 
@@ -69,6 +71,7 @@ export interface PaymentMethod {
 export interface Sneaker {
   id: string;
   name: string;
+  slug?: string;
   brand?: string;
   category?: string;
   price: number;

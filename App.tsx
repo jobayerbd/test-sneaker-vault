@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Navigation from './components/Navigation';
 import Home from './components/Storefront/Home';
 import Shop from './components/Storefront/Shop';
@@ -25,11 +25,8 @@ const DEFAULT_FOOTER: FooterConfig = {
 const trackFBPixel = (event: string, params?: any) => {
   const f = window as any;
   if (f.fbq) {
-    if (params) {
-      f.fbq('track', event, params);
-    } else {
-      f.fbq('track', event);
-    }
+    if (params) f.fbq('track', event, params);
+    else f.fbq('track', event);
   }
 };
 
@@ -39,6 +36,7 @@ const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<View>('home');
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Sneaker | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [wishlist, setWishlist] = useState<Sneaker[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
@@ -56,7 +54,6 @@ const App: React.FC = () => {
   const [footerConfig, setFooterConfig] = useState<FooterConfig>(DEFAULT_FOOTER);
   
   const [isPlacingOrder, setIsPlacingOrder] = useState(false);
-  const [isFetchingOrders, setIsFetchingOrders] = useState(false);
   const [isFetchingSneakers, setIsFetchingSneakers] = useState(false);
   const [isCartSidebarOpen, setIsCartSidebarOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -64,10 +61,20 @@ const App: React.FC = () => {
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
   const [checkoutForm, setCheckoutForm] = useState<Record<string, any>>({});
 
-  // 1. Pixel Initialization
+  const pixelInitialized = useRef(false);
+
+  // 1. Initial Data Fetch & Pixel Init
+  useEffect(() => {
+    fetchSneakers(); fetchOrders(); fetchShippingOptions(); fetchFooterConfig(); 
+    fetchBrands(); fetchCategories(); fetchPaymentMethods(); fetchSlides(); 
+    fetchNavItems(); fetchCheckoutFields();
+    if (localStorage.getItem('sv_admin_session') === 'active') setIsAdminAuthenticated(true);
+  }, []);
+
+  // 2. Pixel Script Inserter
   useEffect(() => {
     const pixelId = footerConfig.fb_pixel_id?.trim();
-    if (!pixelId) return;
+    if (!pixelId || pixelInitialized.current) return;
     const f = window as any;
     if (!f.fbq) {
       f.fbq = function() { f.fbq.callMethod ? f.fbq.callMethod.apply(f.fbq, arguments) : f.fbq.queue.push(arguments); };
@@ -76,38 +83,51 @@ const App: React.FC = () => {
       const s = document.getElementsByTagName('script')[0]; if (s && s.parentNode) s.parentNode.insertBefore(t, s);
     }
     f.fbq('init', pixelId);
-    f.fbq('track', 'PageView');
+    pixelInitialized.current = true;
   }, [footerConfig.fb_pixel_id]);
 
-  // 2. URL Change & History Navigation Handler (Popstate)
-  useEffect(() => {
-    const handlePopState = () => {
-      const urlParams = new URLSearchParams(window.location.search);
-      const productId = urlParams.get('p');
-      const view = urlParams.get('v') as View || 'home';
+  // 3. Routing & Deep Linking Hub
+  const syncViewFromUrl = useCallback(() => {
+    const params = new URLSearchParams(window.location.search);
+    const productSlug = params.get('product');
+    const categorySlug = params.get('category');
+    const view = params.get('view') as View || 'home';
 
-      if (productId && sneakers.length > 0) {
-        const product = sneakers.find(s => s.id === productId);
-        if (product) {
-          setSelectedProduct(product);
-          setCurrentView('pdp');
-          return;
-        }
+    if (productSlug && sneakers.length > 0) {
+      const product = sneakers.find(s => s.slug === productSlug || s.id === productSlug);
+      if (product) {
+        setSelectedProduct(product);
+        setCurrentView('pdp');
+        return;
       }
-      setCurrentView(view);
-    };
+    }
 
-    window.addEventListener('popstate', handlePopState);
-    return () => window.removeEventListener('popstate', handlePopState);
+    if (categorySlug) {
+      setSelectedCategory(categorySlug);
+      setCurrentView('shop');
+      return;
+    }
+
+    setCurrentView(view);
   }, [sneakers]);
 
-  // 3. Pixel Tracker - Triggers on every Product ID or View change
   useEffect(() => {
+    syncViewFromUrl();
+    window.addEventListener('popstate', syncViewFromUrl);
+    return () => window.removeEventListener('popstate', syncViewFromUrl);
+  }, [syncViewFromUrl]);
+
+  // 4. MASTER PIXEL TRACKER: Watches URL changes
+  useEffect(() => {
+    const pixelId = footerConfig.fb_pixel_id?.trim();
+    if (!pixelId) return;
+
     window.scrollTo({ top: 0, behavior: 'auto' });
     
-    // Always trigger a fresh PageView for every view change to reset FB's context
+    // Step A: Reset PageView context for the new URL
     trackFBPixel('PageView');
 
+    // Step B: If in PDP, send fresh product data
     if (currentView === 'pdp' && selectedProduct) {
       trackFBPixel('ViewContent', {
         content_ids: [String(selectedProduct.id)],
@@ -117,20 +137,19 @@ const App: React.FC = () => {
         currency: 'BDT',
         content_category: selectedProduct.category || 'Sneakers'
       });
-      console.log(`[PIXEL] Product Event Sent: ${selectedProduct.name}`);
+      console.log(`[PIXEL-SYNC] Tracked: ${selectedProduct.name} on ${window.location.search}`);
     } else if (currentView === 'checkout') {
       trackFBPixel('InitiateCheckout', {
-        content_category: 'Sneakers',
         num_items: cart.length,
         value: cart.reduce((acc, item) => acc + (item.price * item.quantity), 0),
         currency: 'BDT'
       });
     }
-  }, [selectedProduct?.id, currentView]);
+  }, [selectedProduct?.id, currentView, window.location.search]);
 
-  const handleNavigate = (view: View) => {
+  const handleNavigate = (view: View, params: string = '') => {
     setCurrentView(view);
-    const newUrl = view === 'home' ? '/' : `/?v=${view}`;
+    const newUrl = view === 'home' ? '/' : `/?view=${view}${params ? '&' + params : ''}`;
     window.history.pushState({ view }, '', newUrl);
   };
 
@@ -138,9 +157,16 @@ const App: React.FC = () => {
     setSelectedProduct(sneaker);
     setCurrentView('pdp');
     setIsCartSidebarOpen(false);
-    // Force a real URL update to help Pixel distinguish between product pages
-    const productUrl = `/?v=pdp&p=${sneaker.id}`;
-    window.history.pushState({ view: 'pdp', productId: sneaker.id }, '', productUrl);
+    // Use slug if available, fallback to id
+    const slug = sneaker.slug || sneaker.id;
+    window.history.pushState({ view: 'pdp', slug }, '', `/?product=${slug}`);
+  };
+
+  const handleSelectCategory = (slug: string | null) => {
+    setSelectedCategory(slug);
+    setCurrentView('shop');
+    const url = slug ? `/?category=${slug}` : `/?view=shop`;
+    window.history.pushState({ view: 'shop', category: slug }, '', url);
   };
 
   const fetchSneakers = useCallback(async () => {
@@ -212,13 +238,12 @@ const App: React.FC = () => {
   }, []);
 
   const fetchOrders = useCallback(async () => {
-    setIsFetchingOrders(true);
     try {
       const response = await fetch(`${SUPABASE_URL}/rest/v1/orders?select=*&order=created_at.desc`, {
         headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
       });
       if (response.ok) setOrders(await response.json());
-    } finally { setIsFetchingOrders(false); }
+    } catch (err) {}
   }, []);
 
   const fetchShippingOptions = useCallback(async () => {
@@ -245,11 +270,6 @@ const App: React.FC = () => {
       }
     } catch (err) {}
   }, []);
-
-  useEffect(() => {
-    if (localStorage.getItem('sv_admin_session') === 'active') setIsAdminAuthenticated(true);
-    fetchSneakers(); fetchOrders(); fetchShippingOptions(); fetchFooterConfig(); fetchBrands(); fetchCategories(); fetchPaymentMethods(); fetchSlides(); fetchNavItems(); fetchCheckoutFields();
-  }, [fetchSneakers, fetchOrders, fetchShippingOptions, fetchFooterConfig, fetchBrands, fetchCategories, fetchPaymentMethods, fetchSlides, fetchNavItems, fetchCheckoutFields]);
 
   const handleAddToCart = (item: CartItem, shouldCheckout: boolean = false) => {
     setCart(prev => {
@@ -284,7 +304,6 @@ const App: React.FC = () => {
       trackFBPixel('AddToWishlist', {
         content_ids: [String(sneaker.id)],
         content_name: sneaker.name,
-        content_type: 'product',
         value: sneaker.price,
         currency: 'BDT'
       });
@@ -512,7 +531,7 @@ const App: React.FC = () => {
     } catch (err) { return false; }
   };
 
-  const handleSaveCategory = async (data: any): Promise<boolean> => {
+  const handleSaveCategoryData = async (data: any): Promise<boolean> => {
     const isUpdate = !!data.id;
     const url = isUpdate ? `${SUPABASE_URL}/rest/v1/categories?id=eq.${data.id}` : `${SUPABASE_URL}/rest/v1/categories`;
     const method = isUpdate ? 'PATCH' : 'POST';
@@ -527,7 +546,7 @@ const App: React.FC = () => {
     } catch (err) { return false; }
   };
 
-  const handleDeleteCategory = async (id: string): Promise<boolean> => {
+  const handleDeleteCategoryData = async (id: string): Promise<boolean> => {
     try {
       const response = await fetch(`${SUPABASE_URL}/rest/v1/categories?id=eq.${id}`, {
         method: 'DELETE',
@@ -709,10 +728,10 @@ const App: React.FC = () => {
   const renderView = () => {
     switch (currentView) {
       case 'home': return <Home sneakers={sneakers} slides={slides} onSelectProduct={handleSelectProduct} onNavigate={handleNavigate} onSearch={handleSearch} />;
-      case 'shop': return <Shop sneakers={sneakers} onSelectProduct={handleSelectProduct} searchQuery={searchQuery} onClearSearch={() => setSearchQuery('')} />;
+      case 'shop': return <Shop sneakers={sneakers} onSelectProduct={handleSelectProduct} searchQuery={searchQuery} onClearSearch={() => setSearchQuery('')} categoryFilter={selectedCategory} onCategoryChange={handleSelectCategory} />;
       case 'pdp': return selectedProduct ? <ProductDetail sneaker={selectedProduct} onAddToCart={handleAddToCart} onBack={() => handleNavigate('shop')} onToggleWishlist={toggleWishlist} isInWishlist={wishlist.some(s => s.id === selectedProduct.id)} onSelectProduct={handleSelectProduct} /> : <Home sneakers={sneakers} slides={slides} onSelectProduct={handleSelectProduct} onNavigate={handleNavigate} onSearch={handleSearch} />;
       case 'admin-login': return <Login supabaseUrl={SUPABASE_URL} supabaseKey={SUPABASE_KEY} onLoginSuccess={() => { setIsAdminAuthenticated(true); handleNavigate('admin'); }} />;
-      case 'admin': return <Dashboard sneakers={sneakers} orders={orders} brands={brands} categories={categories} paymentMethods={paymentMethods} slides={slides} navItems={navItems} checkoutFields={checkoutFields} shippingOptions={shippingOptions} footerConfig={footerConfig} onRefresh={() => { fetchOrders(); fetchSneakers(); fetchShippingOptions(); fetchFooterConfig(); fetchBrands(); fetchCategories(); fetchPaymentMethods(); fetchSlides(); fetchNavItems(); fetchCheckoutFields(); }} onUpdateOrderStatus={handleUpdateOrderStatus} onSaveProduct={handleSaveProduct} onDeleteProduct={handleDeleteProduct} onSaveShipping={handleSaveShippingOption} onDeleteShipping={handleDeleteShippingOption} onSavePaymentMethod={handleSavePaymentMethod} onDeletePaymentMethod={handleDeletePaymentMethod} onSaveFooterConfig={handleSaveFooterConfig} onSaveBrand={handleSaveBrand} onDeleteBrand={handleDeleteBrand} onSaveCategory={handleSaveCategory} onDeleteCategory={handleDeleteCategory} onSaveSlide={handleSaveSlide} onDeleteSlide={handleDeleteSlide} onSaveNavItem={handleSaveNavItem} onDeleteNavItem={handleDeleteNavItem} onSaveCheckoutField={handleSaveCheckoutField} onDeleteCheckoutField={handleDeleteCheckoutField} isRefreshing={isFetchingOrders || isFetchingSneakers} onLogout={handleLogout} />;
+      case 'admin': return <Dashboard sneakers={sneakers} orders={orders} brands={brands} categories={categories} paymentMethods={paymentMethods} slides={slides} navItems={navItems} checkoutFields={checkoutFields} shippingOptions={shippingOptions} footerConfig={footerConfig} onRefresh={() => { fetchOrders(); fetchSneakers(); fetchShippingOptions(); fetchFooterConfig(); fetchBrands(); fetchCategories(); fetchPaymentMethods(); fetchSlides(); fetchNavItems(); fetchCheckoutFields(); }} onUpdateOrderStatus={handleUpdateOrderStatus} onSaveProduct={handleSaveProduct} onDeleteProduct={handleDeleteProduct} onSaveShipping={handleSaveShippingOption} onDeleteShipping={handleDeleteShippingOption} onSavePaymentMethod={handleSavePaymentMethod} onDeletePaymentMethod={handleDeletePaymentMethod} onSaveFooterConfig={handleSaveFooterConfig} onSaveBrand={handleSaveBrand} onDeleteBrand={handleDeleteBrand} onSaveCategory={handleSaveCategoryData} onDeleteCategory={handleDeleteCategoryData} onSaveSlide={handleSaveSlide} onDeleteSlide={handleDeleteSlide} onSaveNavItem={handleSaveNavItem} onDeleteNavItem={handleDeleteNavItem} onSaveCheckoutField={handleSaveCheckoutField} onDeleteCheckoutField={handleDeleteCheckoutField} isRefreshing={isFetchingSneakers} onLogout={handleLogout} />;
       case 'checkout': return (
         <div className="max-w-6xl mx-auto px-4 py-16 animate-in fade-in duration-500">
           <div className="flex flex-col items-center mb-12 text-center">
@@ -858,17 +877,6 @@ const App: React.FC = () => {
                   <span className="text-3xl font-black text-red-700">{lastOrder?.total?.toLocaleString()}৳</span>
                 </div>
               </div>
-            </div>
-            <div className="p-8 border-t border-gray-100 bg-white grid grid-cols-2 gap-8">
-               <div className="space-y-2">
-                 <h5 className="text-[9px] font-black uppercase text-gray-400 tracking-widest italic">Shipping Coordinates</h5>
-                 <p className="text-[10px] font-bold text-black uppercase leading-relaxed">{lastOrder?.first_name} {lastOrder?.last_name}<br/>{lastOrder?.street_address}<br/>{lastOrder?.city}, {lastOrder?.zip_code}</p>
-               </div>
-               <div className="space-y-2">
-                 <h5 className="text-[9px] font-black uppercase text-gray-400 tracking-widest italic">Payment Matrix</h5>
-                 <p className="text-[10px] font-bold text-black uppercase">{lastOrder?.payment_method}</p>
-                 <div className="inline-block px-2 py-1 bg-green-50 text-green-700 border border-green-100 text-[8px] font-black uppercase rounded mt-2">Secured & Confirmed</div>
-               </div>
             </div>
           </div>
           <div className="text-center mt-16">

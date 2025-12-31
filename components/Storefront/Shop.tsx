@@ -7,19 +7,50 @@ interface ShopProps {
   onSelectProduct: (sneaker: Sneaker) => void;
   searchQuery?: string;
   onClearSearch?: () => void;
+  categoryFilter?: string | null;
+  onCategoryChange?: (slug: string | null) => void;
 }
 
-const Shop: React.FC<ShopProps> = ({ sneakers, onSelectProduct, searchQuery = '', onClearSearch }) => {
+const Shop: React.FC<ShopProps> = ({ 
+  sneakers, 
+  onSelectProduct, 
+  searchQuery = '', 
+  onClearSearch, 
+  categoryFilter,
+  onCategoryChange 
+}) => {
   const filteredSneakers = useMemo(() => {
-    if (!searchQuery.trim()) return sneakers;
-    const query = searchQuery.toLowerCase().trim();
-    return sneakers.filter(s => 
-      s.name.toLowerCase().includes(query) || 
-      (s.brand && s.brand.toLowerCase().includes(query)) ||
-      (s.colorway && s.colorway.toLowerCase().includes(query)) ||
-      (s.category && s.category.toLowerCase().includes(query))
-    );
-  }, [sneakers, searchQuery]);
+    let results = sneakers;
+    
+    // Apply Category Filter
+    if (categoryFilter) {
+      results = results.filter(s => 
+        (s.category && s.category.toLowerCase() === categoryFilter.toLowerCase()) ||
+        (s.brand && s.brand.toLowerCase() === categoryFilter.toLowerCase())
+      );
+    }
+
+    // Apply Search Filter
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase().trim();
+      results = results.filter(s => 
+        s.name.toLowerCase().includes(query) || 
+        (s.brand && s.brand.toLowerCase().includes(query)) ||
+        (s.colorway && s.colorway.toLowerCase().includes(query)) ||
+        (s.category && s.category.toLowerCase().includes(query))
+      );
+    }
+    
+    return results;
+  }, [sneakers, searchQuery, categoryFilter]);
+
+  const categories = useMemo(() => {
+    const cats = new Set<string>();
+    sneakers.forEach(s => {
+      if (s.category) cats.add(s.category);
+    });
+    return Array.from(cats);
+  }, [sneakers]);
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-16">
@@ -27,15 +58,37 @@ const Shop: React.FC<ShopProps> = ({ sneakers, onSelectProduct, searchQuery = ''
         <h1 className="text-5xl font-black italic uppercase font-heading mb-4">Vault Archives</h1>
         <div className="w-20 h-1 bg-red-600 mb-4"></div>
         <p className="text-gray-400 text-xs font-bold uppercase tracking-[0.3em]">
-          {searchQuery ? `Protocol Results: "${searchQuery}"` : 'Accessing secured inventory records'}
+          {categoryFilter ? `Active Protocol: ${categoryFilter.toUpperCase()}` : 'Accessing secured inventory records'}
         </p>
         
-        {searchQuery && (
+        {/* Category Quick Filter */}
+        <div className="flex flex-wrap justify-center gap-3 mt-8">
+           <button 
+             onClick={() => onCategoryChange?.(null)}
+             className={`px-4 py-2 text-[9px] font-black uppercase tracking-widest border transition-all ${!categoryFilter ? 'bg-black text-white border-black' : 'text-gray-400 border-gray-100 hover:border-black'}`}
+           >
+             ALL ASSETS
+           </button>
+           {categories.map(cat => (
+             <button 
+               key={cat}
+               onClick={() => onCategoryChange?.(cat.toLowerCase())}
+               className={`px-4 py-2 text-[9px] font-black uppercase tracking-widest border transition-all ${categoryFilter === cat.toLowerCase() ? 'bg-black text-white border-black' : 'text-gray-400 border-gray-100 hover:border-black'}`}
+             >
+               {cat.toUpperCase()}
+             </button>
+           ))}
+        </div>
+        
+        {(searchQuery || categoryFilter) && (
           <button 
-            onClick={onClearSearch}
+            onClick={() => {
+              onClearSearch?.();
+              onCategoryChange?.(null);
+            }}
             className="mt-6 text-[10px] font-black uppercase tracking-widest text-red-600 border border-red-600 px-4 py-2 hover:bg-red-600 hover:text-white transition-all italic"
           >
-            Clear Search Protocol
+            Reset All Filters
           </button>
         )}
       </div>
@@ -58,7 +111,6 @@ const Shop: React.FC<ShopProps> = ({ sneakers, onSelectProduct, searchQuery = ''
                   High Heat
                 </div>
               )}
-              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors duration-300"></div>
             </div>
             <h3 className="font-bold text-[10px] uppercase truncate w-full mb-1 tracking-widest">{s.name}</h3>
             <p className="font-black italic text-sm text-red-600">{s.price}৳</p>
@@ -72,13 +124,7 @@ const Shop: React.FC<ShopProps> = ({ sneakers, onSelectProduct, searchQuery = ''
             <i className="fa-solid fa-box-open text-gray-200 text-3xl"></i>
           </div>
           <h3 className="text-xl font-black italic uppercase font-heading mb-2">Zero Assets Identified</h3>
-          <p className="text-gray-400 text-[10px] font-black uppercase tracking-[0.3em] italic">No records found matching current protocol: "{searchQuery}"</p>
-          <button 
-            onClick={onClearSearch}
-            className="mt-10 px-10 py-4 bg-black text-white text-[10px] font-black uppercase tracking-widest hover:bg-red-700 transition-all italic shadow-2xl"
-          >
-            Reset Intelligence Archive
-          </button>
+          <p className="text-gray-400 text-[10px] font-black uppercase tracking-[0.3em] italic">No records found matching current protocol.</p>
         </div>
       )}
     </div>
