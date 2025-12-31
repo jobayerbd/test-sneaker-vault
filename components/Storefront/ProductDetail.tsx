@@ -228,12 +228,12 @@ const ProductDetail: React.FC<ProductDetailProps> = ({
 
         {/* Info Tabs */}
         <div className="mt-24">
-          <div className="flex justify-center border-b border-gray-100 mb-12">
+          <div className="flex justify-center border-b border-gray-100 mb-12 overflow-x-auto no-scrollbar whitespace-nowrap">
             {['DESCRIPTION', 'SPECIFICATIONS', 'REVIEWS'].map(tab => (
               <button 
                 key={tab}
                 onClick={() => setActiveTab(tab)}
-                className={`px-8 py-4 text-[10px] font-black tracking-[0.3em] uppercase transition-all relative ${activeTab === tab ? 'text-black' : 'text-gray-300 hover:text-gray-500'}`}
+                className={`px-4 sm:px-8 py-4 text-[9px] sm:text-[10px] font-black tracking-[0.1em] sm:tracking-[0.3em] uppercase transition-all relative shrink-0 ${activeTab === tab ? 'text-black' : 'text-gray-300 hover:text-gray-500'}`}
               >
                 {tab}
                 {activeTab === tab && <div className="absolute bottom-0 left-0 right-0 h-1 bg-red-600 animate-in slide-in-from-bottom-1"></div>}
