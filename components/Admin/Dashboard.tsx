@@ -1,4 +1,5 @@
-import React, { useState, useMemo } from 'react';
+
+import React, { useState, useMemo, useRef } from 'react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Cell } from 'recharts';
 import { Order, OrderStatus, Sneaker, Brand, SneakerVariant, ShippingOption, FooterConfig } from '../../types';
 
@@ -44,243 +45,6 @@ const getStatusBadgeStyles = (status: string) => {
   }
 };
 
-const Overview: React.FC<{ orders: Order[], sneakers: Sneaker[], totalRevenue: number, avgOrderValue: number, isRefreshing?: boolean, onRefresh?: () => void }> = ({ orders, sneakers, totalRevenue, avgOrderValue, isRefreshing, onRefresh }) => (
-  <div className="space-y-8 animate-in fade-in">
-    <div className="flex justify-between items-center">
-      <div>
-        <h1 className="text-3xl font-black font-heading tracking-tight italic text-black">COMMAND CENTER</h1>
-        <p className="text-gray-500 text-sm font-medium">Real-time performance monitoring and vault health.</p>
-      </div>
-      <div className="flex space-x-3">
-        <button 
-          onClick={onRefresh}
-          disabled={isRefreshing}
-          className={`bg-white border border-gray-200 px-5 py-2.5 rounded-lg text-xs font-black uppercase tracking-widest hover:border-black transition-all flex items-center space-x-2 shadow-sm ${isRefreshing ? 'opacity-50 cursor-not-allowed' : ''}`}
-        >
-          <i className={`fa-solid fa-sync ${isRefreshing ? 'animate-spin' : ''}`}></i>
-          <span>{isRefreshing ? 'Syncing...' : 'Sync Vault'}</span>
-        </button>
-      </div>
-    </div>
-
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-      {[
-        { label: 'Total Revenue', value: `${totalRevenue.toLocaleString()}৳`, trend: 'Live Data', color: 'text-green-600', icon: 'fa-dollar-sign' },
-        { label: 'Avg Order Value', value: `${avgOrderValue.toLocaleString()}৳`, trend: 'Stable', color: 'text-blue-600', icon: 'fa-chart-line' },
-        { label: 'Total Orders', value: orders.length, trend: 'Database Count', color: 'text-red-600', icon: 'fa-shopping-bag' },
-        { label: 'Inventory Count', value: sneakers.length, trend: 'SKU Count', color: 'text-amber-600', icon: 'fa-box-open' },
-      ].map((kpi, idx) => (
-        <div key={idx} className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm hover:shadow-xl transition-all group">
-          <div className="flex justify-between items-start mb-4">
-            <div className={`p-4 rounded-xl bg-gray-50 ${kpi.color} group-hover:scale-110 transition-transform`}>
-              <i className={`fa-solid ${kpi.icon} text-xl`}></i>
-            </div>
-            <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded bg-gray-50 ${kpi.color}`}>{kpi.trend}</span>
-          </div>
-          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">{kpi.label}</p>
-          <h3 className="text-2xl font-black tracking-tight text-black">{kpi.value}</h3>
-        </div>
-      ))}
-    </div>
-
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-      <div className="bg-white p-8 rounded-2xl border border-gray-100 shadow-sm">
-        <h3 className="text-lg font-black uppercase tracking-widest mb-8 italic font-heading">Performance Analytics</h3>
-        <div className="h-[300px]">
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={CHART_DATA}>
-              <defs>
-                <linearGradient id="colorSales" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#ef4444" stopOpacity={0.2}/>
-                  <stop offset="95%" stopColor="#ef4444" stopOpacity={0}/>
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f1f1" />
-              <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 10, fontWeight: 800, fill: '#9ca3af'}} />
-              <YAxis axisLine={false} tickLine={false} tick={{fontSize: 10, fontWeight: 800, fill: '#9ca3af'}} />
-              <Tooltip 
-                 contentStyle={{ border: 'none', borderRadius: '12px', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', padding: '12px' }}
-                 itemStyle={{ fontWeight: 800, fontSize: '12px' }}
-              />
-              <Area type="monotone" dataKey="sales" stroke="#ef4444" strokeWidth={4} fillOpacity={1} fill="url(#colorSales)" />
-            </AreaChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
-      <div className="bg-white p-8 rounded-2xl border border-gray-100 shadow-sm">
-        <h3 className="text-lg font-black uppercase tracking-widest mb-8 italic font-heading">Channel Distribution</h3>
-        <div className="h-[300px]">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={CHART_DATA}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f1f1" />
-              <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 10, fontWeight: 800, fill: '#9ca3af'}} />
-              <YAxis axisLine={false} tickLine={false} tick={{fontSize: 10, fontWeight: 800, fill: '#9ca3af'}} />
-              <Tooltip cursor={{fill: 'rgba(0,0,0,0.02)'}} />
-              <Bar dataKey="traffic" radius={[6, 6, 0, 0]} barSize={40}>
-                {CHART_DATA.map((_, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
-    </div>
-  </div>
-);
-
-const OrderList: React.FC<{ filteredOrders: Order[], searchQuery: string, setSearchQuery: (q: string) => void, statusFilter: string, setStatusFilter: (s: string) => void, sortKey: SortKey, setSortKey: (k: SortKey) => void, onRefresh?: () => void, isRefreshing?: boolean, handleViewOrder: (order: Order) => void }> = ({ filteredOrders, searchQuery, setSearchQuery, statusFilter, setStatusFilter, sortKey, setSortKey, onRefresh, isRefreshing, handleViewOrder }) => (
-  <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-400">
-    <div className="flex flex-col md:flex-row md:justify-between md:items-end gap-6">
-      <div>
-        <h1 className="text-3xl font-black font-heading tracking-tight italic uppercase text-black">Order Management</h1>
-        <p className="text-gray-500 text-sm font-medium">Reviewing {filteredOrders.length} protocols across all status channels.</p>
-      </div>
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="relative">
-          <i className="fa-solid fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-xs"></i>
-          <input 
-            type="text"
-            placeholder="SEARCH ID OR SUBJECT..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="bg-white border-2 border-gray-100 focus:border-black pl-11 pr-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest outline-none transition-all w-72 shadow-sm"
-          />
-        </div>
-        <div className="relative group">
-          <select 
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="bg-white border-2 border-gray-100 hover:border-gray-200 focus:border-black pl-4 pr-10 py-3 rounded-xl text-[10px] font-black uppercase tracking-[0.15em] outline-none transition-all appearance-none cursor-pointer shadow-sm"
-          >
-            <option value="ALL">FILTER BY STATUS</option>
-            {Object.values(OrderStatus).map(status => (
-              <option key={status} value={status}>{status.toUpperCase()}</option>
-            ))}
-          </select>
-        </div>
-        <div className="relative group">
-          <select 
-            value={sortKey}
-            onChange={(e) => setSortKey(e.target.value as SortKey)}
-            className="bg-white border-2 border-gray-100 hover:border-gray-200 focus:border-black pl-4 pr-10 py-3 rounded-xl text-[10px] font-black uppercase tracking-[0.15em] outline-none transition-all appearance-none cursor-pointer shadow-sm"
-          >
-            <option value="DATE">SORT BY DATE</option>
-            <option value="STATUS">SORT BY STATUS</option>
-            <option value="VALUE">SORT BY VALUE</option>
-          </select>
-        </div>
-        <button onClick={onRefresh} className="p-3.5 bg-black text-white rounded-xl hover:bg-red-700 transition-all shadow-lg active:scale-95 flex items-center justify-center min-w-[50px]">
-          <i className={`fa-solid fa-rotate ${isRefreshing ? 'animate-spin' : ''}`}></i>
-        </button>
-      </div>
-    </div>
-
-    <div className="bg-white rounded-3xl border border-gray-100 shadow-xl overflow-hidden">
-      <div className="overflow-x-auto">
-        <table className="w-full text-left">
-          <thead>
-            <tr className="bg-gray-50/80 border-b border-gray-100">
-              <th className="px-8 py-6 text-[10px] font-black uppercase tracking-widest text-gray-400">Order ID</th>
-              <th className="px-8 py-6 text-[10px] font-black uppercase tracking-widest text-gray-400">Protocol Subject</th>
-              <th className="px-8 py-6 text-[10px] font-black uppercase tracking-widest text-gray-400">Contents</th>
-              <th className="px-8 py-6 text-[10px] font-black uppercase tracking-widest text-gray-400">Status</th>
-              <th className="px-8 py-6 text-[10px] font-black uppercase tracking-widest text-gray-400">Total Value</th>
-              <th className="px-8 py-6 text-[10px] font-black uppercase tracking-widest text-gray-400 text-right">Action</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-50">
-            {filteredOrders.map((order) => (
-              <tr key={order.id} className="hover:bg-gray-50/70 transition-colors group cursor-pointer" onClick={() => handleViewOrder(order)}>
-                <td className="px-8 py-6"><span className="font-mono text-xs font-black bg-gray-100 px-2.5 py-1.5 rounded-lg">{order.id}</span></td>
-                <td className="px-8 py-6"><div className="flex flex-col"><span className="font-bold text-sm">{order.first_name} {order.last_name}</span><span className="text-[10px] text-gray-400 font-bold uppercase">{order.email}</span></div></td>
-                <td className="px-8 py-6"><span className="text-[10px] font-black bg-black text-white px-2 py-0.5 rounded italic">{order.items?.length || 0} SECURED</span></td>
-                <td className="px-8 py-6"><span className={`px-4 py-2 rounded-xl border text-[9px] font-black uppercase tracking-widest inline-flex items-center ${getStatusBadgeStyles(order.status)}`}><span className="w-1.5 h-1.5 rounded-full bg-current mr-2.5"></span>{order.status}</span></td>
-                <td className="px-8 py-6"><span className="font-black text-sm italic">{order.total?.toLocaleString() || '0'}৳</span></td>
-                <td className="px-8 py-6 text-right"><button className="w-10 h-10 border border-gray-100 rounded-xl flex items-center justify-center"><i className="fa-solid fa-arrow-right-long text-xs"></i></button></td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  </div>
-);
-
-const OrderDetail: React.FC<{
-  order: Order,
-  pendingStatus: OrderStatus | null,
-  setPendingStatus: (s: OrderStatus) => void,
-  executeStatusUpdate: () => void,
-  isUpdatingStatus: boolean,
-  setSubView: (v: AdminSubView) => void
-}> = ({ order, pendingStatus, setPendingStatus, executeStatusUpdate, isUpdatingStatus, setSubView }) => {
-  const handlePrint = () => { window.print(); };
-  const assetSubtotal = (order.total || 0) - (order.shipping_rate || 0);
-
-  return (
-    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 print:hidden">
-        <button onClick={() => setSubView('orders')} className="group text-gray-400 hover:text-black font-bold uppercase tracking-widest text-[10px] flex items-center transition-all">
-          <div className="w-10 h-10 rounded-full border border-gray-100 flex items-center justify-center mr-4 group-hover:border-black transition-colors group-hover:shadow-xl"><i className="fa-solid fa-arrow-left"></i></div>
-          Protocol Hub
-        </button>
-        <div className="flex space-x-2">
-          <button onClick={handlePrint} className="bg-white border-2 border-black text-black px-6 py-3 rounded-xl font-black uppercase tracking-widest text-[10px] hover:bg-black hover:text-white transition-all shadow-sm flex items-center"><i className="fa-solid fa-print mr-3"></i> Print Protocol</button>
-          <div className="flex items-center bg-white border border-gray-100 rounded-xl px-4 mr-2 shadow-sm">
-            <span className="text-[10px] font-black uppercase tracking-widest text-gray-400 mr-4 italic">Update Protocol:</span>
-            <select value={pendingStatus || order.status} onChange={(e) => setPendingStatus(e.target.value as OrderStatus)} disabled={isUpdatingStatus} className="bg-transparent text-[10px] font-black uppercase tracking-[0.2em] py-3 outline-none cursor-pointer text-red-700 disabled:opacity-50">
-              {Object.values(OrderStatus).map(status => <option key={status} value={status}>{status.toUpperCase()}</option>)}
-            </select>
-          </div>
-          <button onClick={executeStatusUpdate} disabled={isUpdatingStatus || (pendingStatus === order.status)} className="bg-black text-white px-8 py-3 rounded-xl font-black uppercase tracking-widest text-[10px] hover:bg-red-700 transition-all shadow-2xl flex items-center disabled:opacity-50">{isUpdatingStatus ? 'Executing...' : 'Commit Status'} <i className="fa-solid fa-bolt ml-4 text-[11px]"></i></button>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2 space-y-8">
-          <div className="bg-white rounded-3xl border border-gray-100 shadow-xl overflow-hidden">
-             <div className="px-8 py-6 border-b border-gray-100 bg-gray-50/50 flex justify-between items-center">
-                <h3 className="text-sm font-black uppercase tracking-widest italic font-heading">Secure Inventory Manifest</h3>
-                <span className={`px-4 py-2 rounded-xl border text-[9px] font-black uppercase tracking-widest inline-flex items-center ${getStatusBadgeStyles(order.status)}`}>
-                  {order.status}
-                </span>
-             </div>
-             <div className="p-8 space-y-8">
-               {order.items?.map((item, i) => (
-                 <div key={i} className="flex space-x-8 border-b border-gray-50 pb-8 last:border-0 last:pb-0">
-                   <div className="w-24 h-24 bg-white border rounded-xl p-2 shrink-0"><img src={item.image} className="w-full h-full object-contain" /></div>
-                   <div className="flex-1">
-                      <h4 className="font-black text-lg uppercase font-heading">{item.name}</h4>
-                      <p className="text-[11px] font-black text-gray-400 uppercase tracking-widest">Size: {item.size} | Qty: {item.quantity}</p>
-                      <p className="mt-2 font-black italic">{item.price?.toLocaleString()}৳</p>
-                   </div>
-                 </div>
-               ))}
-             </div>
-          </div>
-        </div>
-        <div className="space-y-8">
-           <div className="bg-white rounded-3xl border border-gray-100 shadow-xl p-8">
-              <h3 className="text-sm font-black uppercase tracking-widest italic font-heading mb-6">Subject Profile</h3>
-              <div className="space-y-4">
-                 <div><p className="text-[10px] font-black text-gray-400 uppercase">Identity</p><p className="font-bold text-sm uppercase">{order.first_name} {order.last_name}</p></div>
-                 <div><p className="text-[10px] font-black text-gray-400 uppercase">Contact</p><p className="text-xs font-bold">{order.email}</p><p className="text-xs font-bold">{order.mobile_number || '---'}</p></div>
-                 <div><p className="text-[10px] font-black text-gray-400 uppercase">Coordinates</p><p className="text-xs font-bold uppercase">{order.street_address}, {order.city}, {order.zip_code}</p></div>
-              </div>
-           </div>
-           <div className="bg-black text-white rounded-3xl shadow-xl p-8">
-              <h3 className="text-sm font-black uppercase tracking-widest italic font-heading mb-6">Summary</h3>
-              <div className="space-y-4">
-                 <div className="flex justify-between text-xs font-bold text-gray-400"><span>Assets</span><span>{assetSubtotal.toLocaleString()}৳</span></div>
-                 <div className="flex justify-between text-xs font-bold text-gray-400"><span>Distribution</span><span>{order.shipping_rate?.toLocaleString()}৳</span></div>
-                 <div className="pt-4 border-t border-white/10 flex justify-between items-end"><span className="text-xs font-black uppercase italic">Total Settlement</span><span className="text-2xl font-black italic">{order.total.toLocaleString()}৳</span></div>
-              </div>
-           </div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
 const Dashboard: React.FC<DashboardProps> = ({ 
   orders, sneakers, shippingOptions = [], footerConfig, onRefresh, onUpdateOrderStatus, onSaveProduct, onDeleteProduct, onSaveShipping, onDeleteShipping, onSaveFooterConfig, isRefreshing, onLogout 
 }) => {
@@ -294,10 +58,10 @@ const Dashboard: React.FC<DashboardProps> = ({
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const [pendingStatus, setPendingStatus] = useState<OrderStatus | null>(null);
   const [isSavingProduct, setIsSavingProduct] = useState(false);
-  const [isSavingShipping, setIsSavingShipping] = useState(false);
-  const [isSavingFooter, setIsSavingFooter] = useState(false);
-
   const [footerForm, setFooterForm] = useState<FooterConfig>({ ...footerConfig });
+
+  const mainImageInputRef = useRef<HTMLInputElement>(null);
+  const galleryInputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
   const totalRevenue = useMemo(() => orders.reduce((acc, o) => acc + (Number(o.total) || 0), 0), [orders]);
   const avgOrderValue = useMemo(() => orders.length > 0 ? Math.round(totalRevenue / orders.length) : 0, [totalRevenue, orders.length]);
@@ -315,50 +79,47 @@ const Dashboard: React.FC<DashboardProps> = ({
     });
   }, [orders, statusFilter, searchQuery, sortKey]);
 
-  const handleViewOrder = (order: Order) => { setSelectedOrder(order); setPendingStatus(order.status); setSubView('order-detail'); };
-  
-  const executeStatusUpdate = async () => {
-    if (!selectedOrder || !pendingStatus || !onUpdateOrderStatus) return;
-    setIsUpdatingStatus(true);
-    const success = await onUpdateOrderStatus(selectedOrder.id, pendingStatus);
-    if (success) { setSelectedOrder({ ...selectedOrder, status: pendingStatus }); alert('PROTOCOL UPDATED SUCCESSFULLY'); }
-    setIsUpdatingStatus(false);
-  };
-
-  const handleSaveFooter = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!onSaveFooterConfig) return;
-    setIsSavingFooter(true);
-    const success = await onSaveFooterConfig(footerForm);
-    if (success) alert('FOOTER ARCHIVE UPDATED');
-    setIsSavingFooter(false);
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, callback: (url: string) => void) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        callback(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   const renderContent = () => {
     switch(subView) {
-      case 'overview': return <Overview orders={orders} sneakers={sneakers} totalRevenue={totalRevenue} avgOrderValue={avgOrderValue} isRefreshing={isRefreshing} onRefresh={onRefresh} />;
-      case 'orders': return <OrderList filteredOrders={filteredOrders} searchQuery={searchQuery} setSearchQuery={setSearchQuery} statusFilter={statusFilter} setStatusFilter={setStatusFilter} sortKey={sortKey} setSortKey={setSortKey} onRefresh={onRefresh} isRefreshing={isRefreshing} handleViewOrder={handleViewOrder} />;
+      case 'overview': 
+        return (
+          <div className="space-y-8 animate-in fade-in">
+            <div className="flex justify-between items-center">
+              <div>
+                <h1 className="text-3xl font-black font-heading tracking-tight italic text-black uppercase">Command Center</h1>
+                <p className="text-gray-500 text-sm font-medium">Real-time performance monitoring and vault health.</p>
+              </div>
+              <button onClick={onRefresh} className="bg-white border border-gray-200 px-5 py-2.5 rounded-lg text-xs font-black uppercase tracking-widest hover:border-black transition-all flex items-center space-x-2 shadow-sm">
+                <i className={`fa-solid fa-sync ${isRefreshing ? 'animate-spin' : ''}`}></i>
+                <span>Sync Vault</span>
+              </button>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm"><p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Total Revenue</p><h3 className="text-2xl font-black">{totalRevenue.toLocaleString()}৳</h3></div>
+              <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm"><p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Avg Order Value</p><h3 className="text-2xl font-black">{avgOrderValue.toLocaleString()}৳</h3></div>
+              <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm"><p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Total Orders</p><h3 className="text-2xl font-black">{orders.length}</h3></div>
+              <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm"><p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Inventory</p><h3 className="text-2xl font-black">{sneakers.length}</h3></div>
+            </div>
+          </div>
+        );
       case 'inventory': 
         return (
           <div className="space-y-8 animate-in fade-in">
              <div className="flex justify-between items-center">
                 <h1 className="text-3xl font-black uppercase italic font-heading">Vault Inventory</h1>
                 <button onClick={() => { 
-                  setEditingProduct({ 
-                    name: '', 
-                    brand: Brand.NIKE, 
-                    price: 0, 
-                    original_price: 0, 
-                    image: '', 
-                    gallery: [], 
-                    description: '', 
-                    release_date: new Date().toISOString().split('T')[0], 
-                    is_drop: false, 
-                    colorway: '', 
-                    variants: [], 
-                    fit_score: 'True to Size', 
-                    trending: false 
-                  }); 
+                  setEditingProduct({ name: '', brand: Brand.NIKE, price: 0, image: '', gallery: [], variants: [] }); 
                   setSubView('product-form'); 
                 }} className="bg-black text-white px-8 py-4 rounded-xl font-black uppercase text-[10px] tracking-widest shadow-xl">Initialize Asset</button>
              </div>
@@ -367,9 +128,12 @@ const Dashboard: React.FC<DashboardProps> = ({
                    <tbody className="divide-y divide-gray-50">
                      {sneakers.map((sneaker) => (
                        <tr key={sneaker.id} className="hover:bg-gray-50/50 transition-colors group">
-                         <td className="px-8 py-6"><div className="w-16 h-16 bg-white border border-gray-100 rounded-xl p-1 overflow-hidden"><img src={sneaker.image} className="w-full h-full object-contain" /></div></td>
-                         <td className="px-8 py-6"><div className="flex flex-col"><span className="font-bold text-sm text-gray-900">{sneaker.name}</span><span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{sneaker.brand}</span></div></td>
-                         <td className="px-8 py-6 text-right"><div className="flex justify-end space-x-3"><button onClick={() => { setEditingProduct(sneaker); setSubView('product-form'); }} className="p-3 text-gray-400 hover:text-black"><i className="fa-solid fa-pen-to-square"></i></button><button onClick={() => { if(window.confirm('Wipe Asset?')) onDeleteProduct?.(sneaker.id); }} className="p-3 text-gray-400 hover:text-red-600"><i className="fa-solid fa-trash-can"></i></button></div></td>
+                         <td className="px-8 py-6"><div className="w-16 h-16 border rounded-xl p-1 overflow-hidden"><img src={sneaker.image} className="w-full h-full object-contain" /></div></td>
+                         <td className="px-8 py-6 font-bold uppercase text-xs">{sneaker.name}</td>
+                         <td className="px-8 py-6 text-right">
+                           <button onClick={() => { setEditingProduct(sneaker); setSubView('product-form'); }} className="p-3 text-gray-400 hover:text-black"><i className="fa-solid fa-pen"></i></button>
+                           <button onClick={() => onDeleteProduct?.(sneaker.id)} className="p-3 text-gray-400 hover:text-red-600"><i className="fa-solid fa-trash"></i></button>
+                         </td>
                        </tr>
                      ))}
                    </tbody>
@@ -377,215 +141,143 @@ const Dashboard: React.FC<DashboardProps> = ({
              </div>
           </div>
         );
-      case 'product-form': return editingProduct ? (
-        <div className="space-y-8 animate-in fade-in">
-           <button onClick={() => setSubView('inventory')} className="text-gray-400 font-black uppercase text-[10px] tracking-widest hover:text-black"><i className="fa-solid fa-arrow-left mr-2"></i> Return to Hub</button>
-           <div className="bg-white p-10 rounded-3xl border border-gray-100 shadow-xl max-w-4xl mx-auto">
-              <h2 className="text-2xl font-black italic uppercase font-heading mb-8">Asset Initialization</h2>
-              <form onSubmit={async (e) => { e.preventDefault(); setIsSavingProduct(true); if(await onSaveProduct?.(editingProduct)) setSubView('inventory'); setIsSavingProduct(false); }} className="space-y-8">
-                 {/* Main Information */}
-                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                       <label className="text-[10px] font-black uppercase text-gray-400 block mb-2 italic tracking-widest">Asset Title*</label>
-                       <input type="text" required value={editingProduct.name} onChange={e => setEditingProduct({...editingProduct, name: e.target.value})} placeholder="e.g. Air Jordan 1 OG" className="w-full bg-gray-50 p-4 rounded-xl font-bold uppercase text-xs outline-none focus:bg-white border-2 border-transparent focus:border-black" />
-                    </div>
-                    <div>
-                       <label className="text-[10px] font-black uppercase text-gray-400 block mb-2 italic tracking-widest">Brand Matrix*</label>
-                       <select required value={editingProduct.brand} onChange={e => setEditingProduct({...editingProduct, brand: e.target.value as Brand})} className="w-full bg-gray-50 p-4 rounded-xl font-bold uppercase text-xs outline-none focus:bg-white border-2 border-transparent focus:border-black cursor-pointer appearance-none">
-                          {Object.values(Brand).map(b => <option key={b} value={b}>{b.toUpperCase()}</option>)}
-                       </select>
-                    </div>
-                 </div>
+      case 'product-form': 
+        return editingProduct ? (
+          <div className="space-y-8 animate-in fade-in">
+             <button onClick={() => setSubView('inventory')} className="text-gray-400 font-black uppercase text-[10px] tracking-widest hover:text-black"><i className="fa-solid fa-arrow-left mr-2"></i> Return to Hub</button>
+             <div className="bg-white p-10 rounded-3xl border border-gray-100 shadow-xl max-w-4xl mx-auto">
+                <h2 className="text-2xl font-black italic uppercase font-heading mb-8">Asset Initialization</h2>
+                <form onSubmit={async (e) => { e.preventDefault(); setIsSavingProduct(true); if(await onSaveProduct?.(editingProduct)) setSubView('inventory'); setIsSavingProduct(false); }} className="space-y-8">
+                   <div className="grid grid-cols-2 gap-6">
+                      <div>
+                        <label className="text-[10px] font-black uppercase text-gray-400 block mb-2">Asset Title*</label>
+                        <input type="text" required value={editingProduct.name} onChange={e => setEditingProduct({...editingProduct, name: e.target.value})} className="w-full bg-gray-50 p-4 rounded-xl font-bold uppercase text-xs outline-none border-2 border-transparent focus:border-black" />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-black uppercase text-gray-400 block mb-2">Brand*</label>
+                        <select value={editingProduct.brand} onChange={e => setEditingProduct({...editingProduct, brand: e.target.value as Brand})} className="w-full bg-gray-50 p-4 rounded-xl font-bold uppercase text-xs outline-none border-2 border-transparent focus:border-black">
+                           {Object.values(Brand).map(b => <option key={b} value={b}>{b}</option>)}
+                        </select>
+                      </div>
+                   </div>
 
-                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                       <label className="text-[10px] font-black uppercase text-gray-400 block mb-2 italic tracking-widest">Protocol Value (৳)*</label>
-                       <input type="number" required value={editingProduct.price} onChange={e => setEditingProduct({...editingProduct, price: Number(e.target.value)})} placeholder="0.00" className="w-full bg-gray-50 p-4 rounded-xl font-bold text-xs outline-none focus:bg-white border-2 border-transparent focus:border-black" />
-                    </div>
-                    <div>
-                       <label className="text-[10px] font-black uppercase text-gray-400 block mb-2 italic tracking-widest">Retail Anchor (Original Price) (৳)</label>
-                       <input type="number" value={editingProduct.original_price} onChange={e => setEditingProduct({...editingProduct, original_price: Number(e.target.value)})} placeholder="0.00" className="w-full bg-gray-50 p-4 rounded-xl font-bold text-xs outline-none focus:bg-white border-2 border-transparent focus:border-black" />
-                    </div>
-                 </div>
+                   <div>
+                      <label className="text-[10px] font-black uppercase text-gray-400 block mb-2">Primary Frame (Main Image URL)*</label>
+                      <div className="flex gap-4">
+                        <input type="text" required value={editingProduct.image} onChange={e => setEditingProduct({...editingProduct, image: e.target.value})} placeholder="URL or Base64" className="flex-1 bg-gray-50 p-4 rounded-xl font-bold text-xs outline-none" />
+                        <input type="file" ref={mainImageInputRef} className="hidden" accept="image/*" onChange={(e) => handleFileChange(e, (url) => setEditingProduct({...editingProduct, image: url}))} />
+                        <button type="button" onClick={() => mainImageInputRef.current?.click()} className="bg-black text-white px-6 py-4 rounded-xl text-[10px] font-black uppercase"><i className="fa-solid fa-upload mr-2"></i> Upload</button>
+                      </div>
+                      {editingProduct.image && <img src={editingProduct.image} className="mt-4 w-24 h-24 border rounded-lg object-contain p-1" />}
+                   </div>
 
-                 {/* Media Section */}
-                 <div className="space-y-6">
-                    <div>
-                       <label className="text-[10px] font-black uppercase text-gray-400 block mb-2 italic tracking-widest">Primary Identity Frame (Main Image URL)*</label>
-                       <input type="text" required value={editingProduct.image} onChange={e => setEditingProduct({...editingProduct, image: e.target.value})} placeholder="https://..." className="w-full bg-gray-50 p-4 rounded-xl font-bold text-xs outline-none focus:bg-white border-2 border-transparent focus:border-black" />
-                    </div>
-                    <div>
-                       <label className="text-[10px] font-black uppercase text-gray-400 block mb-2 italic tracking-widest">Asset Gallery Array (JSON or Line Separated URLs)</label>
-                       <textarea 
-                          value={editingProduct.gallery?.join('\n')} 
-                          onChange={e => setEditingProduct({...editingProduct, gallery: e.target.value.split('\n').filter(l => l.trim() !== '')})} 
-                          placeholder="One URL per line..." 
-                          className="w-full bg-gray-50 p-4 rounded-xl font-bold text-xs outline-none focus:bg-white border-2 border-transparent focus:border-black h-32 resize-none" 
-                       />
-                    </div>
-                 </div>
+                   <div>
+                      <label className="text-[10px] font-black uppercase text-gray-400 block mb-2">Asset Gallery (Multiple Images)</label>
+                      <div className="space-y-4">
+                        {(editingProduct.gallery || []).map((url, idx) => (
+                           <div key={idx} className="flex gap-4 items-center">
+                              <input type="text" value={url} onChange={e => {
+                                 const newGallery = [...(editingProduct.gallery || [])];
+                                 newGallery[idx] = e.target.value;
+                                 setEditingProduct({...editingProduct, gallery: newGallery});
+                              }} placeholder="Gallery URL" className="flex-1 bg-gray-50 p-4 rounded-xl font-bold text-xs" />
+                              {/* Fix: Callback ref in React must return void to match RefCallback type */}
+                              <input type="file" ref={el => { galleryInputRefs.current[idx] = el; }} className="hidden" accept="image/*" onChange={(e) => handleFileChange(e, (newUrl) => {
+                                 const newGallery = [...(editingProduct.gallery || [])];
+                                 newGallery[idx] = newUrl;
+                                 setEditingProduct({...editingProduct, gallery: newGallery});
+                              })} />
+                              <button type="button" onClick={() => galleryInputRefs.current[idx]?.click()} className="bg-gray-100 p-4 rounded-xl text-black hover:bg-gray-200"><i className="fa-solid fa-upload"></i></button>
+                              <button type="button" onClick={() => {
+                                 const newGallery = editingProduct.gallery?.filter((_, i) => i !== idx);
+                                 setEditingProduct({...editingProduct, gallery: newGallery});
+                              }} className="text-red-600"><i className="fa-solid fa-trash-can"></i></button>
+                           </div>
+                        ))}
+                        <button type="button" onClick={() => setEditingProduct({...editingProduct, gallery: [...(editingProduct.gallery || []), '']})} className="w-full border-2 border-dashed border-gray-200 p-4 rounded-xl text-[10px] font-black uppercase text-gray-400 hover:border-black hover:text-black transition-all">
+                           <i className="fa-solid fa-plus mr-2"></i> Add Gallery Field
+                        </button>
+                      </div>
+                   </div>
 
-                 {/* Details */}
-                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                       <label className="text-[10px] font-black uppercase text-gray-400 block mb-2 italic tracking-widest">Colorway Identity</label>
-                       <input type="text" value={editingProduct.colorway} onChange={e => setEditingProduct({...editingProduct, colorway: e.target.value})} placeholder="e.g. University Blue" className="w-full bg-gray-50 p-4 rounded-xl font-bold text-xs outline-none focus:bg-white border-2 border-transparent focus:border-black" />
-                    </div>
-                    <div>
-                       <label className="text-[10px] font-black uppercase text-gray-400 block mb-2 italic tracking-widest">Launch Timestamp (Release Date)</label>
-                       <input type="date" value={editingProduct.release_date} onChange={e => setEditingProduct({...editingProduct, release_date: e.target.value})} className="w-full bg-gray-50 p-4 rounded-xl font-bold text-xs outline-none focus:bg-white border-2 border-transparent focus:border-black" />
-                    </div>
-                 </div>
+                   <div className="grid grid-cols-2 gap-6">
+                      <div><label className="text-[10px] font-black uppercase text-gray-400 block mb-2">Price (৳)*</label><input type="number" required value={editingProduct.price} onChange={e => setEditingProduct({...editingProduct, price: Number(e.target.value)})} className="w-full bg-gray-50 p-4 rounded-xl font-bold text-xs" /></div>
+                      <div><label className="text-[10px] font-black uppercase text-gray-400 block mb-2">Colorway</label><input type="text" value={editingProduct.colorway} onChange={e => setEditingProduct({...editingProduct, colorway: e.target.value})} className="w-full bg-gray-50 p-4 rounded-xl font-bold text-xs" /></div>
+                   </div>
 
-                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                       <label className="text-[10px] font-black uppercase text-gray-400 block mb-2 italic tracking-widest">Fit Optimization (Fit Score)</label>
-                       <input type="text" value={editingProduct.fit_score} onChange={e => setEditingProduct({...editingProduct, fit_score: e.target.value})} placeholder="e.g. True to Size" className="w-full bg-gray-50 p-4 rounded-xl font-bold text-xs outline-none focus:bg-white border-2 border-transparent focus:border-black" />
-                    </div>
-                    <div className="flex space-x-6 items-center pt-6">
-                       <label className="flex items-center space-x-3 cursor-pointer select-none">
-                          <input type="checkbox" checked={editingProduct.is_drop} onChange={e => setEditingProduct({...editingProduct, is_drop: e.target.checked})} className="w-5 h-5 accent-red-600" />
-                          <span className="text-[10px] font-black uppercase tracking-widest italic">High Heat Drop</span>
-                       </label>
-                       <label className="flex items-center space-x-3 cursor-pointer select-none">
-                          <input type="checkbox" checked={editingProduct.trending} onChange={e => setEditingProduct({...editingProduct, trending: e.target.checked})} className="w-5 h-5 accent-black" />
-                          <span className="text-[10px] font-black uppercase tracking-widest italic">Trending Active</span>
-                       </label>
-                    </div>
-                 </div>
-
-                 <div>
-                    <label className="text-[10px] font-black uppercase text-gray-400 block mb-2 italic tracking-widest">Intelligence Profile (Description)</label>
-                    <textarea value={editingProduct.description} onChange={e => setEditingProduct({...editingProduct, description: e.target.value})} placeholder="Detailed asset brief..." className="w-full bg-gray-50 p-4 rounded-xl font-bold text-xs outline-none focus:bg-white border-2 border-transparent focus:border-black h-40 resize-none" />
-                 </div>
-
-                 {/* Variant Editor */}
-                 <div className="space-y-4">
-                    <div className="flex justify-between items-center">
-                       <label className="text-[10px] font-black uppercase text-gray-400 italic tracking-widest">Size/Stock Matrix</label>
-                       <button type="button" onClick={() => setEditingProduct({...editingProduct, variants: [...(editingProduct.variants || []), { size: '', stock: 0 }]})} className="bg-black text-white px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest">+ Add Size</button>
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                       {(editingProduct.variants || []).map((v, idx) => (
-                          <div key={idx} className="flex items-center space-x-2 bg-gray-50 p-3 rounded-xl border border-gray-100">
-                             <input type="text" value={v.size} onChange={e => {
-                                const newVariants = [...(editingProduct.variants || [])];
-                                newVariants[idx].size = e.target.value;
-                                setEditingProduct({...editingProduct, variants: newVariants});
-                             }} placeholder="SIZE" className="w-20 bg-white border border-gray-100 p-2 rounded-lg font-bold text-xs text-center" />
-                             <input type="number" value={v.stock} onChange={e => {
-                                const newVariants = [...(editingProduct.variants || [])];
-                                newVariants[idx].stock = Number(e.target.value);
-                                setEditingProduct({...editingProduct, variants: newVariants});
-                             }} placeholder="STOCK" className="w-20 bg-white border border-gray-100 p-2 rounded-lg font-bold text-xs text-center" />
-                             <button type="button" onClick={() => {
-                                const newVariants = editingProduct.variants?.filter((_, i) => i !== idx);
-                                setEditingProduct({...editingProduct, variants: newVariants});
-                             }} className="text-gray-300 hover:text-red-600 transition-colors"><i className="fa-solid fa-circle-minus"></i></button>
-                          </div>
-                       ))}
-                    </div>
-                 </div>
-
-                 <button type="submit" disabled={isSavingProduct} className="w-full bg-red-700 text-white py-6 rounded-2xl font-black uppercase tracking-widest text-xs shadow-2xl disabled:opacity-50 transition-all hover:bg-black hover:scale-[1.01] active:scale-[0.99]">
-                    {isSavingProduct ? <><i className="fa-solid fa-circle-notch animate-spin mr-3"></i> Synchronizing Archive...</> : 'Commit to Vault Repository'}
-                 </button>
-              </form>
-           </div>
-        </div>
-      ) : null;
+                   <button type="submit" disabled={isSavingProduct} className="w-full bg-red-700 text-white py-6 rounded-2xl font-black uppercase tracking-widest text-xs shadow-2xl disabled:opacity-50">
+                      {isSavingProduct ? 'Synchronizing...' : 'Commit to Vault'}
+                   </button>
+                </form>
+             </div>
+          </div>
+        ) : null;
+      case 'orders': 
+        return (
+          <div className="space-y-8 animate-in fade-in">
+             <h1 className="text-3xl font-black uppercase italic font-heading">Protocol Registry</h1>
+             <div className="bg-white rounded-3xl border border-gray-100 shadow-xl overflow-hidden">
+                <table className="w-full text-left">
+                   <thead>
+                      <tr className="bg-gray-50 text-[10px] font-black uppercase tracking-widest text-gray-400">
+                        <th className="px-8 py-4">Order ID</th>
+                        <th className="px-8 py-4">Subject</th>
+                        <th className="px-8 py-4">Status</th>
+                        <th className="px-8 py-4">Value</th>
+                      </tr>
+                   </thead>
+                   <tbody className="divide-y divide-gray-50">
+                     {filteredOrders.map(order => (
+                       <tr key={order.id} className="hover:bg-gray-50/50 cursor-pointer" onClick={() => { setSelectedOrder(order); setPendingStatus(order.status); setSubView('order-detail'); }}>
+                         <td className="px-8 py-6 font-mono text-xs">{order.id}</td>
+                         <td className="px-8 py-6 font-bold text-xs uppercase">{order.first_name} {order.last_name}</td>
+                         <td className="px-8 py-6"><span className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase border ${getStatusBadgeStyles(order.status)}`}>{order.status}</span></td>
+                         <td className="px-8 py-6 font-black italic">{order.total.toLocaleString()}৳</td>
+                       </tr>
+                     ))}
+                   </tbody>
+                </table>
+             </div>
+          </div>
+        );
       case 'order-detail':
         if (!selectedOrder) return null;
         return (
-          <OrderDetail 
-            order={selectedOrder} 
-            pendingStatus={pendingStatus} 
-            setPendingStatus={setPendingStatus} 
-            executeStatusUpdate={executeStatusUpdate} 
-            isUpdatingStatus={isUpdatingStatus} 
-            setSubView={setSubView}
-          />
+          <div className="space-y-8 animate-in fade-in">
+             <button onClick={() => setSubView('orders')} className="text-gray-400 font-black uppercase text-[10px] tracking-widest hover:text-black"><i className="fa-solid fa-arrow-left mr-2"></i> Registry Hub</button>
+             <div className="bg-white rounded-3xl border border-gray-100 shadow-xl p-10">
+                <h3 className="text-2xl font-black italic uppercase font-heading mb-6">Manifest {selectedOrder.id}</h3>
+                <div className="grid grid-cols-2 gap-10">
+                   <div>
+                      <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4 italic">Protocol Update</p>
+                      <select value={pendingStatus || selectedOrder.status} onChange={e => setPendingStatus(e.target.value as OrderStatus)} className="w-full bg-gray-50 p-4 rounded-xl font-black uppercase text-xs border-2 border-transparent focus:border-black outline-none mb-4">
+                         {Object.values(OrderStatus).map(s => <option key={s} value={s}>{s}</option>)}
+                      </select>
+                      <button onClick={async () => { setIsUpdatingStatus(true); await onUpdateOrderStatus?.(selectedOrder.id, pendingStatus!); setIsUpdatingStatus(false); }} className="w-full bg-black text-white py-4 rounded-xl font-black uppercase text-[10px] tracking-widest">Execute Status Update</button>
+                   </div>
+                   <div className="space-y-4">
+                      <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest italic">Subject Coordinates</p>
+                      <p className="font-bold text-xs uppercase">{selectedOrder.first_name} {selectedOrder.last_name}</p>
+                      <p className="text-xs">{selectedOrder.email} | {selectedOrder.mobile_number}</p>
+                      <p className="text-xs uppercase">{selectedOrder.street_address}, {selectedOrder.city}</p>
+                   </div>
+                </div>
+             </div>
+          </div>
         );
       case 'settings':
         return (
-          <div className="space-y-12 animate-in fade-in">
-            <h1 className="text-3xl font-black font-heading italic uppercase text-black">Protocol Settings</h1>
-            
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-              <div className="space-y-6">
-                <div className="flex justify-between items-center mb-6">
-                  <h3 className="text-sm font-black uppercase tracking-widest italic text-red-600">Logistics Registry</h3>
-                  <button onClick={() => setEditingShipping({ name: '', rate: 0 })} className="text-[10px] font-black uppercase bg-black text-white px-4 py-2 rounded-lg">New Method</button>
-                </div>
-                <div className="bg-white rounded-3xl border border-gray-100 shadow-xl overflow-hidden">
-                  <table className="w-full text-left">
-                    <tbody className="divide-y divide-gray-50">
-                      {shippingOptions.map((opt) => (
-                        <tr key={opt.id} className="group">
-                          <td className="px-8 py-6 font-black text-xs uppercase">{opt.name}</td>
-                          <td className="px-8 py-6 font-black text-red-600 italic">{opt.rate}৳</td>
-                          <td className="px-8 py-6 text-right">
-                            <button onClick={() => setEditingShipping(opt)} className="p-2 text-gray-300 hover:text-black mr-2"><i className="fa-solid fa-pen-nib"></i></button>
-                            <button onClick={() => opt.id && onDeleteShipping?.(opt.id)} className="p-2 text-gray-300 hover:text-red-600"><i className="fa-solid fa-trash-can"></i></button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-                {editingShipping && (
-                  <div className="bg-black text-white p-10 rounded-3xl shadow-2xl">
-                    <h3 className="text-xs font-black uppercase italic mb-8 border-b border-white/10 pb-5">Shipping Archive</h3>
-                    <form onSubmit={async (e) => { e.preventDefault(); setIsSavingShipping(true); if(await onSaveShipping?.(editingShipping)) setEditingShipping(null); setIsSavingShipping(false); }} className="space-y-6">
-                      <input type="text" required value={editingShipping.name} onChange={e => setEditingShipping({...editingShipping, name: e.target.value})} placeholder="METHOD NAME" className="w-full bg-white/5 p-4 rounded-xl font-bold uppercase text-xs" />
-                      <input type="number" required value={editingShipping.rate} onChange={e => setEditingShipping({...editingShipping, rate: Number(e.target.value)})} placeholder="RATE" className="w-full bg-white/5 p-4 rounded-xl font-bold text-xs" />
-                      <button type="submit" disabled={isSavingShipping} className="w-full bg-red-700 text-white py-4 rounded-xl font-black uppercase text-[10px] tracking-widest disabled:opacity-50">SAVE METHOD</button>
-                    </form>
-                  </div>
-                )}
-              </div>
-
-              <div className="space-y-6">
-                <h3 className="text-sm font-black uppercase tracking-widest italic text-red-600 mb-6">Footer Management</h3>
-                <div className="bg-white p-10 rounded-3xl border border-gray-100 shadow-xl">
-                  <form onSubmit={handleSaveFooter} className="space-y-6">
-                    <div>
-                      <label className="text-[10px] font-black uppercase text-gray-400 block mb-2">Vault Brand Identity</label>
-                      <input type="text" value={footerForm.store_name} onChange={e => setFooterForm({...footerForm, store_name: e.target.value})} className="w-full bg-gray-50 border-2 border-transparent focus:border-black p-4 rounded-xl outline-none font-bold uppercase text-xs" />
-                    </div>
-                    <div>
-                      <label className="text-[10px] font-black uppercase text-gray-400 block mb-2">Mission Statement (Description)</label>
-                      <textarea value={footerForm.description} onChange={e => setFooterForm({...footerForm, description: e.target.value})} className="w-full bg-gray-50 border-2 border-transparent focus:border-black p-4 rounded-xl outline-none font-bold text-xs h-24 resize-none" />
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div>
-                        <label className="text-[10px] font-black uppercase text-gray-400 block mb-2">Facebook</label>
-                        <input type="text" value={footerForm.facebook_url} onChange={e => setFooterForm({...footerForm, facebook_url: e.target.value})} className="w-full bg-gray-50 p-3 rounded-lg text-[9px] font-bold" />
-                      </div>
-                      <div>
-                        <label className="text-[10px] font-black uppercase text-gray-400 block mb-2">Instagram</label>
-                        <input type="text" value={footerForm.instagram_url} onChange={e => setFooterForm({...footerForm, instagram_url: e.target.value})} className="w-full bg-gray-50 p-3 rounded-lg text-[9px] font-bold" />
-                      </div>
-                      <div>
-                        <label className="text-[10px] font-black uppercase text-gray-400 block mb-2">Twitter</label>
-                        <input type="text" value={footerForm.twitter_url} onChange={e => setFooterForm({...footerForm, twitter_url: e.target.value})} className="w-full bg-gray-50 p-3 rounded-lg text-[9px] font-bold" />
-                      </div>
-                    </div>
-                    <div>
+          <div className="space-y-8 animate-in fade-in">
+             <h1 className="text-3xl font-black uppercase italic font-heading">Protocol Settings</h1>
+             <div className="bg-white p-10 rounded-3xl border border-gray-100 shadow-xl max-w-2xl">
+                <form onSubmit={async (e) => { e.preventDefault(); if(await onSaveFooterConfig?.(footerForm)) alert('FOOTER ARCHIVE UPDATED'); }} className="space-y-6">
+                   <div>
                       <label className="text-[10px] font-black uppercase text-gray-400 block mb-2">Facebook Pixel ID</label>
-                      <input type="text" value={footerForm.fb_pixel_id || ''} onChange={e => setFooterForm({...footerForm, fb_pixel_id: e.target.value})} placeholder="e.g. 1234567890" className="w-full bg-gray-50 border-2 border-transparent focus:border-black p-4 rounded-xl outline-none font-bold text-xs" />
-                    </div>
-                    <div>
-                      <label className="text-[10px] font-black uppercase text-gray-400 block mb-2">Copyright Registry</label>
-                      <input type="text" value={footerForm.copyright} onChange={e => setFooterForm({...footerForm, copyright: e.target.value})} className="w-full bg-gray-50 p-4 rounded-xl font-bold uppercase text-[10px]" />
-                    </div>
-                    <button type="submit" disabled={isSavingFooter} className="w-full bg-black text-white py-4 rounded-xl font-black uppercase text-[10px] tracking-widest hover:bg-red-700 transition-all">
-                      {isSavingFooter ? 'SYNCING ARCHIVE...' : 'UPDATE FOOTER ARCHIVE'}
-                    </button>
-                  </form>
-                </div>
-              </div>
-            </div>
+                      <input type="text" value={footerForm.fb_pixel_id || ''} onChange={e => setFooterForm({...footerForm, fb_pixel_id: e.target.value})} className="w-full bg-gray-50 p-4 rounded-xl font-bold text-xs outline-none focus:bg-white border-2 border-transparent focus:border-black" />
+                   </div>
+                   <button type="submit" className="w-full bg-black text-white py-5 rounded-xl font-black uppercase text-[10px] tracking-widest">Update Vault Archives</button>
+                </form>
+             </div>
           </div>
         );
       default: return null;
@@ -594,30 +286,27 @@ const Dashboard: React.FC<DashboardProps> = ({
 
   return (
     <div className="flex bg-[#fafafa] min-h-screen">
-      <aside className="w-72 bg-white border-r border-gray-100 p-8 hidden lg:flex flex-col h-screen sticky top-0 shadow-2xl z-30 print:hidden">
+      <aside className="w-72 bg-white border-r border-gray-100 p-8 flex flex-col h-screen sticky top-0 shadow-2xl z-30">
         <div className="mb-14 text-center">
-          <div className="inline-block p-4 bg-black rounded-3xl mb-6 shadow-2xl"><i className="fa-solid fa-vault text-white text-3xl"></i></div>
-          <div className="text-2xl font-black font-heading tracking-tighter italic text-black">SNEAKER<span className="text-red-600">VAULT</span></div>
-          <p className="text-[9px] font-black text-gray-300 uppercase tracking-[0.5em] mt-2">ADMIN OS v2.5</p>
+          <div className="text-2xl font-black font-heading tracking-tighter italic">SNEAKER<span className="text-red-600">VAULT</span></div>
+          <p className="text-[9px] font-black text-gray-300 uppercase tracking-[0.5em] mt-2 italic">Admin Central</p>
         </div>
-        <nav className="space-y-2.5 flex-1">
+        <nav className="space-y-2 flex-1">
           {[
             { id: 'overview', icon: 'fa-gauge-high', label: 'Overview' },
             { id: 'orders', icon: 'fa-folder-tree', label: 'Orders' },
             { id: 'inventory', icon: 'fa-cubes-stacked', label: 'Inventory' },
             { id: 'settings', icon: 'fa-gears', label: 'Settings' },
           ].map((item) => (
-            <button key={item.id} onClick={() => { setSubView(item.id as AdminSubView); setStatusFilter('ALL'); setSearchQuery(''); }} className={`w-full flex items-center space-x-4 px-6 py-4.5 rounded-2xl text-[11px] font-black uppercase tracking-[0.2em] transition-all ${subView === item.id || (subView === 'order-detail' && item.id === 'orders') || (subView === 'product-form' && item.id === 'inventory') ? 'bg-black text-white shadow-2xl translate-x-3 scale-105' : 'text-gray-400 hover:bg-gray-50 hover:text-black'}`}>
-              <i className={`fa-solid ${item.icon} w-6 text-sm`}></i>
+            <button key={item.id} onClick={() => setSubView(item.id as AdminSubView)} className={`w-full flex items-center space-x-4 px-6 py-4 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${subView === item.id ? 'bg-black text-white' : 'text-gray-400 hover:bg-gray-50'}`}>
+              <i className={`fa-solid ${item.icon} w-6`}></i>
               <span>{item.label}</span>
             </button>
           ))}
         </nav>
-        <div className="mt-auto pt-8 border-t border-gray-100">
-          <button onClick={onLogout} className="w-full flex items-center space-x-4 px-6 py-4.5 rounded-2xl text-[11px] font-black uppercase text-red-600 hover:bg-red-50 transition-all group"><i className="fa-solid fa-sign-out-alt w-6 text-sm group-hover:rotate-45 transition-transform"></i><span>Log Off</span></button>
-        </div>
+        <button onClick={onLogout} className="mt-auto flex items-center space-x-4 px-6 py-4 rounded-xl text-[10px] font-black uppercase text-red-600 hover:bg-red-50"><i className="fa-solid fa-sign-out-alt w-6"></i><span>Log Off</span></button>
       </aside>
-      <main className="flex-1 p-8 md:p-14 overflow-y-auto print:p-0"><div className="max-w-7xl mx-auto">{renderContent()}</div></main>
+      <main className="flex-1 p-14 overflow-y-auto"><div className="max-w-6xl mx-auto">{renderContent()}</div></main>
     </div>
   );
 };
