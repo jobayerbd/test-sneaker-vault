@@ -1,5 +1,5 @@
 
-import React, { useRef } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import { Sneaker, HomeSlide } from '../../types.ts';
 import HeroSlider from './HeroSlider.tsx';
 
@@ -37,7 +37,7 @@ const Home: React.FC<HomeProps> = ({ sneakers, slides, onSelectProduct, onNaviga
   const ProductCard: React.FC<{ sneaker: Sneaker; isLarge?: boolean }> = ({ sneaker, isLarge = false }) => (
     <div 
       onClick={() => onSelectProduct(sneaker)}
-      className={`group bg-white border border-gray-100 p-0 flex flex-col cursor-pointer hover:shadow-2xl transition-all duration-500 ${isLarge ? 'min-w-[280px] md:min-w-[320px]' : ''}`}
+      className={`group bg-white border border-gray-100 p-0 flex flex-col cursor-pointer hover:shadow-2xl transition-all duration-500 shrink-0 ${isLarge ? 'w-[calc(50%-12px)] lg:w-[calc(25%-18px)]' : 'w-full'}`}
     >
       <div className="relative aspect-[4/5] bg-white overflow-hidden">
         <img 
@@ -59,36 +59,78 @@ const Home: React.FC<HomeProps> = ({ sneakers, slides, onSelectProduct, onNaviga
 
   const Carousel: React.FC<{ data: Sneaker[] }> = ({ data }) => {
     const scrollRef = useRef<HTMLDivElement>(null);
+    const [isPaused, setIsPaused] = useState(false);
 
     const scroll = (direction: 'left' | 'right') => {
       if (scrollRef.current) {
-        const scrollAmount = 300;
-        scrollRef.current.scrollBy({ left: direction === 'left' ? -scrollAmount : scrollAmount, behavior: 'smooth' });
+        const { current } = scrollRef;
+        const scrollAmount = current.clientWidth;
+        
+        if (direction === 'right') {
+          // If we are at the end, wrap back to start
+          if (current.scrollLeft + current.clientWidth >= current.scrollWidth - 20) {
+            current.scrollTo({ left: 0, behavior: 'smooth' });
+          } else {
+            current.scrollBy({ left: scrollAmount, behavior: 'smooth' });
+          }
+        } else {
+          // If at start, jump to end
+          if (current.scrollLeft <= 10) {
+            current.scrollTo({ left: current.scrollWidth, behavior: 'smooth' });
+          } else {
+            current.scrollBy({ left: -scrollAmount, behavior: 'smooth' });
+          }
+        }
       }
     };
 
+    // Automatic Sliding Logic with Hover Pause
+    useEffect(() => {
+      if (isPaused || data.length === 0) return;
+      
+      const interval = setInterval(() => {
+        scroll('right');
+      }, 4000);
+      
+      return () => clearInterval(interval);
+    }, [data, isPaused]);
+
     return (
-      <div className="relative w-full group">
+      <div 
+        className="relative w-full group"
+        onMouseEnter={() => setIsPaused(true)}
+        onMouseLeave={() => setIsPaused(false)}
+      >
+        {/* Navigation Arrows */}
         <button 
           onClick={() => scroll('left')}
-          className="absolute left-0 top-1/2 -translate-y-1/2 z-10 w-12 h-12 bg-black/80 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center -translate-x-6 hover:bg-red-700 shadow-2xl"
+          className="absolute left-0 top-1/2 -translate-y-1/2 z-10 w-12 h-12 bg-black/90 text-white rounded-full opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center -translate-x-6 hover:bg-red-700 shadow-2xl active:scale-90"
+          aria-label="Scroll Left"
         >
-          <i className="fa-solid fa-chevron-left"></i>
+          <i className="fa-solid fa-chevron-left text-sm"></i>
         </button>
+        
         <div 
           ref={scrollRef}
           className="flex overflow-x-auto space-x-6 pb-12 pt-4 no-scrollbar scroll-smooth"
         >
           {data.map(sneaker => (
-            <ProductCard key={sneaker.id} sneaker={sneaker} isLarge />
+            <ProductCard key={sneaker.id} sneaker={sneaker} isLarge={true} />
           ))}
         </div>
+        
         <button 
           onClick={() => scroll('right')}
-          className="absolute right-0 top-1/2 -translate-y-1/2 z-10 w-12 h-12 bg-black/80 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center translate-x-6 hover:bg-red-700 shadow-2xl"
+          className="absolute right-0 top-1/2 -translate-y-1/2 z-10 w-12 h-12 bg-black/90 text-white rounded-full opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center translate-x-6 hover:bg-red-700 shadow-2xl active:scale-90"
+          aria-label="Scroll Right"
         >
-          <i className="fa-solid fa-chevron-right"></i>
+          <i className="fa-solid fa-chevron-right text-sm"></i>
         </button>
+
+        {/* Tactical Progress Bar */}
+        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 w-32 h-[2px] bg-gray-100 rounded-full overflow-hidden">
+          <div className={`h-full bg-red-600 transition-all duration-[4000ms] ease-linear ${isPaused ? 'w-0 opacity-0' : 'w-full opacity-100'}`}></div>
+        </div>
       </div>
     );
   };
@@ -102,7 +144,7 @@ const Home: React.FC<HomeProps> = ({ sneakers, slides, onSelectProduct, onNaviga
         
         {/* Automatic New Arrivals Section (Standard Grid) */}
         <section className="flex flex-col items-center">
-          <div className="text-center mb-16">
+          <div className="text-center mb-16 animate-in fade-in slide-in-from-bottom-4 duration-700">
             <h2 className="text-2xl font-black text-black font-heading italic tracking-[0.4em] uppercase">NEW ARRIVALS</h2>
             <div className="w-16 h-[4px] bg-red-700 mx-auto mt-4 mb-4"></div>
             <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em] italic">FRESH ASSETS JUST SECURED IN THE VAULT</p>
@@ -116,7 +158,7 @@ const Home: React.FC<HomeProps> = ({ sneakers, slides, onSelectProduct, onNaviga
 
           <button 
             onClick={() => onNavigate('shop')}
-            className="mt-16 px-12 py-4 border-2 border-black text-black text-[11px] font-black uppercase tracking-[0.4em] hover:bg-black hover:text-white transition-all italic shadow-lg"
+            className="mt-16 px-12 py-4 border-2 border-black text-black text-[11px] font-black uppercase tracking-[0.4em] hover:bg-black hover:text-white transition-all italic shadow-lg active:scale-95"
           >
             Explore All Assets
           </button>
@@ -124,7 +166,7 @@ const Home: React.FC<HomeProps> = ({ sneakers, slides, onSelectProduct, onNaviga
 
         {/* Managed Featured Sections (Carousel Layout) */}
         {sections.map((section, idx) => (
-          <section key={idx} className="flex flex-col w-full">
+          <section key={idx} className="flex flex-col w-full animate-in fade-in duration-1000" style={{ animationDelay: `${idx * 200}ms` }}>
             <div className="flex justify-between items-end mb-12 px-2">
               <div>
                 <h2 className="text-3xl font-black text-red-700 font-heading italic tracking-[0.2em] uppercase">{section.title}</h2>
