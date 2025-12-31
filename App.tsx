@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import Navigation from './components/Navigation';
 import Home from './components/Storefront/Home';
@@ -23,10 +22,11 @@ const DEFAULT_FOOTER: FooterConfig = {
   fb_pixel_id: ""
 };
 
-// FB Pixel Tracking Helper
+// FB Pixel Tracking Helper - Pushes to the global fbq queue
 const trackFBPixel = (event: string, params?: any) => {
-  if (typeof window !== 'undefined' && (window as any).fbq) {
-    (window as any).fbq('track', event, params);
+  const f = window as any;
+  if (f.fbq) {
+    f.fbq('track', event, params);
   }
 };
 
@@ -62,7 +62,37 @@ const App: React.FC = () => {
     password: ''
   });
 
-  // Track PageView on view change
+  // FB Pixel Script and Initialization Management
+  useEffect(() => {
+    const pixelId = footerConfig.fb_pixel_id?.trim();
+    if (!pixelId) return;
+
+    const f = window as any;
+    
+    // Standard Pixel Boilerplate if not already initialized
+    if (!f.fbq) {
+      f.fbq = function() {
+        f.fbq.callMethod ? f.fbq.callMethod.apply(f.fbq, arguments) : f.fbq.queue.push(arguments);
+      };
+      if (!f._fbq) f._fbq = f.fbq;
+      f.fbq.push = f.fbq;
+      f.fbq.loaded = !0;
+      f.fbq.version = '2.0';
+      f.fbq.queue = [];
+      const t = document.createElement('script');
+      t.async = !0;
+      t.src = 'https://connect.facebook.net/en_US/fbevents.js';
+      const s = document.getElementsByTagName('script')[0];
+      if (s && s.parentNode) s.parentNode.insertBefore(t, s);
+    }
+
+    // Always call init with the current ID to ensure events are tracked to the correct pixel
+    f.fbq('init', pixelId);
+    // Track initial PageView for this specific pixel ID
+    f.fbq('track', 'PageView');
+  }, [footerConfig.fb_pixel_id]);
+
+  // Track PageView on view change (Navigation events for SPA)
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'auto' });
     trackFBPixel('PageView');
@@ -71,35 +101,6 @@ const App: React.FC = () => {
       trackFBPixel('InitiateCheckout');
     }
   }, [currentView]);
-
-  // FB Pixel Script Management
-  useEffect(() => {
-    if (!footerConfig.fb_pixel_id) return;
-
-    const pixelId = footerConfig.fb_pixel_id.trim();
-    if (!pixelId) return;
-
-    const f = window as any;
-    if (f.fbq) return;
-
-    // Fix: cast 'n' to any to allow dynamic property assignment for FB pixel initialization
-    const n: any = f.fbq = function() {
-      n.callMethod ? n.callMethod.apply(n, arguments) : n.queue.push(arguments);
-    };
-    if (!f._fbq) f._fbq = n;
-    n.push = n;
-    n.loaded = !0;
-    n.version = '2.0';
-    n.queue = [];
-    const t = document.createElement('script');
-    t.async = !0;
-    t.src = 'https://connect.facebook.net/en_US/fbevents.js';
-    const s = document.getElementsByTagName('script')[0];
-    if (s && s.parentNode) s.parentNode.insertBefore(t, s);
-
-    f.fbq('init', pixelId);
-    f.fbq('track', 'PageView');
-  }, [footerConfig.fb_pixel_id]);
 
   const fetchFooterConfig = useCallback(async () => {
     try {
