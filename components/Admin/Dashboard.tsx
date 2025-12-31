@@ -299,7 +299,7 @@ const Dashboard: React.FC<DashboardProps> = ({
 
   const [footerForm, setFooterForm] = useState<FooterConfig>({ ...footerConfig });
 
-  const totalRevenue = useMemo(() => orders.reduce((acc, o) => acc + (Number(o.total) || 0), 0), [orders]);
+  const totalRevenue = useMemo(() => orders.reduce((acc, o) => acc + (Number(o.total) || 0), [orders]), [orders]);
   const avgOrderValue = useMemo(() => orders.length > 0 ? Math.round(totalRevenue / orders.length) : 0, [totalRevenue, orders.length]);
 
   const filteredOrders = useMemo(() => {
@@ -343,7 +343,24 @@ const Dashboard: React.FC<DashboardProps> = ({
           <div className="space-y-8 animate-in fade-in">
              <div className="flex justify-between items-center">
                 <h1 className="text-3xl font-black uppercase italic font-heading">Vault Inventory</h1>
-                <button onClick={() => { setEditingProduct({ name: '', brand: Brand.NIKE, price: 0, image: '', variants: [], gallery: [] }); setSubView('product-form'); }} className="bg-black text-white px-8 py-4 rounded-xl font-black uppercase text-[10px] tracking-widest shadow-xl">Initialize Asset</button>
+                <button onClick={() => { 
+                  setEditingProduct({ 
+                    name: '', 
+                    brand: Brand.NIKE, 
+                    price: 0, 
+                    original_price: 0, 
+                    image: '', 
+                    gallery: [], 
+                    description: '', 
+                    release_date: new Date().toISOString().split('T')[0], 
+                    is_drop: false, 
+                    colorway: '', 
+                    variants: [], 
+                    fit_score: 'True to Size', 
+                    trending: false 
+                  }); 
+                  setSubView('product-form'); 
+                }} className="bg-black text-white px-8 py-4 rounded-xl font-black uppercase text-[10px] tracking-widest shadow-xl">Initialize Asset</button>
              </div>
              <div className="bg-white rounded-3xl border border-gray-100 shadow-xl overflow-hidden">
                 <table className="w-full text-left">
@@ -363,13 +380,116 @@ const Dashboard: React.FC<DashboardProps> = ({
       case 'product-form': return editingProduct ? (
         <div className="space-y-8 animate-in fade-in">
            <button onClick={() => setSubView('inventory')} className="text-gray-400 font-black uppercase text-[10px] tracking-widest hover:text-black"><i className="fa-solid fa-arrow-left mr-2"></i> Return to Hub</button>
-           <div className="bg-white p-10 rounded-3xl border border-gray-100 shadow-xl max-w-2xl mx-auto">
+           <div className="bg-white p-10 rounded-3xl border border-gray-100 shadow-xl max-w-4xl mx-auto">
               <h2 className="text-2xl font-black italic uppercase font-heading mb-8">Asset Initialization</h2>
-              <form onSubmit={async (e) => { e.preventDefault(); setIsSavingProduct(true); if(await onSaveProduct?.(editingProduct)) setSubView('inventory'); setIsSavingProduct(false); }} className="space-y-6">
-                 <input type="text" required value={editingProduct.name} onChange={e => setEditingProduct({...editingProduct, name: e.target.value})} placeholder="ASSET NAME" className="w-full bg-gray-50 p-4 rounded-xl font-bold uppercase text-xs outline-none focus:bg-white border-2 border-transparent focus:border-black" />
-                 <input type="number" required value={editingProduct.price} onChange={e => setEditingProduct({...editingProduct, price: Number(e.target.value)})} placeholder="PRICE" className="w-full bg-gray-50 p-4 rounded-xl font-bold text-xs outline-none focus:bg-white border-2 border-transparent focus:border-black" />
-                 <input type="text" required value={editingProduct.image} onChange={e => setEditingProduct({...editingProduct, image: e.target.value})} placeholder="PRIMARY IMAGE URL" className="w-full bg-gray-50 p-4 rounded-xl font-bold text-xs outline-none focus:bg-white border-2 border-transparent focus:border-black" />
-                 <button type="submit" disabled={isSavingProduct} className="w-full bg-red-700 text-white py-5 rounded-xl font-black uppercase tracking-widest text-xs shadow-2xl disabled:opacity-50">{isSavingProduct ? 'Synchronizing...' : 'Commit to Vault'}</button>
+              <form onSubmit={async (e) => { e.preventDefault(); setIsSavingProduct(true); if(await onSaveProduct?.(editingProduct)) setSubView('inventory'); setIsSavingProduct(false); }} className="space-y-8">
+                 {/* Main Information */}
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                       <label className="text-[10px] font-black uppercase text-gray-400 block mb-2 italic tracking-widest">Asset Title*</label>
+                       <input type="text" required value={editingProduct.name} onChange={e => setEditingProduct({...editingProduct, name: e.target.value})} placeholder="e.g. Air Jordan 1 OG" className="w-full bg-gray-50 p-4 rounded-xl font-bold uppercase text-xs outline-none focus:bg-white border-2 border-transparent focus:border-black" />
+                    </div>
+                    <div>
+                       <label className="text-[10px] font-black uppercase text-gray-400 block mb-2 italic tracking-widest">Brand Matrix*</label>
+                       <select required value={editingProduct.brand} onChange={e => setEditingProduct({...editingProduct, brand: e.target.value as Brand})} className="w-full bg-gray-50 p-4 rounded-xl font-bold uppercase text-xs outline-none focus:bg-white border-2 border-transparent focus:border-black cursor-pointer appearance-none">
+                          {Object.values(Brand).map(b => <option key={b} value={b}>{b.toUpperCase()}</option>)}
+                       </select>
+                    </div>
+                 </div>
+
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                       <label className="text-[10px] font-black uppercase text-gray-400 block mb-2 italic tracking-widest">Protocol Value (৳)*</label>
+                       <input type="number" required value={editingProduct.price} onChange={e => setEditingProduct({...editingProduct, price: Number(e.target.value)})} placeholder="0.00" className="w-full bg-gray-50 p-4 rounded-xl font-bold text-xs outline-none focus:bg-white border-2 border-transparent focus:border-black" />
+                    </div>
+                    <div>
+                       <label className="text-[10px] font-black uppercase text-gray-400 block mb-2 italic tracking-widest">Retail Anchor (Original Price) (৳)</label>
+                       <input type="number" value={editingProduct.original_price} onChange={e => setEditingProduct({...editingProduct, original_price: Number(e.target.value)})} placeholder="0.00" className="w-full bg-gray-50 p-4 rounded-xl font-bold text-xs outline-none focus:bg-white border-2 border-transparent focus:border-black" />
+                    </div>
+                 </div>
+
+                 {/* Media Section */}
+                 <div className="space-y-6">
+                    <div>
+                       <label className="text-[10px] font-black uppercase text-gray-400 block mb-2 italic tracking-widest">Primary Identity Frame (Main Image URL)*</label>
+                       <input type="text" required value={editingProduct.image} onChange={e => setEditingProduct({...editingProduct, image: e.target.value})} placeholder="https://..." className="w-full bg-gray-50 p-4 rounded-xl font-bold text-xs outline-none focus:bg-white border-2 border-transparent focus:border-black" />
+                    </div>
+                    <div>
+                       <label className="text-[10px] font-black uppercase text-gray-400 block mb-2 italic tracking-widest">Asset Gallery Array (JSON or Line Separated URLs)</label>
+                       <textarea 
+                          value={editingProduct.gallery?.join('\n')} 
+                          onChange={e => setEditingProduct({...editingProduct, gallery: e.target.value.split('\n').filter(l => l.trim() !== '')})} 
+                          placeholder="One URL per line..." 
+                          className="w-full bg-gray-50 p-4 rounded-xl font-bold text-xs outline-none focus:bg-white border-2 border-transparent focus:border-black h-32 resize-none" 
+                       />
+                    </div>
+                 </div>
+
+                 {/* Details */}
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                       <label className="text-[10px] font-black uppercase text-gray-400 block mb-2 italic tracking-widest">Colorway Identity</label>
+                       <input type="text" value={editingProduct.colorway} onChange={e => setEditingProduct({...editingProduct, colorway: e.target.value})} placeholder="e.g. University Blue" className="w-full bg-gray-50 p-4 rounded-xl font-bold text-xs outline-none focus:bg-white border-2 border-transparent focus:border-black" />
+                    </div>
+                    <div>
+                       <label className="text-[10px] font-black uppercase text-gray-400 block mb-2 italic tracking-widest">Launch Timestamp (Release Date)</label>
+                       <input type="date" value={editingProduct.release_date} onChange={e => setEditingProduct({...editingProduct, release_date: e.target.value})} className="w-full bg-gray-50 p-4 rounded-xl font-bold text-xs outline-none focus:bg-white border-2 border-transparent focus:border-black" />
+                    </div>
+                 </div>
+
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                       <label className="text-[10px] font-black uppercase text-gray-400 block mb-2 italic tracking-widest">Fit Optimization (Fit Score)</label>
+                       <input type="text" value={editingProduct.fit_score} onChange={e => setEditingProduct({...editingProduct, fit_score: e.target.value})} placeholder="e.g. True to Size" className="w-full bg-gray-50 p-4 rounded-xl font-bold text-xs outline-none focus:bg-white border-2 border-transparent focus:border-black" />
+                    </div>
+                    <div className="flex space-x-6 items-center pt-6">
+                       <label className="flex items-center space-x-3 cursor-pointer select-none">
+                          <input type="checkbox" checked={editingProduct.is_drop} onChange={e => setEditingProduct({...editingProduct, is_drop: e.target.checked})} className="w-5 h-5 accent-red-600" />
+                          <span className="text-[10px] font-black uppercase tracking-widest italic">High Heat Drop</span>
+                       </label>
+                       <label className="flex items-center space-x-3 cursor-pointer select-none">
+                          <input type="checkbox" checked={editingProduct.trending} onChange={e => setEditingProduct({...editingProduct, trending: e.target.checked})} className="w-5 h-5 accent-black" />
+                          <span className="text-[10px] font-black uppercase tracking-widest italic">Trending Active</span>
+                       </label>
+                    </div>
+                 </div>
+
+                 <div>
+                    <label className="text-[10px] font-black uppercase text-gray-400 block mb-2 italic tracking-widest">Intelligence Profile (Description)</label>
+                    <textarea value={editingProduct.description} onChange={e => setEditingProduct({...editingProduct, description: e.target.value})} placeholder="Detailed asset brief..." className="w-full bg-gray-50 p-4 rounded-xl font-bold text-xs outline-none focus:bg-white border-2 border-transparent focus:border-black h-40 resize-none" />
+                 </div>
+
+                 {/* Variant Editor */}
+                 <div className="space-y-4">
+                    <div className="flex justify-between items-center">
+                       <label className="text-[10px] font-black uppercase text-gray-400 italic tracking-widest">Size/Stock Matrix</label>
+                       <button type="button" onClick={() => setEditingProduct({...editingProduct, variants: [...(editingProduct.variants || []), { size: '', stock: 0 }]})} className="bg-black text-white px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest">+ Add Size</button>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                       {(editingProduct.variants || []).map((v, idx) => (
+                          <div key={idx} className="flex items-center space-x-2 bg-gray-50 p-3 rounded-xl border border-gray-100">
+                             <input type="text" value={v.size} onChange={e => {
+                                const newVariants = [...(editingProduct.variants || [])];
+                                newVariants[idx].size = e.target.value;
+                                setEditingProduct({...editingProduct, variants: newVariants});
+                             }} placeholder="SIZE" className="w-20 bg-white border border-gray-100 p-2 rounded-lg font-bold text-xs text-center" />
+                             <input type="number" value={v.stock} onChange={e => {
+                                const newVariants = [...(editingProduct.variants || [])];
+                                newVariants[idx].stock = Number(e.target.value);
+                                setEditingProduct({...editingProduct, variants: newVariants});
+                             }} placeholder="STOCK" className="w-20 bg-white border border-gray-100 p-2 rounded-lg font-bold text-xs text-center" />
+                             <button type="button" onClick={() => {
+                                const newVariants = editingProduct.variants?.filter((_, i) => i !== idx);
+                                setEditingProduct({...editingProduct, variants: newVariants});
+                             }} className="text-gray-300 hover:text-red-600 transition-colors"><i className="fa-solid fa-circle-minus"></i></button>
+                          </div>
+                       ))}
+                    </div>
+                 </div>
+
+                 <button type="submit" disabled={isSavingProduct} className="w-full bg-red-700 text-white py-6 rounded-2xl font-black uppercase tracking-widest text-xs shadow-2xl disabled:opacity-50 transition-all hover:bg-black hover:scale-[1.01] active:scale-[0.99]">
+                    {isSavingProduct ? <><i className="fa-solid fa-circle-notch animate-spin mr-3"></i> Synchronizing Archive...</> : 'Commit to Vault Repository'}
+                 </button>
               </form>
            </div>
         </div>
