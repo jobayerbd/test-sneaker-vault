@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo } from 'react';
-import { Order, OrderStatus, Sneaker, BrandEntity, Category, ShippingOption, FooterConfig, PaymentMethod, HomeSlide } from '../../types';
+import { Order, OrderStatus, Sneaker, BrandEntity, Category, ShippingOption, FooterConfig, PaymentMethod, HomeSlide, NavItem } from '../../types';
 
 import AdminSidebar from './AdminSidebar';
 import AdminOverview from './AdminOverview';
@@ -12,6 +12,7 @@ import AdminSettings from './AdminSettings';
 import AdminBrands from './AdminBrands';
 import AdminCategories from './AdminCategories';
 import AdminSlider from './AdminSlider';
+import AdminMenuManagement from './AdminMenuManagement';
 
 interface DashboardProps {
   orders: Order[];
@@ -20,6 +21,7 @@ interface DashboardProps {
   categories: Category[];
   paymentMethods: PaymentMethod[];
   slides: HomeSlide[];
+  navItems: NavItem[];
   shippingOptions?: ShippingOption[];
   footerConfig: FooterConfig;
   onRefresh?: () => void;
@@ -37,20 +39,23 @@ interface DashboardProps {
   onDeleteCategory: (id: string) => Promise<boolean>;
   onSaveSlide: (slide: Partial<HomeSlide>) => Promise<boolean>;
   onDeleteSlide: (id: string) => Promise<boolean>;
+  onSaveNavItem: (item: Partial<NavItem>) => Promise<boolean>;
+  onDeleteNavItem: (id: string) => Promise<boolean>;
   isRefreshing?: boolean;
   onLogout?: () => void;
 }
 
-type AdminSubView = 'overview' | 'orders' | 'inventory' | 'settings' | 'customers' | 'order-detail' | 'product-form' | 'brands' | 'categories' | 'slider';
+type AdminSubView = 'overview' | 'orders' | 'inventory' | 'settings' | 'customers' | 'order-detail' | 'product-form' | 'brands' | 'categories' | 'slider' | 'menu';
 
 const Dashboard: React.FC<DashboardProps> = (props) => {
   const { 
-    orders, sneakers, brands, categories, paymentMethods, slides, shippingOptions = [], footerConfig, onRefresh, onUpdateOrderStatus, 
+    orders, sneakers, brands, categories, paymentMethods, slides, navItems, shippingOptions = [], footerConfig, onRefresh, onUpdateOrderStatus, 
     onSaveProduct, onDeleteProduct, onSaveShipping, onDeleteShipping, 
     onSavePaymentMethod, onDeletePaymentMethod,
     onSaveFooterConfig, 
     onSaveBrand, onDeleteBrand, onSaveCategory, onDeleteCategory,
     onSaveSlide, onDeleteSlide,
+    onSaveNavItem, onDeleteNavItem,
     isRefreshing, onLogout 
   } = props;
 
@@ -109,6 +114,8 @@ const Dashboard: React.FC<DashboardProps> = (props) => {
         return <AdminCategories categories={categories} onSave={onSaveCategory} onDelete={onDeleteCategory} />;
       case 'slider':
         return <AdminSlider slides={slides} onSave={onSaveSlide} onDelete={onDeleteSlide} />;
+      case 'menu':
+        return <AdminMenuManagement navItems={navItems} onSave={onSaveNavItem} onDelete={onDeleteNavItem} />;
       case 'settings':
         return <AdminSettings shippingOptions={shippingOptions} paymentMethods={paymentMethods} footerConfig={footerConfig} onSaveShipping={onSaveShipping} onDeleteShipping={onDeleteShipping} onSavePaymentMethod={onSavePaymentMethod} onDeletePaymentMethod={onDeletePaymentMethod} onSaveFooterConfig={onSaveFooterConfig} />;
       default:

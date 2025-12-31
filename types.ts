@@ -16,6 +16,14 @@ export enum OrderStatus {
   RETURNED = 'Returned'
 }
 
+export interface NavItem {
+  id: string;
+  label: string;
+  target_view: string;
+  order: number;
+  active: boolean;
+}
+
 export interface TimelineEvent {
   status: OrderStatus;
   timestamp: string;

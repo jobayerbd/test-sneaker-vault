@@ -7,7 +7,7 @@ import ProductDetail from './components/Storefront/ProductDetail';
 import Dashboard from './components/Admin/Dashboard';
 import Login from './components/Admin/Login';
 import Footer from './components/Footer';
-import { Sneaker, CartItem, Order, OrderStatus, ShippingOption, FooterConfig, TimelineEvent, BrandEntity, Category, PaymentMethod, HomeSlide } from './types';
+import { Sneaker, CartItem, Order, OrderStatus, ShippingOption, FooterConfig, TimelineEvent, BrandEntity, Category, PaymentMethod, HomeSlide, NavItem } from './types';
 
 const SUPABASE_URL = 'https://vwbctddmakbnvfxzrjeo.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_8WhV41Km5aj8Dhvu6tUbvA_JnyPoVxu';
@@ -43,6 +43,7 @@ const App: React.FC = () => {
   const [categories, setCategories] = useState<Category[]>([]);
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [slides, setSlides] = useState<HomeSlide[]>([]);
+  const [navItems, setNavItems] = useState<NavItem[]>([]);
   const [shippingOptions, setShippingOptions] = useState<ShippingOption[]>([]);
   const [selectedShipping, setSelectedShipping] = useState<ShippingOption | null>(null);
   const [selectedPayment, setSelectedPayment] = useState<PaymentMethod | null>(null);
@@ -141,6 +142,15 @@ const App: React.FC = () => {
     } catch (err) {}
   }, []);
 
+  const fetchNavItems = useCallback(async () => {
+    try {
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/site_navigation?select=*&order=order.asc`, {
+        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
+      });
+      if (response.ok) setNavItems(await response.json());
+    } catch (err) {}
+  }, []);
+
   const fetchOrders = useCallback(async () => {
     setIsFetchingOrders(true);
     try {
@@ -178,8 +188,8 @@ const App: React.FC = () => {
 
   useEffect(() => {
     if (localStorage.getItem('sv_admin_session') === 'active') setIsAdminAuthenticated(true);
-    fetchSneakers(); fetchOrders(); fetchShippingOptions(); fetchFooterConfig(); fetchBrands(); fetchCategories(); fetchPaymentMethods(); fetchSlides();
-  }, [fetchSneakers, fetchOrders, fetchShippingOptions, fetchFooterConfig, fetchBrands, fetchCategories, fetchPaymentMethods, fetchSlides]);
+    fetchSneakers(); fetchOrders(); fetchShippingOptions(); fetchFooterConfig(); fetchBrands(); fetchCategories(); fetchPaymentMethods(); fetchSlides(); fetchNavItems();
+  }, [fetchSneakers, fetchOrders, fetchShippingOptions, fetchFooterConfig, fetchBrands, fetchCategories, fetchPaymentMethods, fetchSlides, fetchNavItems]);
 
   const handleAddToCart = (item: CartItem, shouldCheckout: boolean = false) => {
     setCart(prev => {
@@ -313,6 +323,32 @@ const App: React.FC = () => {
         headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
       });
       if (response.ok) { fetchSlides(); return true; }
+      return false;
+    } catch (err) { return false; }
+  };
+
+  const handleSaveNavItem = async (data: Partial<NavItem>): Promise<boolean> => {
+    const isUpdate = !!data.id;
+    const url = isUpdate ? `${SUPABASE_URL}/rest/v1/site_navigation?id=eq.${data.id}` : `${SUPABASE_URL}/rest/v1/site_navigation`;
+    const method = isUpdate ? 'PATCH' : 'POST';
+    try {
+      const response = await fetch(url, {
+        method,
+        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+      if (response.ok) { fetchNavItems(); return true; }
+      return false;
+    } catch (err) { return false; }
+  };
+
+  const handleDeleteNavItem = async (id: string): Promise<boolean> => {
+    try {
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/site_navigation?id=eq.${id}`, {
+        method: 'DELETE',
+        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
+      });
+      if (response.ok) { fetchNavItems(); return true; }
       return false;
     } catch (err) { return false; }
   };
@@ -589,7 +625,7 @@ const App: React.FC = () => {
       case 'shop': return <Shop sneakers={sneakers} onSelectProduct={handleSelectProduct} searchQuery={searchQuery} onClearSearch={() => setSearchQuery('')} />;
       case 'pdp': return selectedProduct ? <ProductDetail sneaker={selectedProduct} onAddToCart={handleAddToCart} onBack={() => setCurrentView('shop')} onToggleWishlist={toggleWishlist} isInWishlist={wishlist.some(s => s.id === selectedProduct.id)} onSelectProduct={handleSelectProduct} /> : <Home sneakers={sneakers} slides={slides} onSelectProduct={handleSelectProduct} onNavigate={setCurrentView} onSearch={handleSearch} />;
       case 'admin-login': return <Login supabaseUrl={SUPABASE_URL} supabaseKey={SUPABASE_KEY} onLoginSuccess={() => { setIsAdminAuthenticated(true); setCurrentView('admin'); }} />;
-      case 'admin': return <Dashboard sneakers={sneakers} orders={orders} brands={brands} categories={categories} paymentMethods={paymentMethods} slides={slides} shippingOptions={shippingOptions} footerConfig={footerConfig} onRefresh={() => { fetchOrders(); fetchSneakers(); fetchShippingOptions(); fetchFooterConfig(); fetchBrands(); fetchCategories(); fetchPaymentMethods(); fetchSlides(); }} onUpdateOrderStatus={handleUpdateOrderStatus} onSaveProduct={handleSaveProduct} onDeleteProduct={handleDeleteProduct} onSaveShipping={handleSaveShippingOption} onDeleteShipping={handleDeleteShippingOption} onSavePaymentMethod={handleSavePaymentMethod} onDeletePaymentMethod={handleDeletePaymentMethod} onSaveFooterConfig={handleSaveFooterConfig} onSaveBrand={handleSaveBrand} onDeleteBrand={handleDeleteBrand} onSaveCategory={handleSaveCategory} onDeleteCategory={handleDeleteCategory} onSaveSlide={handleSaveSlide} onDeleteSlide={handleDeleteSlide} isRefreshing={isFetchingOrders || isFetchingSneakers} onLogout={handleLogout} />;
+      case 'admin': return <Dashboard sneakers={sneakers} orders={orders} brands={brands} categories={categories} paymentMethods={paymentMethods} slides={slides} navItems={navItems} shippingOptions={shippingOptions} footerConfig={footerConfig} onRefresh={() => { fetchOrders(); fetchSneakers(); fetchShippingOptions(); fetchFooterConfig(); fetchBrands(); fetchCategories(); fetchPaymentMethods(); fetchSlides(); fetchNavItems(); }} onUpdateOrderStatus={handleUpdateOrderStatus} onSaveProduct={handleSaveProduct} onDeleteProduct={handleDeleteProduct} onSaveShipping={handleSaveShippingOption} onDeleteShipping={handleDeleteShippingOption} onSavePaymentMethod={handleSavePaymentMethod} onDeletePaymentMethod={handleDeletePaymentMethod} onSaveFooterConfig={handleSaveFooterConfig} onSaveBrand={handleSaveBrand} onDeleteBrand={handleDeleteBrand} onSaveCategory={handleSaveCategory} onDeleteCategory={handleDeleteCategory} onSaveSlide={handleSaveSlide} onDeleteSlide={handleDeleteSlide} onSaveNavItem={handleSaveNavItem} onDeleteNavItem={handleDeleteNavItem} isRefreshing={isFetchingOrders || isFetchingSneakers} onLogout={handleLogout} />;
       case 'checkout': return (
         <div className="max-w-6xl mx-auto px-4 py-16 animate-in fade-in duration-500">
           <div className="flex flex-col items-center mb-12 text-center">
@@ -794,6 +830,7 @@ const App: React.FC = () => {
           currentView={currentView} 
           onOpenCart={() => setIsCartSidebarOpen(true)} 
           onOpenSearch={() => setIsSearchOpen(true)}
+          navItems={navItems}
         />
       )}
       <div className="flex-1">{renderView()}</div>

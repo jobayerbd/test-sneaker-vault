@@ -1,24 +1,21 @@
 
 import React, { useState } from 'react';
+import { NavItem } from '../types';
 
 interface NavigationProps {
-  onNavigate: (view: 'home' | 'shop' | 'admin' | 'cart' | 'wishlist') => void;
+  onNavigate: (view: any) => void;
   cartCount: number;
   wishlistCount: number;
   currentView: string;
   onOpenCart: () => void;
   onOpenSearch: () => void;
+  navItems: NavItem[];
 }
 
-const Navigation: React.FC<NavigationProps> = ({ onNavigate, cartCount, wishlistCount, currentView, onOpenCart, onOpenSearch }) => {
+const Navigation: React.FC<NavigationProps> = ({ onNavigate, cartCount, wishlistCount, currentView, onOpenCart, onOpenSearch, navItems }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  const navLinks = [
-    { label: 'Men', view: 'shop' as const },
-    { label: 'Women', view: 'shop' as const },
-    { label: 'Accessories', view: 'shop' as const },
-    { label: 'Drops', view: 'shop' as const },
-  ];
+  const activeNavItems = navItems.filter(i => i.active).sort((a, b) => a.order - b.order);
 
   const handleMobileNav = (view: any) => {
     onNavigate(view);
@@ -49,13 +46,13 @@ const Navigation: React.FC<NavigationProps> = ({ onNavigate, cartCount, wishlist
 
           {/* Desktop Nav */}
           <div className="hidden lg:flex items-center space-x-10">
-            {navLinks.map((link) => (
+            {activeNavItems.map((item) => (
               <button 
-                key={link.label}
-                onClick={() => onNavigate(link.view)} 
-                className="text-[11px] font-bold text-gray-800 uppercase tracking-widest hover:text-red-600"
+                key={item.id}
+                onClick={() => onNavigate(item.target_view)} 
+                className="text-[11px] font-bold text-gray-800 uppercase tracking-widest hover:text-red-600 transition-colors"
               >
-                {link.label} {link.label !== 'Accessories' && link.label !== 'Drops' && <i className="fa-solid fa-chevron-down text-[8px] ml-1"></i>}
+                {item.label}
               </button>
             ))}
           </div>
@@ -71,7 +68,6 @@ const Navigation: React.FC<NavigationProps> = ({ onNavigate, cartCount, wishlist
             <button onClick={() => onNavigate('admin')} className="text-gray-600 hover:text-black">
               <i className="fa-regular fa-user text-xl"></i>
             </button>
-            {/* Wishlist Button Removed as per request */}
             <button 
               onClick={onOpenCart}
               className="flex items-center space-x-2 border border-gray-200 px-2 md:px-3 py-1.5 rounded-sm hover:border-black transition-colors"
@@ -103,13 +99,13 @@ const Navigation: React.FC<NavigationProps> = ({ onNavigate, cartCount, wishlist
           <div className="flex-1 overflow-y-auto p-8 space-y-8">
             <div className="space-y-4">
               <p className="text-red-600 text-[9px] font-black uppercase tracking-[0.4em] italic mb-6">Navigation Index</p>
-              {navLinks.map((link) => (
+              {activeNavItems.map((item) => (
                 <button 
-                  key={link.label}
-                  onClick={() => handleMobileNav(link.view)}
+                  key={item.id}
+                  onClick={() => handleMobileNav(item.target_view)}
                   className="w-full text-left text-lg font-black uppercase italic tracking-tight hover:text-red-600 transition-colors flex justify-between items-center group"
                 >
-                  {link.label}
+                  {item.label}
                   <i className="fa-solid fa-arrow-right-long opacity-0 group-hover:opacity-100 transition-opacity text-sm"></i>
                 </button>
               ))}
@@ -136,7 +132,7 @@ const Navigation: React.FC<NavigationProps> = ({ onNavigate, cartCount, wishlist
 
           <div className="p-8 bg-gray-50 border-t border-gray-100">
             <p className="text-[9px] text-gray-400 font-bold uppercase tracking-widest leading-relaxed">
-              SNEAKERVAULT OS v1.0.6<br/>
+              SNEAKERVAULT OS v2.0<br/>
               Status: System Online
             </p>
           </div>
