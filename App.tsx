@@ -2,12 +2,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import Navigation from './components/Navigation';
 import Home from './components/Storefront/Home';
+import Shop from './components/Storefront/Shop';
 import ProductDetail from './components/Storefront/ProductDetail';
 import Dashboard from './components/Admin/Dashboard';
 import Login from './components/Admin/Login';
 import Footer from './components/Footer';
-import { Sneaker, CartItem, Order, OrderStatus, ShippingOption, FooterConfig, TimelineEvent } from './types';
-import { MOCK_SNEAKERS, MOCK_ORDERS } from './constants';
+import { Sneaker, CartItem, Order, OrderStatus, ShippingOption, FooterConfig, TimelineEvent, BrandEntity, Category, PaymentMethod } from './types';
 
 const SUPABASE_URL = 'https://vwbctddmakbnvfxzrjeo.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_8WhV41Km5aj8Dhvu6tUbvA_JnyPoVxu';
@@ -39,8 +39,12 @@ const App: React.FC = () => {
   const [wishlist, setWishlist] = useState<Sneaker[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [sneakers, setSneakers] = useState<Sneaker[]>([]);
+  const [brands, setBrands] = useState<BrandEntity[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [shippingOptions, setShippingOptions] = useState<ShippingOption[]>([]);
   const [selectedShipping, setSelectedShipping] = useState<ShippingOption | null>(null);
+  const [selectedPayment, setSelectedPayment] = useState<PaymentMethod | null>(null);
   const [lastOrder, setLastOrder] = useState<Order | null>(null);
   const [footerConfig, setFooterConfig] = useState<FooterConfig>(DEFAULT_FOOTER);
   
@@ -84,16 +88,44 @@ const App: React.FC = () => {
     } finally { setIsFetchingSneakers(false); }
   }, []);
 
+  const fetchBrands = useCallback(async () => {
+    try {
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/brands?select=*&order=name.asc`, {
+        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
+      });
+      if (response.ok) setBrands(await response.json());
+    } catch (err) {}
+  }, []);
+
+  const fetchCategories = useCallback(async () => {
+    try {
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/categories?select=*&order=name.asc`, {
+        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
+      });
+      if (response.ok) setCategories(await response.json());
+    } catch (err) {}
+  }, []);
+
+  const fetchPaymentMethods = useCallback(async () => {
+    try {
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/payment_methods?select=*&order=name.asc`, {
+        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setPaymentMethods(data);
+        if (data.length > 0) setSelectedPayment(data[0]);
+      }
+    } catch (err) {}
+  }, []);
+
   const fetchOrders = useCallback(async () => {
     setIsFetchingOrders(true);
     try {
       const response = await fetch(`${SUPABASE_URL}/rest/v1/orders?select=*&order=created_at.desc`, {
         headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
       });
-      if (response.ok) {
-        const data = await response.json();
-        setOrders(data);
-      }
+      if (response.ok) setOrders(await response.json());
     } finally { setIsFetchingOrders(false); }
   }, []);
 
@@ -124,30 +156,47 @@ const App: React.FC = () => {
 
   useEffect(() => {
     if (localStorage.getItem('sv_admin_session') === 'active') setIsAdminAuthenticated(true);
-    fetchSneakers(); fetchOrders(); fetchShippingOptions(); fetchFooterConfig();
-  }, [fetchSneakers, fetchOrders, fetchShippingOptions, fetchFooterConfig]);
+    fetchSneakers(); fetchOrders(); fetchShippingOptions(); fetchFooterConfig(); fetchBrands(); fetchCategories(); fetchPaymentMethods();
+  }, [fetchSneakers, fetchOrders, fetchShippingOptions, fetchFooterConfig, fetchBrands, fetchCategories, fetchPaymentMethods]);
+
+  const handleAddToCart = (item: CartItem, shouldCheckout: boolean = false) => {
+    setCart(prev => {
+      const existing = prev.find(i => i.id === item.id && i.selectedSize === item.selectedSize);
+      if (existing) {
+        return prev.map(i => (i.id === item.id && i.selectedSize === item.selectedSize) ? { ...i, quantity: i.quantity + item.quantity } : i);
+      }
+      return [...prev, item];
+    });
+    trackFBPixel('AddToCart', { content_ids: [item.id], content_name: item.name, value: item.price, currency: 'BDT' });
+    if (shouldCheckout) {
+      setCurrentView('checkout');
+      setIsCartSidebarOpen(false);
+    } else {
+      setIsCartSidebarOpen(true);
+    }
+  };
+
+  const toggleWishlist = (sneaker: Sneaker) => {
+    setWishlist(prev => {
+      const exists = prev.find(s => s.id === sneaker.id);
+      if (exists) return prev.filter(s => s.id !== sneaker.id);
+      return [...prev, sneaker];
+    });
+  };
 
   const handleUpdateOrderStatus = async (orderId: string, newStatus: OrderStatus) => {
     const order = orders.find(o => o.id === orderId);
     if (!order) return false;
-
     const newEvent: TimelineEvent = {
       status: newStatus,
       timestamp: new Date().toISOString(),
       note: `Status protocol updated to ${newStatus}.`
     };
-
     const updatedTimeline = [...(order.timeline || []), newEvent];
-
     try {
       const response = await fetch(`${SUPABASE_URL}/rest/v1/orders?id=eq.${orderId}`, {
         method: 'PATCH',
-        headers: {
-          'apikey': SUPABASE_KEY,
-          'Authorization': `Bearer ${SUPABASE_KEY}`,
-          'Content-Type': 'application/json',
-          'Prefer': 'return=representation'
-        },
+        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', 'Prefer': 'return=representation' },
         body: JSON.stringify({ status: newStatus, timeline: updatedTimeline })
       });
       if (response.ok) {
@@ -160,23 +209,19 @@ const App: React.FC = () => {
 
   const handlePlaceOrder = async () => {
     if (!checkoutForm.firstName || !checkoutForm.mobileNumber) { alert("Required fields missing."); return; }
-    if (!selectedShipping) return;
+    if (!selectedShipping || !selectedPayment) { alert("Logistics or Payment Protocol missing."); return; }
     setIsPlacingOrder(true);
-
     const subtotal = cart.reduce((acc, item) => acc + (item.price * item.quantity), 0);
     const total = subtotal + selectedShipping.rate;
     const orderId = `ORD-${Math.floor(Math.random() * 90000) + 10000}`;
-    
     const initialTimeline: TimelineEvent[] = [{
       status: OrderStatus.PLACED,
       timestamp: new Date().toISOString(),
       note: 'Order protocol initiated and secured.'
     }];
-
     const newOrder = {
-      id: orderId, first_name: checkoutForm.firstName, last_name: checkoutForm.lastName, email: checkoutForm.email || 'guest@sneakervault.bd', mobile_number: checkoutForm.mobileNumber, street_address: checkoutForm.address, city: checkoutForm.city, zip_code: checkoutForm.zip, total, status: OrderStatus.PLACED, timeline: initialTimeline, shipping_name: selectedShipping.name, shipping_rate: selectedShipping.rate, items: cart.map(item => ({ sneakerId: item.id, name: item.name, image: item.image, size: item.selectedSize, quantity: item.quantity, price: item.price }))
+      id: orderId, first_name: checkoutForm.firstName, last_name: checkoutForm.lastName, email: checkoutForm.email || 'guest@sneakervault.bd', mobile_number: checkoutForm.mobileNumber, street_address: checkoutForm.address, city: checkoutForm.city, zip_code: checkoutForm.zip, total, status: OrderStatus.PLACED, timeline: initialTimeline, shipping_name: selectedShipping.name, shipping_rate: selectedShipping.rate, payment_method: selectedPayment.name, items: cart.map(item => ({ sneakerId: item.id, name: item.name, image: item.image, size: item.selectedSize, quantity: item.quantity, price: item.price }))
     };
-
     try {
       const response = await fetch(`${SUPABASE_URL}/rest/v1/orders`, {
         method: 'POST',
@@ -194,25 +239,142 @@ const App: React.FC = () => {
   };
 
   const navigateToAdmin = () => {
-    if (isAdminAuthenticated) {
-      setCurrentView('admin');
-    } else {
-      setCurrentView('admin-login');
-    }
+    if (isAdminAuthenticated) setCurrentView('admin');
+    else setCurrentView('admin-login');
   };
 
   const handleSelectProduct = (sneaker: Sneaker) => { setSelectedProduct(sneaker); setCurrentView('pdp'); setIsCartSidebarOpen(false); };
-  const toggleWishlist = (sneaker: Sneaker) => { /* same as before */ };
-  const updateCartQuantity = (index: number, delta: number) => { /* same as before */ };
-  const removeFromCart = (index: number) => { /* same as before */ };
-  const handleAddToCart = (item: CartItem, shouldCheckout: boolean = false) => { /* same as before */ };
-  const handleLogout = () => { localStorage.removeItem('sv_admin_session'); setIsAdminAuthenticated(false); setCurrentView('home'); };
   
-  const handleSaveProduct = async (data: any): Promise<boolean> => { return true; };
-  const handleDeleteProduct = async (id: string): Promise<boolean> => { return true; };
-  const handleSaveShippingOption = async (data: any): Promise<boolean> => { return true; };
-  const handleDeleteShippingOption = async (id: string): Promise<boolean> => { return true; };
-  
+  const handleSaveProduct = async (data: any): Promise<boolean> => {
+    const isUpdate = !!data.id;
+    const url = isUpdate ? `${SUPABASE_URL}/rest/v1/sneakers?id=eq.${data.id}` : `${SUPABASE_URL}/rest/v1/sneakers`;
+    const method = isUpdate ? 'PATCH' : 'POST';
+    try {
+      const response = await fetch(url, {
+        method,
+        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', 'Prefer': 'return=representation' },
+        body: JSON.stringify(data)
+      });
+      if (response.ok) { fetchSneakers(); return true; }
+      return false;
+    } catch (err) { return false; }
+  };
+
+  const handleDeleteProduct = async (id: string): Promise<boolean> => {
+    try {
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/sneakers?id=eq.${id}`, {
+        method: 'DELETE',
+        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
+      });
+      if (response.ok) { fetchSneakers(); return true; }
+      return false;
+    } catch (err) { return false; }
+  };
+
+  const handleSaveBrand = async (data: any): Promise<boolean> => {
+    const isUpdate = !!data.id;
+    const url = isUpdate ? `${SUPABASE_URL}/rest/v1/brands?id=eq.${data.id}` : `${SUPABASE_URL}/rest/v1/brands`;
+    const method = isUpdate ? 'PATCH' : 'POST';
+    try {
+      const response = await fetch(url, {
+        method,
+        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+      if (response.ok) { fetchBrands(); return true; }
+      return false;
+    } catch (err) { return false; }
+  };
+
+  const handleDeleteBrand = async (id: string): Promise<boolean> => {
+    try {
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/brands?id=eq.${id}`, {
+        method: 'DELETE',
+        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
+      });
+      if (response.ok) { fetchBrands(); return true; }
+      return false;
+    } catch (err) { return false; }
+  };
+
+  const handleSaveCategory = async (data: any): Promise<boolean> => {
+    const isUpdate = !!data.id;
+    const url = isUpdate ? `${SUPABASE_URL}/rest/v1/categories?id=eq.${data.id}` : `${SUPABASE_URL}/rest/v1/categories`;
+    const method = isUpdate ? 'PATCH' : 'POST';
+    try {
+      const response = await fetch(url, {
+        method,
+        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+      if (response.ok) { fetchCategories(); return true; }
+      return false;
+    } catch (err) { return false; }
+  };
+
+  const handleDeleteCategory = async (id: string): Promise<boolean> => {
+    try {
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/categories?id=eq.${id}`, {
+        method: 'DELETE',
+        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
+      });
+      if (response.ok) { fetchCategories(); return true; }
+      return false;
+    } catch (err) { return false; }
+  };
+
+  const handleSaveShippingOption = async (data: any): Promise<boolean> => {
+    const isUpdate = !!data.id;
+    const url = isUpdate ? `${SUPABASE_URL}/rest/v1/shipping_options?id=eq.${data.id}` : `${SUPABASE_URL}/rest/v1/shipping_options`;
+    const method = isUpdate ? 'PATCH' : 'POST';
+    try {
+      const response = await fetch(url, {
+        method,
+        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+      if (response.ok) { fetchShippingOptions(); return true; }
+      return false;
+    } catch (err) { return false; }
+  };
+
+  const handleDeleteShippingOption = async (id: string): Promise<boolean> => {
+    try {
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/shipping_options?id=eq.${id}`, {
+        method: 'DELETE',
+        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
+      });
+      if (response.ok) { fetchShippingOptions(); return true; }
+      return false;
+    } catch (err) { return false; }
+  };
+
+  const handleSavePaymentMethod = async (data: any): Promise<boolean> => {
+    const isUpdate = !!data.id;
+    const url = isUpdate ? `${SUPABASE_URL}/rest/v1/payment_methods?id=eq.${data.id}` : `${SUPABASE_URL}/rest/v1/payment_methods`;
+    const method = isUpdate ? 'PATCH' : 'POST';
+    try {
+      const response = await fetch(url, {
+        method,
+        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+      if (response.ok) { fetchPaymentMethods(); return true; }
+      return false;
+    } catch (err) { return false; }
+  };
+
+  const handleDeletePaymentMethod = async (id: string): Promise<boolean> => {
+    try {
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/payment_methods?id=eq.${id}`, {
+        method: 'DELETE',
+        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
+      });
+      if (response.ok) { fetchPaymentMethods(); return true; }
+      return false;
+    } catch (err) { return false; }
+  };
+
   const handleSaveFooterConfig = async (config: FooterConfig): Promise<boolean> => {
     try {
       const response = await fetch(`${SUPABASE_URL}/rest/v1/site_settings?key=eq.footer`, {
@@ -220,45 +382,70 @@ const App: React.FC = () => {
         headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ data: config })
       });
-      if (response.ok) {
-        setFooterConfig(config);
-        return true;
-      }
+      if (response.ok) { setFooterConfig(config); return true; }
       return false;
     } catch (err) { return false; }
   };
+
+  const handleLogout = () => { localStorage.removeItem('sv_admin_session'); setIsAdminAuthenticated(false); setCurrentView('home'); };
 
   const CartSidebar = () => {
     const total = cart.reduce((acc, item) => acc + (item.price * item.quantity), 0);
     return (
       <>
-        <div className={`fixed inset-0 bg-black/60 z-[60] transition-opacity ${isCartSidebarOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`} onClick={() => setIsCartSidebarOpen(false)} />
+        <div className={`fixed inset-0 bg-black/60 z-[60] transition-opacity duration-300 ${isCartSidebarOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`} onClick={() => setIsCartSidebarOpen(false)} />
         <div className={`fixed right-0 top-0 h-screen w-full max-w-md bg-white z-[70] transition-transform duration-500 transform ${isCartSidebarOpen ? 'translate-x-0' : 'translate-x-full'}`}>
-           <div className="flex flex-col h-full">
-            <div className="p-6 bg-black text-white flex justify-between items-center">
-              <h2 className="text-xl font-black uppercase tracking-tighter italic">Vault Bag</h2>
-              <button onClick={() => setIsCartSidebarOpen(false)}><i className="fa-solid fa-xmark"></i></button>
+           <div className="flex flex-col h-full shadow-2xl">
+            <div className="p-8 bg-black text-white flex justify-between items-center">
+              <h2 className="text-xl font-black uppercase tracking-tighter italic font-heading">Vault Bag <span className="text-[10px] text-red-600 ml-2">[{cart.length} ITEMS]</span></h2>
+              <button onClick={() => setIsCartSidebarOpen(false)} className="hover:rotate-90 transition-transform"><i className="fa-solid fa-xmark text-xl"></i></button>
             </div>
-            <div className="flex-1 overflow-y-auto p-6 space-y-6">
+            <div className="flex-1 overflow-y-auto p-8 space-y-6 no-scrollbar">
               {cart.map((item, idx) => (
-                <div key={`${item.id}-${item.selectedSize}`} className="flex space-x-4 border-b border-gray-50 pb-6">
-                  <div className="w-20 h-20 bg-gray-50 border rounded-xl p-2"><img src={item.image} className="w-full h-full object-contain" /></div>
-                  <div className="flex-1">
-                    <div className="flex justify-between">
-                      <div><h4 className="text-[10px] font-black uppercase truncate w-32">{item.name}</h4><p className="text-[9px] text-red-600 font-black">Size: {item.selectedSize}</p></div>
-                      <button onClick={() => removeFromCart(idx)}><i className="fa-solid fa-trash-can text-gray-300"></i></button>
+                <div key={`${item.id}-${item.selectedSize}`} className="flex space-x-6 border-b border-gray-50 pb-6 animate-in slide-in-from-right-4">
+                  <div className="w-24 h-24 bg-gray-50 border border-gray-100 rounded-xl p-2 shrink-0"><img src={item.image} className="w-full h-full object-contain" alt={item.name} /></div>
+                  <div className="flex-1 flex flex-col justify-center">
+                    <div className="flex justify-between items-start mb-2">
+                      <h4 className="text-[11px] font-black uppercase tracking-tight leading-tight">{item.name}</h4>
+                      <button onClick={() => setCart(cart.filter((_, i) => i !== idx))} className="text-gray-300 hover:text-red-600 transition-colors"><i className="fa-solid fa-trash-can text-sm"></i></button>
                     </div>
-                    <div className="flex justify-between items-end mt-2">
-                      <div className="flex border rounded overflow-hidden"><button onClick={() => updateCartQuantity(idx, -1)} className="px-2">-</button><span className="px-2 font-bold">{item.quantity}</span><button onClick={() => updateCartQuantity(idx, 1)} className="px-2">+</button></div>
-                      <p className="text-xs font-black italic">{item.price * item.quantity}৳</p>
+                    <p className="text-[10px] text-red-600 font-black mb-4 italic">SIZE Index: {item.selectedSize}</p>
+                    <div className="flex justify-between items-center mt-auto">
+                      <div className="flex items-center border border-gray-100 rounded-lg bg-gray-50 overflow-hidden h-8">
+                        <button onClick={() => {
+                           const n = [...cart];
+                           n[idx].quantity = Math.max(1, n[idx].quantity - 1);
+                           setCart(n);
+                        }} className="px-3 hover:bg-white">-</button>
+                        <span className="px-2 font-black text-xs">{item.quantity}</span>
+                        <button onClick={() => {
+                           const n = [...cart];
+                           n[idx].quantity += 1;
+                           setCart(n);
+                        }} className="px-3 hover:bg-white">+</button>
+                      </div>
+                      <p className="text-xs font-black italic text-black">{(item.price * item.quantity).toLocaleString()}৳</p>
                     </div>
                   </div>
                 </div>
               ))}
+              {cart.length === 0 && (
+                <div className="flex flex-col items-center justify-center h-full text-center py-20">
+                   <i className="fa-solid fa-bag-shopping text-gray-100 text-7xl mb-6"></i>
+                   <p className="text-gray-400 font-bold uppercase tracking-widest italic">Vault bag is empty</p>
+                </div>
+              )}
             </div>
             <div className="p-8 bg-white border-t border-gray-100">
-               <div className="flex justify-between mb-4"><span className="text-xs font-black uppercase">Total</span><span className="text-2xl font-black">{total}৳</span></div>
-               <button onClick={() => { setCurrentView('checkout'); setIsCartSidebarOpen(false); }} className="w-full bg-black text-white py-4 rounded-xl font-black uppercase text-xs">Checkout</button>
+               <div className="flex justify-between mb-2"><span className="text-[10px] font-black uppercase text-gray-400">Inventory Value</span><span className="text-sm font-black italic">{total.toLocaleString()}৳</span></div>
+               <div className="flex justify-between mb-6 pt-2 border-t border-gray-50"><span className="text-sm font-black uppercase">Final Settlement</span><span className="text-2xl font-black text-red-700">{total.toLocaleString()}৳</span></div>
+               <button 
+                 disabled={cart.length === 0}
+                 onClick={() => { setCurrentView('checkout'); setIsCartSidebarOpen(false); }} 
+                 className="w-full bg-black text-white py-5 rounded-xl font-black uppercase tracking-[0.2em] text-xs shadow-xl hover:bg-red-700 transition-all active:scale-95 disabled:opacity-30"
+               >
+                 Initialize Checkout
+               </button>
             </div>
            </div>
         </div>
@@ -269,53 +456,150 @@ const App: React.FC = () => {
   const renderView = () => {
     switch (currentView) {
       case 'home': return <Home sneakers={sneakers} onSelectProduct={handleSelectProduct} onNavigate={setCurrentView} />;
+      case 'shop': return <Shop sneakers={sneakers} onSelectProduct={handleSelectProduct} />;
       case 'pdp': return selectedProduct ? <ProductDetail sneaker={selectedProduct} onAddToCart={handleAddToCart} onBack={() => setCurrentView('shop')} onToggleWishlist={toggleWishlist} isInWishlist={wishlist.some(s => s.id === selectedProduct.id)} /> : <Home sneakers={sneakers} onSelectProduct={handleSelectProduct} onNavigate={setCurrentView} />;
-      case 'admin-login': return <Login supabaseUrl={SUPABASE_URL} supabaseKey={SUPABASE_KEY} onLoginSuccess={() => { setIsAdminAuthenticated(true); setCurrentView('admin'); fetchOrders(); fetchSneakers(); fetchShippingOptions(); fetchFooterConfig(); }} />;
-      case 'shop': return (
-        <div className="max-w-7xl mx-auto px-4 py-16">
-          <h1 className="text-5xl font-black italic uppercase font-heading mb-10">Vault Archives</h1>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
-            {sneakers.map(s => (
-              <div key={s.id} onClick={() => handleSelectProduct(s)} className="group cursor-pointer">
-                <div className="aspect-[4/5] bg-white border overflow-hidden relative mb-4"><img src={s.image} className="w-full h-full object-cover group-hover:scale-110 transition-transform" />{s.is_drop && <div className="absolute top-2 left-2 bg-red-600 text-white text-[8px] px-2 py-1 uppercase font-black">High Heat</div>}</div>
-                <h3 className="font-bold text-xs uppercase truncate">{s.name}</h3><p className="font-black italic text-sm">{s.price}৳</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      );
+      case 'admin-login': return <Login supabaseUrl={SUPABASE_URL} supabaseKey={SUPABASE_KEY} onLoginSuccess={() => { setIsAdminAuthenticated(true); setCurrentView('admin'); }} />;
+      case 'admin': return <Dashboard sneakers={sneakers} orders={orders} brands={brands} categories={categories} paymentMethods={paymentMethods} shippingOptions={shippingOptions} footerConfig={footerConfig} onRefresh={() => { fetchOrders(); fetchSneakers(); fetchShippingOptions(); fetchFooterConfig(); fetchBrands(); fetchCategories(); fetchPaymentMethods(); }} onUpdateOrderStatus={handleUpdateOrderStatus} onSaveProduct={handleSaveProduct} onDeleteProduct={handleDeleteProduct} onSaveShipping={handleSaveShippingOption} onDeleteShipping={handleDeleteShippingOption} onSavePaymentMethod={handleSavePaymentMethod} onDeletePaymentMethod={handleDeletePaymentMethod} onSaveFooterConfig={handleSaveFooterConfig} onSaveBrand={handleSaveBrand} onDeleteBrand={handleDeleteBrand} onSaveCategory={handleSaveCategory} onDeleteCategory={handleDeleteCategory} isRefreshing={isFetchingOrders || isFetchingSneakers} onLogout={handleLogout} />;
       case 'checkout': return (
-        <div className="max-w-6xl mx-auto px-4 py-16">
-          <h1 className="text-4xl font-black uppercase font-heading italic mb-12">Checkout Registry</h1>
+        <div className="max-w-6xl mx-auto px-4 py-16 animate-in fade-in duration-500">
+          <div className="flex flex-col items-center mb-12 text-center">
+            <h1 className="text-4xl font-black uppercase font-heading italic mb-4">Checkout Registry</h1>
+            <div className="w-16 h-1 bg-red-600 mb-2"></div>
+            <p className="text-gray-400 text-[10px] font-black uppercase tracking-[0.3em]">Finalizing secured transaction protocols</p>
+          </div>
+
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
-            <div className="lg:col-span-2 space-y-6">
-              <div className="bg-white p-8 border rounded-2xl"><h3 className="font-black uppercase italic mb-6">Shipping Coordinates</h3><div className="grid grid-cols-2 gap-4"><input type="text" placeholder="First Name" value={checkoutForm.firstName} onChange={e => setCheckoutForm({...checkoutForm, firstName: e.target.value})} className="border-b py-2 outline-none font-bold text-xs" /><input type="text" placeholder="Last Name" value={checkoutForm.lastName} onChange={e => setCheckoutForm({...checkoutForm, lastName: e.target.value})} className="border-b py-2 outline-none font-bold text-xs" /><input type="tel" placeholder="Mobile" value={checkoutForm.mobileNumber} onChange={e => setCheckoutForm({...checkoutForm, mobileNumber: e.target.value})} className="border-b py-2 outline-none font-bold text-xs" /><input type="email" placeholder="Email" value={checkoutForm.email} onChange={e => setCheckoutForm({...checkoutForm, email: e.target.value})} className="border-b py-2 outline-none font-bold text-xs" /></div><input type="text" placeholder="Address" value={checkoutForm.address} onChange={e => setCheckoutForm({...checkoutForm, address: e.target.value})} className="w-full border-b py-4 outline-none font-bold text-xs mt-4" /></div>
-              <div className="bg-white p-8 border rounded-2xl"><h3 className="font-black uppercase italic mb-6">Logistics</h3><div className="space-y-2">{shippingOptions.map(o => <div key={o.id} onClick={() => setSelectedShipping(o)} className={`p-4 border-2 rounded-xl flex justify-between cursor-pointer ${selectedShipping?.id === o.id ? 'border-black' : 'border-gray-50'}`}><span className="font-black text-[10px] uppercase">{o.name}</span><span className="font-black italic text-xs">{o.rate}৳</span></div>)}</div></div>
+            <div className="lg:col-span-2 space-y-8">
+              {/* Subject Coordinates */}
+              <div className="bg-white p-10 border border-gray-100 rounded-3xl shadow-sm">
+                <h3 className="text-xs font-black uppercase italic mb-8 border-b pb-4 tracking-widest">Subject Coordinates</h3>
+                <div className="grid grid-cols-2 gap-6">
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black uppercase text-gray-400 px-1">First Name</label>
+                    <input type="text" placeholder="GIVEN NAME" value={checkoutForm.firstName} onChange={e => setCheckoutForm({...checkoutForm, firstName: e.target.value})} className="w-full bg-gray-50 p-4 rounded-xl outline-none font-bold text-xs focus:ring-2 ring-black/5" />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black uppercase text-gray-400 px-1">Last Name</label>
+                    <input type="text" placeholder="SURNAME" value={checkoutForm.lastName} onChange={e => setCheckoutForm({...checkoutForm, lastName: e.target.value})} className="w-full bg-gray-50 p-4 rounded-xl outline-none font-bold text-xs focus:ring-2 ring-black/5" />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black uppercase text-gray-400 px-1">Mobile Access</label>
+                    <input type="tel" placeholder="+880" value={checkoutForm.mobileNumber} onChange={e => setCheckoutForm({...checkoutForm, mobileNumber: e.target.value})} className="w-full bg-gray-50 p-4 rounded-xl outline-none font-bold text-xs focus:ring-2 ring-black/5" />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black uppercase text-gray-400 px-1">Email Archive</label>
+                    <input type="email" placeholder="OPERATOR@MAIL.COM" value={checkoutForm.email} onChange={e => setCheckoutForm({...checkoutForm, email: e.target.value})} className="w-full bg-gray-50 p-4 rounded-xl outline-none font-bold text-xs focus:ring-2 ring-black/5" />
+                  </div>
+                </div>
+                <div className="mt-6 space-y-1">
+                  <label className="text-[9px] font-black uppercase text-gray-400 px-1">Sector/Address</label>
+                  <input type="text" placeholder="STREET, BLOCK, AREA" value={checkoutForm.address} onChange={e => setCheckoutForm({...checkoutForm, address: e.target.value})} className="w-full bg-gray-50 p-4 rounded-xl outline-none font-bold text-xs focus:ring-2 ring-black/5" />
+                </div>
+              </div>
+
+              {/* Logistics Hub */}
+              <div className="bg-white p-10 border border-gray-100 rounded-3xl shadow-sm">
+                <h3 className="text-xs font-black uppercase italic mb-8 border-b pb-4 tracking-widest">Logistics Hub</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {shippingOptions.map(o => (
+                    <div 
+                      key={o.id} 
+                      onClick={() => setSelectedShipping(o)} 
+                      className={`p-6 border-2 rounded-2xl flex justify-between items-center cursor-pointer transition-all duration-300 ${selectedShipping?.id === o.id ? 'border-black bg-black text-white shadow-xl scale-[1.02]' : 'border-gray-50 bg-gray-50 hover:border-gray-200'}`}
+                    >
+                      <div className="flex flex-col">
+                        <span className="font-black text-[10px] uppercase tracking-widest mb-1">{o.name}</span>
+                        <span className={`text-[9px] font-bold ${selectedShipping?.id === o.id ? 'text-gray-400' : 'text-gray-400'} uppercase`}>Transit Protocol</span>
+                      </div>
+                      <span className="font-black italic text-sm">{o.rate}৳</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Payment Gateway Matrix */}
+              <div className="bg-white p-10 border border-gray-100 rounded-3xl shadow-sm">
+                <h3 className="text-xs font-black uppercase italic mb-8 border-b pb-4 tracking-widest">Payment Gateway Matrix</h3>
+                <div className="space-y-4">
+                  {paymentMethods.map(pm => (
+                    <div 
+                      key={pm.id}
+                      onClick={() => setSelectedPayment(pm)}
+                      className={`p-6 border-2 rounded-2xl cursor-pointer transition-all duration-300 ${selectedPayment?.id === pm.id ? 'border-red-600 bg-red-50 shadow-md' : 'border-gray-50 bg-gray-50 hover:border-gray-200'}`}
+                    >
+                      <div className="flex justify-between items-center mb-2">
+                         <span className="font-black text-xs uppercase tracking-widest">{pm.name}</span>
+                         {selectedPayment?.id === pm.id && <i className="fa-solid fa-circle-check text-red-600"></i>}
+                      </div>
+                      {pm.details && (
+                        <p className="text-[10px] text-gray-500 font-medium italic leading-relaxed whitespace-pre-line">{pm.details}</p>
+                      )}
+                    </div>
+                  ))}
+                  {paymentMethods.length === 0 && (
+                    <p className="text-gray-400 text-xs italic text-center py-4">No payment gateways initialized by admin.</p>
+                  )}
+                </div>
+              </div>
             </div>
-            <div className="bg-black text-white p-8 rounded-2xl h-fit">
-              <h3 className="text-xl font-black uppercase italic border-b border-white/10 pb-4 mb-4">Summary</h3>
-              <div className="flex justify-between items-end mb-6"><span>Total Settlement</span><span className="text-2xl font-black">{cart.reduce((a,c)=>a+(c.price*c.quantity),0) + (selectedShipping?.rate||0)}৳</span></div>
-              <button onClick={handlePlaceOrder} disabled={isPlacingOrder} className="w-full bg-red-700 py-4 rounded-xl font-black uppercase text-xs">Commit Protocol</button>
+
+            {/* Settlement Summary */}
+            <div className="bg-black text-white p-10 rounded-3xl h-fit shadow-2xl sticky top-24">
+              <h3 className="text-xl font-black uppercase italic border-b border-white/10 pb-6 mb-8 tracking-tighter font-heading">Settlement Summary</h3>
+              <div className="space-y-4 mb-8">
+                <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-gray-500">
+                  <span>Subtotal Value</span>
+                  <span>{cart.reduce((a,c)=>a+(c.price*c.quantity),0).toLocaleString()}৳</span>
+                </div>
+                <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-gray-500">
+                  <span>Logistics Fee</span>
+                  <span>{selectedShipping?.rate || 0}৳</span>
+                </div>
+                <div className="flex justify-between items-end pt-6 border-t border-white/10">
+                  <span className="text-xs font-black uppercase tracking-[0.2em] italic">Final Settlement</span>
+                  <span className="text-3xl font-black text-red-600">{(cart.reduce((a,c)=>a+(c.price*c.quantity),0) + (selectedShipping?.rate||0)).toLocaleString()}৳</span>
+                </div>
+              </div>
+              <button 
+                onClick={handlePlaceOrder} 
+                disabled={isPlacingOrder || cart.length === 0} 
+                className="w-full bg-red-700 py-6 rounded-2xl font-black uppercase tracking-[0.3em] text-[10px] shadow-2xl hover:bg-white hover:text-black transition-all active:scale-95 flex items-center justify-center gap-3"
+              >
+                {isPlacingOrder ? <i className="fa-solid fa-circle-notch animate-spin"></i> : <><i className="fa-solid fa-lock text-sm"></i> Commit Order Protocol</>}
+              </button>
+              <p className="text-[8px] font-black uppercase tracking-widest text-center mt-6 text-gray-600 italic">Secure authenticated transaction channel</p>
             </div>
           </div>
         </div>
       );
       case 'order-success': return (
-        <div className="max-w-2xl mx-auto py-20 text-center">
-          <div className="w-20 h-20 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-6 text-white text-3xl"><i className="fa-solid fa-check"></i></div>
-          <h1 className="text-4xl font-black italic uppercase font-heading mb-4">Vault Secured!</h1>
-          <p className="text-gray-400 mb-8 uppercase font-bold text-xs">Protocol successfully completed. Order ID: {lastOrder?.id}</p>
-          <button onClick={() => setCurrentView('shop')} className="bg-black text-white px-8 py-4 rounded-xl font-black uppercase text-xs">Continue Exploration</button>
+        <div className="max-w-2xl mx-auto py-32 text-center animate-in zoom-in-95 duration-700">
+          <div className="w-24 h-24 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-10 text-white text-4xl shadow-2xl animate-bounce"><i className="fa-solid fa-check-double"></i></div>
+          <h1 className="text-5xl font-black italic uppercase font-heading mb-4 tracking-tighter">Vault Secured!</h1>
+          <p className="text-gray-400 mb-2 uppercase font-black text-[10px] tracking-[0.5em] italic">Protocol Successfully Completed</p>
+          <div className="bg-gray-50 p-6 rounded-2xl border border-gray-100 mb-12 inline-block">
+             <p className="text-[11px] font-black uppercase tracking-widest text-black">Registry Order ID: <span className="text-red-600">{lastOrder?.id}</span></p>
+          </div>
+          <div>
+            <button onClick={() => setCurrentView('shop')} className="bg-black text-white px-12 py-5 rounded-2xl font-black uppercase tracking-[0.3em] text-[10px] shadow-2xl hover:bg-red-700 transition-all active:scale-95">Continue Exploration</button>
+          </div>
         </div>
       );
-      case 'admin': return <Dashboard sneakers={sneakers} orders={orders} shippingOptions={shippingOptions} footerConfig={footerConfig} onRefresh={() => { fetchOrders(); fetchSneakers(); fetchShippingOptions(); fetchFooterConfig(); }} onUpdateOrderStatus={handleUpdateOrderStatus} onSaveProduct={handleSaveProduct} onDeleteProduct={handleDeleteProduct} onSaveShipping={handleSaveShippingOption} onDeleteShipping={handleDeleteShippingOption} onSaveFooterConfig={handleSaveFooterConfig} isRefreshing={isFetchingOrders || isFetchingSneakers} onLogout={handleLogout} />;
       default: return <Home sneakers={sneakers} onSelectProduct={handleSelectProduct} onNavigate={setCurrentView} />;
     }
   };
 
   return (
     <div className="min-h-screen flex flex-col bg-white">
-      {currentView !== 'admin' && <Navigation onNavigate={(v) => v==='admin'?navigateToAdmin():setCurrentView(v as View)} cartCount={cart.reduce((a,c)=>a+c.quantity,0)} wishlistCount={wishlist.length} currentView={currentView} onOpenCart={() => setIsCartSidebarOpen(true)} />}
+      {currentView !== 'admin' && (
+        <Navigation 
+          onNavigate={(v) => v === 'admin' ? navigateToAdmin() : setCurrentView(v as View)} 
+          cartCount={cart.reduce((a,c) => a + c.quantity, 0)} 
+          wishlistCount={wishlist.length} 
+          currentView={currentView} 
+          onOpenCart={() => setIsCartSidebarOpen(true)} 
+        />
+      )}
       <div className="flex-1">{renderView()}</div>
       <CartSidebar />
       {currentView !== 'admin' && currentView !== 'admin-login' && <Footer config={footerConfig} onNavigate={setCurrentView} />}

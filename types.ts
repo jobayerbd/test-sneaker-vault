@@ -27,10 +27,30 @@ export interface SneakerVariant {
   stock: number;
 }
 
+export interface BrandEntity {
+  id: string;
+  name: string;
+  created_at?: string;
+}
+
+export interface Category {
+  id: string;
+  name: string;
+  created_at?: string;
+}
+
+export interface PaymentMethod {
+  id: string;
+  name: string;
+  details?: string;
+  created_at?: string;
+}
+
 export interface Sneaker {
   id: string;
   name: string;
-  brand: Brand;
+  brand?: string;
+  category?: string;
   price: number;
   original_price?: number;
   image: string;
@@ -75,6 +95,7 @@ export interface Order {
   timeline: TimelineEvent[];
   shipping_name?: string;
   shipping_rate?: number;
+  payment_method?: string;
   created_at?: string;
 }
 
