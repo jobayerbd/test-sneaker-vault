@@ -73,7 +73,17 @@ const App: React.FC = () => {
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'auto' });
     trackFBPixel('PageView');
-  }, [currentView]);
+    
+    // Track InitiateCheckout when user hits checkout page
+    if (currentView === 'checkout') {
+      trackFBPixel('InitiateCheckout', {
+        content_category: 'Sneakers',
+        num_items: cart.length,
+        value: cart.reduce((acc, item) => acc + (item.price * item.quantity), 0),
+        currency: 'BDT'
+      });
+    }
+  }, [currentView, cart]);
 
   const fetchSneakers = useCallback(async () => {
     setIsFetchingSneakers(true);
@@ -167,7 +177,15 @@ const App: React.FC = () => {
       }
       return [...prev, item];
     });
-    trackFBPixel('AddToCart', { content_ids: [item.id], content_name: item.name, value: item.price, currency: 'BDT' });
+    
+    trackFBPixel('AddToCart', { 
+      content_ids: [item.id], 
+      content_name: item.name, 
+      content_type: 'product',
+      value: item.price, 
+      currency: 'BDT' 
+    });
+
     if (shouldCheckout) {
       setCurrentView('checkout');
       setIsCartSidebarOpen(false);
@@ -180,6 +198,16 @@ const App: React.FC = () => {
     setWishlist(prev => {
       const exists = prev.find(s => s.id === sneaker.id);
       if (exists) return prev.filter(s => s.id !== sneaker.id);
+      
+      // Track AddToWishlist
+      trackFBPixel('AddToWishlist', {
+        content_ids: [sneaker.id],
+        content_name: sneaker.name,
+        content_type: 'product',
+        value: sneaker.price,
+        currency: 'BDT'
+      });
+      
       return [...prev, sneaker];
     });
   };
@@ -230,6 +258,16 @@ const App: React.FC = () => {
       });
       if (response.ok) {
         const saved = (await response.json())[0];
+        
+        // Track Purchase Event
+        trackFBPixel('Purchase', {
+          value: total,
+          currency: 'BDT',
+          content_ids: cart.map(item => item.id),
+          content_type: 'product',
+          num_items: cart.length
+        });
+
         setOrders(prev => [saved, ...prev]);
         setLastOrder(saved);
         setCart([]);
@@ -243,7 +281,21 @@ const App: React.FC = () => {
     else setCurrentView('admin-login');
   };
 
-  const handleSelectProduct = (sneaker: Sneaker) => { setSelectedProduct(sneaker); setCurrentView('pdp'); setIsCartSidebarOpen(false); };
+  const handleSelectProduct = (sneaker: Sneaker) => { 
+    setSelectedProduct(sneaker); 
+    setCurrentView('pdp'); 
+    setIsCartSidebarOpen(false); 
+    
+    // Track ViewContent Event
+    trackFBPixel('ViewContent', {
+      content_ids: [sneaker.id],
+      content_name: sneaker.name,
+      content_type: 'product',
+      content_category: sneaker.category || 'Sneakers',
+      value: sneaker.price,
+      currency: 'BDT'
+    });
+  };
   
   const handleSaveProduct = async (data: any): Promise<boolean> => {
     const isUpdate = !!data.id;
