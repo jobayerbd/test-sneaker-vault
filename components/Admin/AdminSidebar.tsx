@@ -1,7 +1,7 @@
 
 import React from 'react';
 
-type AdminSubView = 'overview' | 'orders' | 'inventory' | 'settings' | 'customers' | 'order-detail' | 'product-form' | 'brands' | 'categories';
+type AdminSubView = 'overview' | 'orders' | 'inventory' | 'settings' | 'customers' | 'order-detail' | 'product-form' | 'brands' | 'categories' | 'slider';
 
 interface AdminSidebarProps {
   currentView: AdminSubView;
@@ -14,6 +14,7 @@ const AdminSidebar: React.FC<AdminSidebarProps> = ({ currentView, onNavigate, on
     { id: 'overview', icon: 'fa-gauge-high', label: 'Overview' },
     { id: 'orders', icon: 'fa-folder-tree', label: 'Orders' },
     { id: 'inventory', icon: 'fa-cubes-stacked', label: 'Inventory' },
+    { id: 'slider', icon: 'fa-images', label: 'Slider Hub' },
     { id: 'brands', icon: 'fa-tags', label: 'Brands' },
     { id: 'categories', icon: 'fa-layer-group', label: 'Categories' },
     { id: 'settings', icon: 'fa-gears', label: 'Settings' }

@@ -71,6 +71,17 @@ export interface ShippingOption {
   created_at?: string;
 }
 
+export interface HomeSlide {
+  id: string;
+  image: string;
+  headline: string;
+  subtext: string;
+  button_text: string;
+  button_link: string;
+  active: boolean;
+  order: number;
+}
+
 export interface OrderItem {
   sneakerId: string;
   name: string;

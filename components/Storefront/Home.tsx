@@ -1,21 +1,22 @@
 
 import React from 'react';
-import { Sneaker } from '../../types';
+import { Sneaker, HomeSlide } from '../../types';
+import HeroSlider from './HeroSlider';
 
 interface HomeProps {
   sneakers: Sneaker[];
+  slides: HomeSlide[];
   onSelectProduct: (sneaker: Sneaker) => void;
   onNavigate: (view: any) => void;
 }
 
-const Home: React.FC<HomeProps> = ({ sneakers, onSelectProduct, onNavigate }) => {
+const Home: React.FC<HomeProps> = ({ sneakers, slides, onSelectProduct, onNavigate }) => {
   const sections = [
     { title: "NEW ARRIVAL", data: sneakers.filter(s => !s.is_drop).slice(0, 4) },
     { title: "HYPE DROPS", subtitle: "EXCLUSIVE LIMITED RELEASES", data: sneakers.filter(s => s.is_drop).slice(0, 4) },
     { title: "TRENDING NOW", data: sneakers.filter(s => s.trending).slice(0, 4) },
   ];
 
-  // Fix: Explicitly type ProductCard as React.FC to avoid issues with reserved 'key' prop during map()
   const ProductCard: React.FC<{ sneaker: Sneaker }> = ({ sneaker }) => (
     <div 
       onClick={() => onSelectProduct(sneaker)}
@@ -41,23 +42,8 @@ const Home: React.FC<HomeProps> = ({ sneakers, onSelectProduct, onNavigate }) =>
 
   return (
     <div className="bg-white">
-      {/* Hero Banner */}
-      <div className="relative w-full aspect-[21/9] bg-[#B91C1C] overflow-hidden">
-        <div className="absolute inset-0 opacity-10 pointer-events-none">
-          <div className="grid grid-cols-12 h-full w-full">
-            {Array.from({ length: 48 }).map((_, i) => (
-              <i key={i} className="fa-solid fa-shield-halved text-white text-4xl m-auto"></i>
-            ))}
-          </div>
-        </div>
-        <div className="relative h-full flex flex-col items-center justify-center text-center px-4">
-          <p className="text-yellow-400 text-xs md:text-lg font-black mb-2 tracking-[0.4em] uppercase italic">The Vault Is Open</p>
-          <h1 className="text-white text-5xl md:text-9xl font-black font-heading leading-none drop-shadow-2xl italic">
-            AUTHENTIC <br />
-            <span className="text-yellow-400 italic text-3xl md:text-7xl block mt-2">GRAILS ONLY</span>
-          </h1>
-        </div>
-      </div>
+      {/* Dynamic Hero Slider */}
+      <HeroSlider slides={slides} onNavigate={onNavigate} />
 
       {/* Sections */}
       <div className="max-w-7xl mx-auto px-4 py-12 space-y-24">
