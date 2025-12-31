@@ -27,6 +27,7 @@ const ProductDetail: React.FC<ProductDetailProps> = ({
   const [loadingAi, setLoadingAi] = useState(false);
   const [quantity, setQuantity] = useState(1);
   const [activeTab, setActiveTab] = useState('DESCRIPTION');
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchHype = async () => {
@@ -40,11 +41,14 @@ const ProductDetail: React.FC<ProductDetailProps> = ({
     setMainImage(sneaker.image);
     setSelectedSize('');
     setQuantity(1);
+    setError(null);
   }, [sneaker]);
 
   const handleAction = (directToCheckout: boolean = false) => {
     if (!selectedSize) {
-      alert('Please select a size to proceed with the protocol.');
+      setError('PROTOCOL ERROR: SIZE INDEX NOT SELECTED');
+      // Auto clear after 3 seconds
+      setTimeout(() => setError(null), 3000);
       return;
     }
     
@@ -150,7 +154,10 @@ const ProductDetail: React.FC<ProductDetailProps> = ({
                   <button
                     key={v.size}
                     disabled={v.stock === 0}
-                    onClick={() => setSelectedSize(v.size)}
+                    onClick={() => {
+                      setSelectedSize(v.size);
+                      setError(null);
+                    }}
                     className={`
                       py-3 text-[11px] font-black border transition-all duration-300
                       ${selectedSize === v.size ? 'border-black bg-black text-white shadow-xl scale-105' : 'border-gray-100 text-gray-600 hover:border-gray-300'}
@@ -163,37 +170,46 @@ const ProductDetail: React.FC<ProductDetailProps> = ({
               </div>
             </div>
 
-            <div className="flex flex-col sm:flex-row items-stretch gap-4 mb-10">
-              <div className="flex items-center border-2 border-gray-100 h-14 rounded-xl overflow-hidden bg-gray-50/50">
+            <div className="flex flex-col gap-4 mb-10">
+              {/* Custom In-Page Alert */}
+              {error && (
+                <div className="bg-red-600 text-white p-3 rounded-xl flex items-center justify-center gap-3 animate-in slide-in-from-top-2 duration-300">
+                  <i className="fa-solid fa-triangle-exclamation animate-pulse"></i>
+                  <span className="text-[9px] font-black uppercase tracking-widest italic">{error}</span>
+                </div>
+              )}
+
+              {/* Quantity Selector - Large & Circular */}
+              <div className="flex items-center border-2 border-gray-100 h-16 rounded-full overflow-hidden bg-gray-50/50">
                 <button 
                   onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                  className="w-12 h-full hover:bg-white transition-colors font-black"
+                  className="w-16 h-full hover:bg-white transition-colors font-black text-xl"
                 >-</button>
-                <input 
-                  type="number" 
-                  readOnly 
-                  value={quantity} 
-                  className="w-12 text-center bg-transparent font-black text-sm outline-none no-spinner"
-                />
+                <div className="flex-1 text-center font-black text-base tracking-widest">
+                  {quantity}
+                </div>
                 <button 
                   onClick={() => setQuantity(quantity + 1)}
-                  className="w-12 h-full hover:bg-white transition-colors font-black"
+                  className="w-16 h-full hover:bg-white transition-colors font-black text-xl"
                 >+</button>
               </div>
               
-              <button 
-                onClick={() => handleAction(false)}
-                className="flex-1 h-14 bg-white border-2 border-black text-black font-black uppercase text-[11px] tracking-[0.2em] hover:bg-black hover:text-white transition-all duration-300 rounded-xl"
-              >
-                Add to Cart
-              </button>
-              
-              <button 
-                onClick={() => handleAction(true)}
-                className="flex-1 h-14 bg-red-700 text-white font-black uppercase text-[11px] tracking-[0.2em] hover:bg-black transition-all duration-300 rounded-xl shadow-xl shadow-red-700/20 active:scale-95"
-              >
-                Buy Now
-              </button>
+              {/* Action Buttons - SIDE-BY-SIDE ON THE SAME LINE */}
+              <div className="flex flex-row gap-2 sm:gap-4 h-16">
+                <button 
+                  onClick={() => handleAction(false)}
+                  className="flex-1 h-full bg-white border-2 border-black text-black font-black uppercase text-[9px] sm:text-[11px] tracking-widest hover:bg-black hover:text-white transition-all duration-300 rounded-full flex items-center justify-center px-1"
+                >
+                  ADD TO CART
+                </button>
+                
+                <button 
+                  onClick={() => handleAction(true)}
+                  className="flex-1 h-full bg-red-700 text-white font-black uppercase text-[9px] sm:text-[11px] tracking-widest hover:bg-black transition-all duration-300 rounded-full shadow-lg shadow-red-700/10 active:scale-95 flex items-center justify-center px-1"
+                >
+                  BUY NOW
+                </button>
+              </div>
             </div>
 
             <div className="border-t border-gray-50 pt-8 space-y-4">
