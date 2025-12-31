@@ -10,6 +10,7 @@ interface ProductDetailProps {
   onBack: () => void;
   onToggleWishlist: (sneaker: Sneaker) => void;
   isInWishlist: boolean;
+  onSelectProduct: (sneaker: Sneaker) => void;
 }
 
 const ProductDetail: React.FC<ProductDetailProps> = ({ 
@@ -17,7 +18,8 @@ const ProductDetail: React.FC<ProductDetailProps> = ({
   onAddToCart, 
   onBack, 
   onToggleWishlist, 
-  isInWishlist
+  isInWishlist,
+  onSelectProduct
 }) => {
   const [selectedSize, setSelectedSize] = useState<string>('');
   const [mainImage, setMainImage] = useState(sneaker.image);
@@ -43,7 +45,6 @@ const ProductDetail: React.FC<ProductDetailProps> = ({
   const handleAction = (directToCheckout: boolean = false) => {
     if (!selectedSize) {
       alert('Please select a size to proceed with the protocol.');
-      // Optional: scroll to size selection or highlight it
       return;
     }
     
@@ -254,7 +255,7 @@ const ProductDetail: React.FC<ProductDetailProps> = ({
             {relatedProducts.map(s => (
               <div 
                 key={s.id} 
-                onClick={() => { window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                onClick={() => onSelectProduct(s)}
                 className="group cursor-pointer"
               >
                 <div className="relative aspect-[4/5] overflow-hidden border border-gray-100 mb-4 bg-white">
