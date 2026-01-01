@@ -803,7 +803,7 @@ const App: React.FC = () => {
                 <div className="grid grid-cols-2 gap-6">
                   {checkoutFields.filter(f => f.enabled).sort((a,b) => a.order - b.order).map((field) => (
                     <div key={field.id} className={`${field.width === 'half' ? 'col-span-1' : 'col-span-2'} space-y-1`}>
-                      <label className="text-[9px] font-black uppercase text-gray-400 px-1">{field.label} {field.required && '*'}</label>
+                      <label className="text-[10px] font-black uppercase text-black px-1 tracking-widest">{field.label} {field.required && '*'}</label>
                       <input 
                         type={field.type} 
                         placeholder={field.placeholder.toUpperCase()} 
@@ -829,7 +829,7 @@ const App: React.FC = () => {
                     >
                       <div className="flex flex-col">
                         <span className="font-black text-[10px] uppercase tracking-widest mb-1">{o.name}</span>
-                        <span className={`text-[9px] font-bold ${selectedShipping?.id === o.id ? 'text-gray-400' : 'text-gray-400'} uppercase`}>Transit Protocol</span>
+                        <span className={`text-[9px] font-bold ${selectedShipping?.id === o.id ? 'text-gray-300' : 'text-black'} uppercase`}>Transit Protocol</span>
                       </div>
                       <span className="font-black italic text-sm">{o.rate}৳</span>
                     </div>
@@ -858,11 +858,11 @@ const App: React.FC = () => {
             <div className="bg-black text-white p-10 rounded-3xl h-fit shadow-2xl sticky top-24">
               <h3 className="text-xl font-black uppercase italic border-b border-white/10 pb-6 mb-8 tracking-tighter font-heading">Settlement Summary</h3>
               <div className="space-y-4 mb-8">
-                <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-gray-500">
+                <div className="flex justify-between text-[11px] font-black uppercase tracking-widest text-white">
                   <span>Subtotal Value</span>
                   <span>{cart.reduce((acc, item) => acc + (item.price * item.quantity), 0).toLocaleString()}৳</span>
                 </div>
-                <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-gray-500">
+                <div className="flex justify-between text-[11px] font-black uppercase tracking-widest text-white">
                   <span>Logistics Fee</span>
                   <span>{selectedShipping?.rate || 0}৳</span>
                 </div>
