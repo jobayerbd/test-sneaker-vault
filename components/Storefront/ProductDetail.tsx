@@ -46,7 +46,7 @@ const ProductDetail: React.FC<ProductDetailProps> = ({
 
   const handleAction = (directToCheckout: boolean = false) => {
     if (!selectedSize) {
-      setError('PROTOCOL ERROR: SIZE INDEX NOT SELECTED');
+      setError('ERROR: PLEASE SELECT A SIZE');
       // Auto clear after 3 seconds
       setTimeout(() => setError(null), 3000);
       return;
@@ -63,7 +63,6 @@ const ProductDetail: React.FC<ProductDetailProps> = ({
 
   const navigateToCategory = (cat: string) => {
     // We use the browser history API to trigger the category filter in App.tsx
-    // Constructed without leading slash to avoid SecurityError in blob/sandbox environments
     const queryString = `?category=${cat.toLowerCase().replace(/\s+/g, '-')}`;
     try {
       window.history.pushState({ view: 'shop', category: cat.toLowerCase() }, '', window.location.pathname + queryString);
@@ -71,8 +70,6 @@ const ProductDetail: React.FC<ProductDetailProps> = ({
       window.dispatchEvent(new PopStateEvent('popstate'));
     } catch (e) {
       console.warn('SneakerVault: Deep-link history blocked.', e);
-      // Fallback: manually update current location for local app state if possible, 
-      // but App.tsx handles state via the dispatchEvent if history fails
     }
   };
 
@@ -83,9 +80,9 @@ const ProductDetail: React.FC<ProductDetailProps> = ({
       <div className="max-w-7xl mx-auto px-4 py-6">
         {/* Breadcrumbs */}
         <div className="text-[10px] text-gray-400 font-black uppercase tracking-widest mb-8 flex items-center space-x-2">
-          <button className="cursor-pointer hover:text-black transition-colors" onClick={onBack}>ARCHIVES</button>
+          <button className="cursor-pointer hover:text-black transition-colors" onClick={onBack}>SHOP</button>
           <span className="text-gray-200">/</span>
-          <span className="text-gray-400">{sneaker.brand || 'UNBRANDED'}</span>
+          <span className="text-gray-400">{sneaker.brand || 'BRAND'}</span>
           <span className="text-gray-200">/</span>
           <span className="text-black italic">{sneaker.name}</span>
         </div>
@@ -116,7 +113,7 @@ const ProductDetail: React.FC<ProductDetailProps> = ({
               />
               {sneaker.is_drop && (
                 <div className="absolute top-6 left-6 bg-red-600 text-[10px] text-white font-black px-4 py-2 uppercase tracking-[0.2em] italic shadow-2xl animate-pulse">
-                  Vault Priority
+                  FEATURED
                 </div>
               )}
             </div>
@@ -139,7 +136,7 @@ const ProductDetail: React.FC<ProductDetailProps> = ({
           <div className="lg:col-span-6 flex flex-col">
             <div className="flex justify-between items-start">
               <div>
-                <p className="text-[10px] font-black text-red-600 uppercase tracking-[0.4em] mb-2 italic">{sneaker.brand || 'Vault Original'}</p>
+                <p className="text-[10px] font-black text-red-600 uppercase tracking-[0.4em] mb-2 italic">{sneaker.brand || 'Store Exclusive'}</p>
                 <h1 className="text-3xl font-black font-heading text-gray-900 leading-tight mb-4 uppercase italic tracking-tight">{sneaker.name}</h1>
               </div>
               <button 
@@ -159,7 +156,7 @@ const ProductDetail: React.FC<ProductDetailProps> = ({
             <div className="mb-8">
               <div className="flex justify-between items-end mb-4">
                 <label className="text-[10px] font-black text-gray-900 uppercase tracking-widest">
-                  Protocol Size Index <span className="text-red-600 ml-2">{selectedSize ? `[${selectedSize}]` : '[SELECT]'}</span>
+                  SELECT SIZE <span className="text-red-600 ml-2">{selectedSize ? `[${selectedSize}]` : '[SELECT]'}</span>
                 </label>
                 <button className="text-[9px] font-black text-gray-400 uppercase tracking-widest hover:text-black underline underline-offset-4">Size Guide</button>
               </div>
@@ -194,7 +191,7 @@ const ProductDetail: React.FC<ProductDetailProps> = ({
                 </div>
               )}
 
-              {/* Quantity Selector - Large & Circular */}
+              {/* Quantity Selector */}
               <div className="flex items-center border-2 border-gray-100 h-16 rounded-full overflow-hidden bg-gray-50/50">
                 <button 
                   onClick={() => setQuantity(Math.max(1, quantity - 1))}
@@ -229,12 +226,12 @@ const ProductDetail: React.FC<ProductDetailProps> = ({
 
             <div className="border-t border-gray-50 pt-8 space-y-4">
               <div className="flex items-center space-x-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-                <div className="flex items-center"><i className="fa-solid fa-truck-fast text-red-600 mr-2"></i> Fast Transit</div>
-                <div className="flex items-center"><i className="fa-solid fa-shield-check text-red-600 mr-2"></i> Authenticated</div>
-                <div className="flex items-center"><i className="fa-solid fa-rotate text-red-600 mr-2"></i> Easy Return</div>
+                <div className="flex items-center"><i className="fa-solid fa-truck-fast text-red-600 mr-2"></i> Fast Delivery</div>
+                <div className="flex items-center"><i className="fa-solid fa-shield-check text-red-600 mr-2"></i> Authentic</div>
+                <div className="flex items-center"><i className="fa-solid fa-rotate text-red-600 mr-2"></i> Easy Returns</div>
               </div>
               <div className="text-[9px] text-gray-400 uppercase font-black tracking-widest leading-relaxed">
-                <p className="mb-1">ID: SV_{sneaker.id}_PRT</p>
+                <p className="mb-1">PRODUCT ID: {sneaker.id}</p>
                 <div className="flex flex-wrap items-center gap-x-2">
                   <span>CATEGORIES:</span>
                   {(sneaker.categories || [sneaker.category || 'GENERAL']).map((cat, idx) => (
@@ -247,9 +244,7 @@ const ProductDetail: React.FC<ProductDetailProps> = ({
                     </button>
                   ))}
                   <span className="text-gray-200">|</span>
-                  <span>{sneaker.brand || 'VAULT'}</span>
-                  <span className="text-gray-200">|</span>
-                  <span>SEASON_24</span>
+                  <span>{sneaker.brand || 'STORE'}</span>
                 </div>
               </div>
             </div>
@@ -277,7 +272,7 @@ const ProductDetail: React.FC<ProductDetailProps> = ({
                 <p className="text-xs text-gray-500 leading-8 text-center italic font-medium whitespace-pre-wrap">
                   {loadingAi ? (
                     <span className="flex items-center justify-center gap-2">
-                      <i className="fa-solid fa-circle-notch animate-spin"></i> Analyzing asset aesthetics...
+                      <i className="fa-solid fa-circle-notch animate-spin"></i> Analyzing product details...
                     </span>
                   ) : (sneaker.description || aiDescription)}
                 </p>
@@ -285,7 +280,7 @@ const ProductDetail: React.FC<ProductDetailProps> = ({
             )}
             {activeTab !== 'DESCRIPTION' && (
               <div className="text-center py-10 text-gray-200 italic text-xs uppercase tracking-widest font-black">
-                Registry records currently encrypted.
+                No information available at this time.
               </div>
             )}
           </div>
@@ -294,7 +289,7 @@ const ProductDetail: React.FC<ProductDetailProps> = ({
         {/* Related Products */}
         <div className="mt-32">
           <div className="flex flex-col items-center mb-12">
-            <h2 className="text-xl font-black text-black font-heading italic tracking-[0.2em] uppercase">Tactical Alternatives</h2>
+            <h2 className="text-xl font-black text-black font-heading italic tracking-[0.2em] uppercase">Recommended Products</h2>
             <div className="w-12 h-1 bg-red-600 mt-4"></div>
           </div>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-8">
