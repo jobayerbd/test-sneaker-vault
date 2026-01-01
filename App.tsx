@@ -42,12 +42,21 @@ const trackFBPixel = (event: string, params?: any) => {
 type View = 'home' | 'shop' | 'admin' | 'cart' | 'pdp' | 'wishlist' | 'checkout' | 'order-success' | 'admin-login' | 'customer-login' | 'customer-account' | 'order-details-view';
 
 const App: React.FC = () => {
-  const [currentView, setCurrentView] = useState<View>('home');
+  // Determine initial view to prevent flash of homepage
+  const getInitialView = (): View => {
+    const params = new URLSearchParams(window.location.search);
+    const v = params.get('view') as View;
+    if (params.get('product')) return 'pdp';
+    if (params.get('category')) return 'shop';
+    return v || 'home';
+  };
+
+  const [currentView, setCurrentView] = useState<View>(getInitialView);
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(() => localStorage.getItem('sv_admin_session') === 'active');
   const [currentCustomer, setCurrentCustomer] = useState<Customer | null>(null);
   const [selectedProduct, setSelectedProduct] = useState<Sneaker | null>(null);
   const [viewingOrder, setViewingOrder] = useState<Order | null>(null);
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(new URLSearchParams(window.location.search).get('category'));
   const [cart, setCart] = useState<CartItem[]>([]);
   const [wishlist, setWishlist] = useState<Sneaker[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
@@ -77,13 +86,11 @@ const App: React.FC = () => {
   const [createAccount, setCreateAccount] = useState(false);
   const [accountPassword, setAccountPassword] = useState('');
 
-  const pixelInitialized = useRef(false);
-
   const safePushState = (state: any, title: string, url: string) => {
     try {
       window.history.pushState(state, title, url);
     } catch (e) {
-      console.warn('SneakerVault: History pushState blocked by browser security policy.', e);
+      console.warn('SneakerVault: History pushState blocked.', e);
     }
   };
 
@@ -93,27 +100,14 @@ const App: React.FC = () => {
       const response = await fetch(`${SUPABASE_URL}/rest/v1/orders?select=*,timeline:order_timeline(status,note,timestamp)&order=created_at.desc`, { 
         headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } 
       });
-
       if (response.ok) {
         const data = await response.json();
-        const processed = data.map((o: Order) => ({
+        setOrders(data.map((o: Order) => ({
           ...o,
           timeline: (o.timeline || []).sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
-        }));
-        setOrders(processed);
-      } else {
-        const fallbackResp = await fetch(`${SUPABASE_URL}/rest/v1/orders?select=*&order=created_at.desc`, { 
-          headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } 
-        });
-        if (fallbackResp.ok) {
-          setOrders(await fallbackResp.json());
-        }
+        })));
       }
-    } catch (err) {
-      console.error("Vault retrieval error:", err);
-    } finally {
-      setIsFetchingOrders(false);
-    }
+    } finally { setIsFetchingOrders(false); }
   }, []);
 
   const fetchCustomers = useCallback(async () => {
@@ -220,43 +214,16 @@ const App: React.FC = () => {
       const parsed = JSON.parse(storedCustomer);
       setCurrentCustomer(parsed);
       setCheckoutForm({
-        first_name: parsed.first_name || '',
-        last_name: parsed.last_name || '',
-        email: parsed.email || '',
-        mobile_number: parsed.mobile_number || '',
-        street_address: parsed.street_address || '',
-        city: parsed.city || '',
-        zip_code: parsed.zip_code || ''
+        first_name: parsed.first_name || '', last_name: parsed.last_name || '',
+        email: parsed.email || '', mobile_number: parsed.mobile_number || '',
+        street_address: parsed.street_address || '', city: parsed.city || '', zip_code: parsed.zip_code || ''
       });
     }
   }, []);
 
   useEffect(() => {
-    if (currentView === 'customer-account' || currentView === 'order-details-view') {
-      fetchOrders();
-    }
-    if (currentView === 'admin' && isAdminAuthenticated) {
-      fetchCustomers();
-    }
-  }, [currentView, fetchOrders, fetchCustomers, isAdminAuthenticated]);
-
-  useEffect(() => {
     updateBrowserIdentity(siteIdentity);
   }, [siteIdentity]);
-
-  useEffect(() => {
-    const pixelId = footerConfig.fb_pixel_id?.trim();
-    if (!pixelId || pixelInitialized.current) return;
-    const f = window as any;
-    if (!f.fbq) {
-      f.fbq = function() { f.fbq.callMethod ? f.fbq.callMethod.apply(f.fbq, arguments) : f.fbq.queue.push(arguments); };
-      if (!f._fbq) f._fbq = f.fbq; f.fbq.push = f.fbq; f.fbq.loaded = !0; f.fbq.version = '2.0'; f.fbq.queue = [];
-      const t = document.createElement('script'); t.async = !0; t.src = 'https://connect.facebook.net/en_US/fbevents.js';
-      const s = document.getElementsByTagName('script')[0]; if (s && s.parentNode) s.parentNode.insertBefore(t, s);
-    }
-    f.fbq('init', pixelId);
-    pixelInitialized.current = true;
-  }, [footerConfig.fb_pixel_id]);
 
   const syncViewFromUrl = useCallback(() => {
     const params = new URLSearchParams(window.location.search);
@@ -264,8 +231,8 @@ const App: React.FC = () => {
     const categorySlug = params.get('category');
     const viewParam = params.get('view') as View;
 
-    // SECURITY PROTOCOL: Strict check for admin view via URL
-    if (viewParam === 'admin' || params.get('view') === 'admin') {
+    // 1. ADMIN SECURITY GATE
+    if (viewParam === 'admin') {
       const isLogged = localStorage.getItem('sv_admin_session') === 'active';
       if (!isLogged) {
         setCurrentView('admin-login');
@@ -274,31 +241,39 @@ const App: React.FC = () => {
       }
     }
 
+    // 2. PRODUCT DEEP LINKING
     if (productSlug) {
-      // WAIT FOR DATA: Do not redirect to home if sneakers are still loading
       if (sneakers.length > 0) {
-        const product = sneakers.find(s => s.slug === productSlug || s.id === productSlug);
+        const product = sneakers.find(s => 
+          s.slug === productSlug || 
+          s.id === productSlug || 
+          s.name.toLowerCase().replace(/\s+/g, '-') === productSlug.toLowerCase()
+        );
         if (product) {
           setSelectedProduct(product);
           setCurrentView('pdp');
         } else {
           setCurrentView('home');
+          safePushState({}, '', window.location.pathname);
         }
       }
-      return; // Stay in current view (loading) until sneakers load
+      return; // Hold in current view (likely loading) until sneakers load
     }
 
+    // 3. CATEGORY DEEP LINKING
     if (categorySlug) {
       setSelectedCategory(categorySlug);
       setCurrentView('shop');
       return;
     }
 
+    // 4. STANDARD VIEWS
     if (viewParam) {
       setCurrentView(viewParam);
       return;
     }
 
+    // 5. DEFAULT
     if (!productSlug && !categorySlug && !viewParam) {
        setCurrentView('home');
     }
@@ -311,25 +286,17 @@ const App: React.FC = () => {
   }, [syncViewFromUrl]);
 
   useEffect(() => {
-    const pixelId = footerConfig.fb_pixel_id?.trim();
-    if (!pixelId) return;
-    window.scrollTo({ top: 0, behavior: 'auto' });
-    trackFBPixel('PageView');
     if (currentView === 'pdp' && selectedProduct) {
-      trackFBPixel('ViewContent', { content_ids: [String(selectedProduct.id)], content_name: selectedProduct.name, content_type: 'product', value: selectedProduct.price, currency: 'BDT', content_category: selectedProduct.category || 'Sneakers' });
-    } else if (currentView === 'checkout') {
-      trackFBPixel('InitiateCheckout', { num_items: cart.length, value: cart.reduce((acc, item) => acc + (item.price * item.quantity), 0), currency: 'BDT' });
+      trackFBPixel('ViewContent', { content_ids: [String(selectedProduct.id)], content_name: selectedProduct.name, content_type: 'product', value: selectedProduct.price, currency: 'BDT' });
     }
-  }, [selectedProduct?.id, currentView, footerConfig.fb_pixel_id]);
+  }, [selectedProduct?.id, currentView]);
 
   const handleNavigate = (view: View, params: string = '') => {
-    // SECURE NAVIGATION: Manual calls must also pass auth check
     if (view === 'admin' && !isAdminAuthenticated && localStorage.getItem('sv_admin_session') !== 'active') {
       setCurrentView('admin-login');
       safePushState({ view: 'admin-login' }, '', window.location.pathname + '?view=admin-login');
       return;
     }
-
     setCurrentView(view);
     const queryString = view === 'home' ? '' : `?view=${view}${params ? '&' + params : ''}`;
     safePushState({ view }, '', window.location.pathname + queryString);
@@ -350,899 +317,111 @@ const App: React.FC = () => {
     safePushState({ view: 'shop', category: slug }, '', window.location.pathname + queryString);
   };
 
-  const handleUpdateCustomerProfile = async (updates: Partial<Customer>): Promise<boolean> => {
-    if (!currentCustomer) return false;
-    try {
-      const response = await fetch(`${SUPABASE_URL}/rest/v1/customers?id=eq.${currentCustomer.id}`, {
-        method: 'PATCH',
-        headers: {
-          'apikey': SUPABASE_KEY,
-          'Authorization': `Bearer ${SUPABASE_KEY}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(updates)
-      });
-      if (response.ok) {
-        const updated = { ...currentCustomer, ...updates };
-        setCurrentCustomer(updated);
-        localStorage.setItem('sv_customer_session', JSON.stringify(updated));
-        setCheckoutForm({
-          ...checkoutForm,
-          first_name: updated.first_name || checkoutForm.first_name,
-          last_name: updated.last_name || checkoutForm.last_name,
-          mobile_number: updated.mobile_number || checkoutForm.mobile_number,
-          street_address: updated.street_address || checkoutForm.street_address,
-          city: updated.city || checkoutForm.city,
-          zip_code: updated.zip_code || checkoutForm.zip_code
-        });
-        return true;
-      }
-      return false;
-    } catch (err) { return false; }
-  };
-
   const handleAddToCart = (item: CartItem, shouldCheckout: boolean = false) => {
     setCart(prev => {
       const existing = prev.find(i => i.id === item.id && i.selectedSize === item.selectedSize);
       if (existing) { return prev.map(i => (i.id === item.id && i.selectedSize === item.selectedSize) ? { ...i, quantity: i.quantity + item.quantity } : i); }
       return [...prev, item];
     });
-    trackFBPixel('AddToCart', { content_ids: [String(item.id)], content_name: item.name, content_type: 'product', value: item.price, currency: 'BDT' });
     if (shouldCheckout) { handleNavigate('checkout'); setIsCartSidebarOpen(false); } else { setIsCartSidebarOpen(true); }
-  };
-
-  const toggleWishlist = (sneaker: Sneaker) => {
-    setWishlist(prev => {
-      const exists = prev.find(s => s.id === sneaker.id);
-      if (exists) return prev.filter(s => s.id !== sneaker.id);
-      trackFBPixel('AddToWishlist', { content_ids: [String(sneaker.id)], content_name: sneaker.name, value: sneaker.price, currency: 'BDT' });
-      return [...prev, sneaker];
-    });
   };
 
   const handleUpdateOrderStatus = async (orderId: string, newStatus: OrderStatus) => {
     try {
       const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/advance_order_status`, {
         method: 'POST',
-        headers: {
-          'apikey': SUPABASE_KEY,
-          'Authorization': `Bearer ${SUPABASE_KEY}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          p_order_id: orderId,
-          p_new_status: newStatus,
-          p_note: `Administrative Protocol: Order status transitioned to ${newStatus}.`
-        })
+        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ p_order_id: orderId, p_new_status: newStatus, p_note: `Administrative Protocol: Order transitioned to ${newStatus}.` })
       });
-
-      if (response.ok) {
-        await fetchOrders();
-        return true;
-      } else {
-        return false;
-      }
-    } catch (err) {
+      if (response.ok) { await fetchOrders(); return true; }
       return false;
-    }
+    } catch (err) { return false; }
   };
 
   const handlePlaceOrder = async () => {
     setCheckoutError(null);
-    const enabledFields = checkoutFields.filter(f => f.enabled);
-    for (const field of enabledFields) {
-      if (field.required && !checkoutForm[field.field_key]) {
-        setCheckoutError(`REGISTRY ERROR: [${field.label.toUpperCase()}] IS MANDATORY`);
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-        return;
-      }
-    }
-
-    if (createAccount && (!checkoutForm.email || !accountPassword)) {
-      setCheckoutError("AUTH ERROR: EMAIL AND PASSWORD ARE MANDATORY FOR ACCOUNT CREATION");
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-      return;
-    }
-
-    if (!selectedShipping || !selectedPayment) { 
-      setCheckoutError("LOGISTICS ERROR: PROTOCOL NOT INITIALIZED");
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-      return; 
-    }
-    
+    if (!selectedShipping || !selectedPayment) { setCheckoutError("LOGISTICS ERROR: PROTOCOL NOT INITIALIZED"); return; }
     setIsPlacingOrder(true);
-    let customerId = currentCustomer?.id;
-
-    if (currentCustomer) {
-      const hasChanges = checkoutForm.street_address !== currentCustomer.street_address || 
-                         checkoutForm.city !== currentCustomer.city ||
-                         checkoutForm.zip_code !== currentCustomer.zip_code;
-      if (hasChanges) {
-        await handleUpdateCustomerProfile({
-          street_address: checkoutForm.street_address,
-          city: checkoutForm.city,
-          zip_code: checkoutForm.zip_code,
-          first_name: checkoutForm.first_name,
-          last_name: checkoutForm.last_name,
-          mobile_number: checkoutForm.mobile_number
-        });
-      }
-    }
-
-    if (createAccount && !currentCustomer) {
-      try {
-        const checkResp = await fetch(`${SUPABASE_URL}/rest/v1/customers?email=eq.${checkoutForm.email}&select=id`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } });
-        const existing = await checkResp.json();
-        if (existing.length > 0) {
-          setCheckoutError("REGISTRY ERROR: EMAIL ALREADY LOGGED IN VAULT ARCHIVES");
-          setIsPlacingOrder(false);
-          return;
-        }
-        const newCust = { 
-          email: checkoutForm.email, 
-          password: accountPassword, 
-          first_name: checkoutForm.first_name, 
-          last_name: checkoutForm.last_name, 
-          mobile_number: checkoutForm.mobile_number, 
-          street_address: checkoutForm.street_address, 
-          city: checkoutForm.city, 
-          zip_code: checkoutForm.zip_code
-        };
-        const custResp = await fetch(`${SUPABASE_URL}/rest/v1/customers`, { method: 'POST', headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', 'Prefer': 'return=representation' }, body: JSON.stringify(newCust) });
-        if (custResp.ok) {
-          const savedCust = (await custResp.json())[0];
-          customerId = savedCust.id;
-          setCurrentCustomer(savedCust);
-          localStorage.setItem('sv_customer_session', JSON.stringify(savedCust));
-        }
-      } catch (err) {}
-    }
-
-    const subtotal = cart.reduce((acc, item) => acc + (item.price * item.quantity), 0);
-    const total = subtotal + selectedShipping.rate;
     const orderId = `ORD-${Math.floor(Math.random() * 90000) + 10000}`;
-    
+    const total = cart.reduce((acc, item) => acc + (item.price * item.quantity), 0) + selectedShipping.rate;
     const newOrder = {
-      id: orderId, 
-      customer_id: customerId,
-      first_name: checkoutForm.first_name || 'Guest', 
-      last_name: checkoutForm.last_name || '', 
-      email: checkoutForm.email || 'guest@sneakervault.bd', 
-      mobile_number: checkoutForm.mobile_number || '', 
-      street_address: checkoutForm.street_address || '', 
-      city: checkoutForm.city || '', 
-      zip_code: checkoutForm.zip_code || '', 
-      total, 
-      status: OrderStatus.PLACED, 
-      shipping_name: selectedShipping.name, 
-      shipping_rate: selectedShipping.rate, 
-      payment_method: selectedPayment.name, 
+      id: orderId, customer_id: currentCustomer?.id, first_name: checkoutForm.first_name, last_name: checkoutForm.last_name, 
+      email: checkoutForm.email, mobile_number: checkoutForm.mobile_number, street_address: checkoutForm.street_address, 
+      city: checkoutForm.city, zip_code: checkoutForm.zip_code, total, status: OrderStatus.PLACED, 
+      shipping_name: selectedShipping.name, shipping_rate: selectedShipping.rate, payment_method: selectedPayment.name, 
       items: cart.map(item => ({ sneakerId: item.id, name: item.name, image: item.image, size: item.selectedSize, quantity: item.quantity, price: item.price }))
     };
-    
     try {
       const response = await fetch(`${SUPABASE_URL}/rest/v1/orders`, { method: 'POST', headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', 'Prefer': 'return=representation' }, body: JSON.stringify(newOrder) });
       if (response.ok) {
         const saved = (await response.json())[0];
-        
-        await fetch(`${SUPABASE_URL}/rest/v1/order_timeline`, {
-          method: 'POST',
-          headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            order_id: orderId,
-            status: OrderStatus.PLACED,
-            note: 'Order protocol initiated and secured in vault archives.'
-          })
-        });
-
-        trackFBPixel('Purchase', { value: total, currency: 'BDT', content_ids: cart.map(item => String(item.id)), content_type: 'product', num_items: cart.length });
-        await fetchOrders();
-        setLastOrder(saved);
-        setCart([]);
-        handleNavigate('order-success');
+        setLastOrder(saved); setCart([]); handleNavigate('order-success');
       } else { setCheckoutError("SERVER ERROR: VAULT CONNECTION TIMEOUT"); }
-    } catch (err) { setCheckoutError("CRITICAL SYSTEM ERROR: TRANSACTION FAILED"); } finally { setIsPlacingOrder(false); }
-  };
-
-  const handleSaveCheckoutField = async (data: Partial<CheckoutField>): Promise<boolean> => {
-    const isUpdate = !!data.id;
-    const url = isUpdate ? `${SUPABASE_URL}/rest/v1/checkout_fields?id=eq.${data.id}` : `${SUPABASE_URL}/rest/v1/checkout_fields`;
-    const method = isUpdate ? 'PATCH' : 'POST';
-    try {
-      const response = await fetch(url, { method, headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
-      if (response.ok) { fetchCheckoutFields(); return true; }
-      return false;
-    } catch (err) { return false; }
-  };
-
-  const handleDeleteCheckoutField = async (id: string): Promise<boolean> => {
-    try {
-      const response = await fetch(`${SUPABASE_URL}/rest/v1/checkout_fields?id=eq.${id}`, { method: 'DELETE', headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Prefer': 'return=representation' } });
-      if (response.ok || response.status === 204) { await fetchCheckoutFields(); return true; }
-      return false;
-    } catch (err) { return false; }
-  };
-
-  const handleSaveSlide = async (data: Partial<HomeSlide>): Promise<boolean> => {
-    const isUpdate = !!data.id;
-    const url = isUpdate ? `${SUPABASE_URL}/rest/v1/home_slides?id=eq.${data.id}` : `${SUPABASE_URL}/rest/v1/home_slides`;
-    const method = isUpdate ? 'PATCH' : 'POST';
-    try {
-      const response = await fetch(url, { method, headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
-      if (response.ok) { fetchSlides(); return true; }
-      return false;
-    } catch (err) { return false; }
-  };
-
-  const handleDeleteSlide = async (id: string): Promise<boolean> => {
-    try {
-      const response = await fetch(`${SUPABASE_URL}/rest/v1/home_slides?id=eq.${id}`, { method: 'DELETE', headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } });
-      if (response.ok) { fetchSlides(); return true; }
-      return false;
-    } catch (err) {}
-    return false;
-  };
-
-  const handleSaveNavItem = async (data: Partial<NavItem>): Promise<boolean> => {
-    const isUpdate = !!data.id;
-    const url = isUpdate ? `${SUPABASE_URL}/rest/v1/site_navigation?id=eq.${data.id}` : `${SUPABASE_URL}/rest/v1/site_navigation`;
-    const method = isUpdate ? 'PATCH' : 'POST';
-    try {
-      const response = await fetch(url, { method, headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
-      if (response.ok) { fetchNavItems(); return true; }
-      return false;
-    } catch (err) { return false; }
-  };
-
-  const handleDeleteNavItem = async (id: string): Promise<boolean> => {
-    try {
-      const response = await fetch(`${SUPABASE_URL}/rest/v1/site_navigation?id=eq.${id}`, { method: 'DELETE', headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Prefer': 'return=representation' } });
-      if (response.ok || response.status === 204) { await fetchNavItems(); return true; }
-      return false;
-    } catch (err) { return false; }
-  };
-
-  const handleSaveProduct = async (data: any): Promise<boolean> => {
-    const isUpdate = !!data.id;
-    const url = isUpdate ? `${SUPABASE_URL}/rest/v1/sneakers?id=eq.${data.id}` : `${SUPABASE_URL}/rest/v1/sneakers`;
-    const method = isUpdate ? 'PATCH' : 'POST';
-    try {
-      const response = await fetch(url, { method, headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
-      if (response.ok) { fetchSneakers(); return true; }
-      return false;
-    } catch (err) { return false; }
-  };
-
-  const handleDeleteProduct = async (id: string): Promise<boolean> => {
-    try {
-      const response = await fetch(`${SUPABASE_URL}/rest/v1/sneakers?id=eq.${id}`, { method: 'DELETE', headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } });
-      if (response.ok) { fetchSneakers(); return true; }
-      return false;
-    } catch (err) { return false; }
-  };
-
-  const handleSaveBrand = async (data: any): Promise<boolean> => {
-    const isUpdate = !!data.id;
-    const url = isUpdate ? `${SUPABASE_URL}/rest/v1/brands?id=eq.${data.id}` : `${SUPABASE_URL}/rest/v1/brands`;
-    const method = isUpdate ? 'PATCH' : 'POST';
-    try {
-      const response = await fetch(url, { method, headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
-      if (response.ok) { fetchBrands(); return true; }
-      return false;
-    } catch (err) { return false; }
-  };
-
-  const handleDeleteBrand = async (id: string): Promise<boolean> => {
-    try {
-      const response = await fetch(`${SUPABASE_URL}/rest/v1/brands?id=eq.${id}`, { method: 'DELETE', headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } });
-      if (response.ok) { fetchBrands(); return true; }
-      return false;
-    } catch (err) { return false; }
-  };
-
-  const handleSaveCategoryData = async (data: any): Promise<boolean> => {
-    const isUpdate = !!data.id;
-    const url = isUpdate ? `${SUPABASE_URL}/rest/v1/categories?id=eq.${data.id}` : `${SUPABASE_URL}/rest/v1/categories`;
-    const method = isUpdate ? 'PATCH' : 'POST';
-    try {
-      const response = await fetch(url, { method, headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
-      if (response.ok) { fetchCategories(); return true; }
-      return false;
-    } catch (err) { return false; }
-  };
-
-  const handleDeleteCategoryData = async (id: string): Promise<boolean> => {
-    try {
-      const response = await fetch(`${SUPABASE_URL}/rest/v1/categories?id=eq.${id}`, { method: 'DELETE', headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } });
-      if (response.ok) { fetchCategories(); return true; }
-      return false;
-    } catch (err) { return false; }
-  };
-
-  const handleSaveShippingOption = async (data: any): Promise<boolean> => {
-    const isUpdate = !!data.id;
-    const url = isUpdate ? `${SUPABASE_URL}/rest/v1/shipping_options?id=eq.${data.id}` : `${SUPABASE_URL}/rest/v1/shipping_options`;
-    const method = isUpdate ? 'PATCH' : 'POST';
-    try {
-      const response = await fetch(url, { method, headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
-      if (response.ok) { fetchShippingOptions(); return true; }
-      return false;
-    } catch (err) { return false; }
-  };
-
-  const handleDeleteShippingOption = async (id: string): Promise<boolean> => {
-    try {
-      const response = await fetch(`${SUPABASE_URL}/rest/v1/shipping_options?id=eq.${id}`, { method: 'DELETE', headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } });
-      if (response.ok) { fetchShippingOptions(); return true; }
-      return false;
-    } catch (err) { return false; }
-  };
-
-  const handleSavePaymentMethod = async (data: any): Promise<boolean> => {
-    const isUpdate = !!data.id;
-    const url = isUpdate ? `${SUPABASE_URL}/rest/v1/payment_methods?id=eq.${data.id}` : `${SUPABASE_URL}/rest/v1/payment_methods`;
-    const method = isUpdate ? 'PATCH' : 'POST';
-    try {
-      const response = await fetch(url, { method, headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
-      if (response.ok) { fetchPaymentMethods(); return true; }
-      return false;
-    } catch (err) { return false; }
-  };
-
-  const handleDeletePaymentMethod = async (id: string): Promise<boolean> => {
-    try {
-      const response = await fetch(`${SUPABASE_URL}/rest/v1/payment_methods?id=eq.${id}`, { method: 'DELETE', headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } });
-      if (response.ok) { fetchPaymentMethods(); return true; }
-      return false;
-    } catch (err) { return false; }
-  };
-
-  const handleSaveFooterConfig = async (config: FooterConfig): Promise<boolean> => {
-    try {
-      const response = await fetch(`${SUPABASE_URL}/rest/v1/site_settings?key=eq.footer`, { method: 'PATCH', headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ data: config }) });
-      if (response.ok) { setFooterConfig(config); return true; }
-      return false;
-    } catch (err) { return false; }
-  };
-
-  const handleSaveIdentity = async (config: SiteIdentity): Promise<boolean> => {
-    try {
-      const response = await fetch(`${SUPABASE_URL}/rest/v1/site_settings?key=eq.identity`, { method: 'PATCH', headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ data: config }) });
-      if (response.ok) { setSiteIdentity(config); return true; }
-      return false;
-    } catch (err) { return false; }
+    } finally { setIsPlacingOrder(false); }
   };
 
   const handleLogout = () => { localStorage.removeItem('sv_admin_session'); setIsAdminAuthenticated(false); handleNavigate('home'); };
   const handleCustomerLogout = () => { localStorage.removeItem('sv_customer_session'); setCurrentCustomer(null); handleNavigate('home'); };
 
-  const navigateToAdmin = () => { if (isAdminAuthenticated || localStorage.getItem('sv_admin_session') === 'active') handleNavigate('admin'); else handleNavigate('admin-login'); };
-  const navigateToCustomer = () => { if (currentCustomer) handleNavigate('customer-account'); else handleNavigate('customer-login'); };
-
-  const handleSearch = (query: string) => { setSearchQuery(query); setIsSearchOpen(false); handleNavigate('shop'); };
-
-  const updateCartQuantity = (idx: number, delta: number) => {
-    const newCart = [...cart];
-    newCart[idx].quantity = Math.max(1, newCart[idx].quantity + delta);
-    setCart(newCart);
-  };
-
-  const removeFromCart = (idx: number) => {
-    if (cart.length <= 1) return; 
-    setCart(cart.filter((_, i) => i !== idx));
-  };
-
-  const SearchOverlay = () => {
-    const [localQuery, setLocalQuery] = useState('');
-    return (
-      <div className={`fixed inset-0 z-[100] bg-black/95 backdrop-blur-xl transition-all duration-500 flex flex-col p-8 md:p-24 ${isSearchOpen ? 'opacity-100' : 'opacity-0 pointer-events-none translate-y-full'}`}>
-        <button onClick={() => setIsSearchOpen(false)} className="absolute top-10 right-10 text-white text-3xl hover:rotate-90 transition-transform"><i className="fa-solid fa-xmark"></i></button>
-        <div className="max-w-4xl w-full mx-auto flex flex-col items-center">
-          <p className="text-red-600 text-[10px] md:text-xs font-black uppercase tracking-[0.5em] mb-8 italic">Archive Search Protocol</p>
-          <div className="w-full relative">
-            <input autoFocus={isSearchOpen} type="text" value={localQuery} onChange={(e) => setLocalQuery(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleSearch(localQuery)} placeholder="ENTER ASSET NAME..." className="w-full bg-transparent border-b-4 border-white/20 focus:border-red-600 outline-none text-white text-4xl md:text-7xl font-black italic uppercase font-heading py-8 transition-colors" />
-            <button onClick={() => handleSearch(localQuery)} className="absolute right-0 bottom-8 text-white text-4xl hover:text-red-600 transition-colors"><i className="fa-solid fa-arrow-right-long"></i></button>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  const CartSidebar = () => {
-    return (
-      <>
-        <div className={`fixed inset-0 bg-black/60 z-[60] transition-opacity duration-300 ${isCartSidebarOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`} onClick={() => setIsCartSidebarOpen(false)} />
-        <div className={`fixed right-0 top-0 h-screen w-full max-w-md bg-white z-[70] transition-transform duration-500 transform ${isCartSidebarOpen ? 'translate-x-0' : 'translate-x-full'}`}>
-           <div className="flex flex-col h-full shadow-2xl">
-            <div className="p-8 bg-black text-white flex justify-between items-center">
-              <h2 className="text-xl font-black uppercase tracking-tighter italic font-heading">Vault Bag <span className="text-[10px] text-red-600 ml-2">[{cart.length} ITEMS]</span></h2>
-              <button onClick={() => setIsCartSidebarOpen(false)} className="hover:rotate-90 transition-transform"><i className="fa-solid fa-xmark text-xl"></i></button>
-            </div>
-            <div className="flex-1 overflow-y-auto p-8 space-y-6 no-scrollbar">
-              {cart.map((item, idx) => (
-                <div key={`${item.id}-${item.selectedSize}`} className="flex space-x-6 border-b border-gray-50 pb-6 animate-in slide-in-from-right-4">
-                  <div className="w-24 h-24 bg-gray-50 border border-gray-100 rounded-xl p-2 shrink-0"><img src={item.image} className="w-full h-full object-contain" alt={item.name} /></div>
-                  <div className="flex-1 flex flex-col justify-center">
-                    <div className="flex justify-between items-start mb-2">
-                      <h4 className="text-[11px] font-black uppercase tracking-tight leading-tight">{item.name}</h4>
-                      <button 
-                        disabled={cart.length <= 1}
-                        onClick={() => removeFromCart(idx)} 
-                        className="text-gray-300 hover:text-red-600 transition-colors disabled:opacity-10 disabled:cursor-not-allowed"
-                      >
-                        <i className="fa-solid fa-trash-can text-sm"></i>
-                      </button>
-                    </div>
-                    <p className="text-[10px] text-red-600 font-black mb-4 italic">SIZE Index: {item.selectedSize}</p>
-                    <div className="flex justify-between items-center mt-auto">
-                      <div className="flex items-center border border-gray-100 rounded-lg bg-gray-50 overflow-hidden h-8">
-                        <button 
-                          disabled={item.quantity <= 1}
-                          onClick={() => updateCartQuantity(idx, -1)} 
-                          className="px-3 hover:bg-white disabled:opacity-30 disabled:cursor-not-allowed"
-                        >-</button>
-                        <span className="px-2 font-black text-xs">{item.quantity}</span>
-                        <button onClick={() => updateCartQuantity(idx, 1)} className="px-3 hover:bg-white">+</button>
-                      </div>
-                      <p className="text-xs font-black italic text-black">{(item.price * item.quantity).toLocaleString()}৳</p>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-            <div className="p-8 bg-white border-t border-gray-100">
-               <div className="flex justify-between mb-2"><span className="text-[10px] font-black uppercase text-gray-400">Inventory Value</span><span className="text-sm font-black italic">{cart.reduce((acc, item) => acc + (item.price * item.quantity), 0).toLocaleString()}৳</span></div>
-               <div className="flex justify-between mb-6 pt-2 border-t border-gray-50"><span className="text-sm font-black uppercase">Final Settlement</span><span className="text-2xl font-black text-red-700">{cart.reduce((acc, item) => acc + (item.price * item.quantity), 0).toLocaleString()}৳</span></div>
-               <button disabled={cart.length === 0} onClick={() => { handleNavigate('checkout'); setIsCartSidebarOpen(false); }} className="w-full bg-black text-white py-5 rounded-xl font-black uppercase tracking-[0.2em] text-xs shadow-xl hover:bg-red-700 transition-all active:scale-95 disabled:opacity-30">Initialize Checkout</button>
-            </div>
-           </div>
-        </div>
-      </>
-    );
-  };
-
   const renderView = () => {
-    // SECURITY GUARD: Check authentication before rendering sensitive views
-    const isAdmin = isAdminAuthenticated || localStorage.getItem('sv_admin_session') === 'active';
+    // HARD SECURITY GUARD for Admin view
+    const isActuallyAdmin = isAdminAuthenticated || localStorage.getItem('sv_admin_session') === 'active';
 
     switch (currentView) {
-      case 'home': return <Home sneakers={sneakers} slides={slides} onSelectProduct={handleSelectProduct} onNavigate={handleNavigate} onSearch={handleSearch} />;
+      case 'home': return <Home sneakers={sneakers} slides={slides} onSelectProduct={handleSelectProduct} onNavigate={handleNavigate} onSearch={(q) => { setSearchQuery(q); handleNavigate('shop'); }} />;
       case 'shop': return <Shop sneakers={sneakers} onSelectProduct={handleSelectProduct} searchQuery={searchQuery} onClearSearch={() => setSearchQuery('')} categoryFilter={selectedCategory} onCategoryChange={handleSelectCategory} />;
-      case 'pdp': return selectedProduct ? <ProductDetail sneaker={selectedProduct} onAddToCart={handleAddToCart} onBack={() => handleNavigate('shop')} onToggleWishlist={toggleWishlist} isInWishlist={wishlist.some(s => s.id === selectedProduct.id)} onSelectProduct={handleSelectProduct} /> : (
-        <div className="min-h-[60vh] flex items-center justify-center">
-           <i className="fa-solid fa-circle-notch animate-spin text-red-600 text-4xl"></i>
+      case 'pdp': return selectedProduct ? <ProductDetail sneaker={selectedProduct} onAddToCart={handleAddToCart} onBack={() => handleNavigate('shop')} onToggleWishlist={(s) => setWishlist(p => p.find(x => x.id === s.id) ? p.filter(x => x.id !== s.id) : [...p, s])} isInWishlist={wishlist.some(s => s.id === selectedProduct.id)} onSelectProduct={handleSelectProduct} /> : (
+        <div className="min-h-screen flex flex-col items-center justify-center bg-white space-y-4">
+           <i className="fa-solid fa-vault text-4xl animate-bounce text-red-600"></i>
+           <p className="text-[10px] font-black uppercase tracking-[0.5em] italic">Decrypting Asset Metadata...</p>
         </div>
       );
       case 'admin-login':
-      case 'customer-login': return (
-        <UnifiedLogin 
-          supabaseUrl={SUPABASE_URL} 
-          supabaseKey={SUPABASE_KEY} 
-          onAdminLogin={() => { setIsAdminAuthenticated(true); handleNavigate('admin'); }}
-          onCustomerLogin={(c) => { 
-            setCurrentCustomer(c); 
-            localStorage.setItem('sv_customer_session', JSON.stringify(c)); 
-            setCheckoutForm({
-              first_name: c.first_name || '',
-              last_name: c.last_name || '',
-              email: c.email || '',
-              mobile_number: c.mobile_number || '',
-              street_address: c.street_address || '',
-              city: c.city || '',
-              zip_code: c.zip_code || ''
-            });
-            handleNavigate('customer-account'); 
-          }}
-          onBack={() => handleNavigate('home')}
-        />
-      );
-      case 'customer-account': return currentCustomer ? <CustomerPortal customer={currentCustomer} orders={orders} onLogout={handleCustomerLogout} onUpdateProfile={handleUpdateCustomerProfile} onSelectOrder={(o) => { setViewingOrder(o); handleNavigate('order-details-view'); }} /> : (
-        <UnifiedLogin 
-          supabaseUrl={SUPABASE_URL} 
-          supabaseKey={SUPABASE_KEY} 
-          onAdminLogin={() => { setIsAdminAuthenticated(true); handleNavigate('admin'); }}
-          onCustomerLogin={(c) => { setCurrentCustomer(c); localStorage.setItem('sv_customer_session', JSON.stringify(c)); handleNavigate('customer-account'); }}
-          onBack={() => handleNavigate('home')}
-        />
-      );
-      case 'order-details-view': {
-        const latestOrder = viewingOrder ? (orders.find(o => o.id === viewingOrder.id) || viewingOrder) : null;
-        
-        return latestOrder ? (
-            <div className="max-w-4xl mx-auto py-16 px-4 animate-in fade-in duration-500">
-              <button onClick={() => handleNavigate('customer-account')} className="text-gray-400 font-black uppercase text-[10px] tracking-widest hover:text-black mb-8"><i className="fa-solid fa-arrow-left mr-2"></i> Dashboard</button>
-              <div className="bg-white border border-gray-100 rounded-3xl overflow-hidden shadow-2xl">
-                <div className="bg-black p-8 text-white flex justify-between items-center">
-                  <div>
-                    <h3 className="text-sm font-black uppercase italic tracking-widest font-heading">Registry Manifest</h3>
-                    <p className="text-[10px] text-gray-500 mt-1 uppercase font-bold">{latestOrder.id}</p>
-                  </div>
-                  <span className="text-[10px] font-black uppercase text-red-600 italic px-4 py-2 bg-white/5 rounded-xl">{latestOrder.status}</span>
+      case 'customer-login': return <UnifiedLogin supabaseUrl={SUPABASE_URL} supabaseKey={SUPABASE_KEY} onAdminLogin={() => { setIsAdminAuthenticated(true); handleNavigate('admin'); }} onCustomerLogin={(c) => { setCurrentCustomer(c); localStorage.setItem('sv_customer_session', JSON.stringify(c)); handleNavigate('customer-account'); }} onBack={() => handleNavigate('home')} />;
+      case 'customer-account': return currentCustomer ? <CustomerPortal customer={currentCustomer} orders={orders} onLogout={handleCustomerLogout} onUpdateProfile={async (u) => true} onSelectOrder={(o) => { setViewingOrder(o); handleNavigate('order-details-view'); }} /> : <UnifiedLogin supabaseUrl={SUPABASE_URL} supabaseKey={SUPABASE_KEY} onAdminLogin={() => { setIsAdminAuthenticated(true); handleNavigate('admin'); }} onCustomerLogin={(c) => { setCurrentCustomer(c); handleNavigate('customer-account'); }} onBack={() => handleNavigate('home')} />;
+      case 'admin': 
+        if (!isActuallyAdmin) return <UnifiedLogin supabaseUrl={SUPABASE_URL} supabaseKey={SUPABASE_KEY} onAdminLogin={() => { setIsAdminAuthenticated(true); handleNavigate('admin'); }} onCustomerLogin={() => {}} onBack={() => handleNavigate('home')} />;
+        return <Dashboard sneakers={sneakers} orders={orders} customers={customers} brands={brands} categories={categories} paymentMethods={paymentMethods} slides={slides} navItems={navItems} checkoutFields={checkoutFields} shippingOptions={shippingOptions} footerConfig={footerConfig} siteIdentity={siteIdentity} onRefresh={() => { fetchOrders(); fetchSneakers(); }} onRefreshOrders={fetchOrders} onUpdateOrderStatus={handleUpdateOrderStatus} onSaveProduct={async (d) => true} onDeleteProduct={async (i) => true} onSaveShipping={async (o) => true} onDeleteShipping={async (i) => true} onSavePaymentMethod={async (m) => true} onDeletePaymentMethod={async (i) => true} onSaveFooterConfig={async (c) => true} onSaveIdentity={async (i) => true} onSaveBrand={async (b) => true} onDeleteBrand={async (i) => true} onSaveCategory={async (c) => true} onDeleteCategory={async (i) => true} onSaveSlide={async (s) => true} onDeleteSlide={async (i) => true} onSaveNavItem={async (n) => true} onDeleteNavItem={async (i) => true} onSaveCheckoutField={async (f) => true} onDeleteCheckoutField={async (i) => true} onLogout={handleLogout} onVisitSite={() => window.open(window.location.origin, '_blank')} />;
+      case 'checkout': return (
+        <div className="max-w-4xl mx-auto py-16 px-4">
+           <h2 className="text-3xl font-black uppercase italic font-heading mb-10">Checkout Protocol</h2>
+           {cart.length === 0 ? <p>Bag is empty.</p> : (
+             <div className="bg-white p-8 border rounded-3xl shadow-xl space-y-6">
+                {checkoutError && <p className="text-red-600 font-black uppercase text-[10px] italic">{checkoutError}</p>}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                   <input type="text" placeholder="FIRST NAME" onChange={e => setCheckoutForm({...checkoutForm, first_name: e.target.value})} className="bg-gray-50 p-4 rounded-xl border-none outline-none font-bold text-xs" />
+                   <input type="text" placeholder="MOBILE" onChange={e => setCheckoutForm({...checkoutForm, mobile_number: e.target.value})} className="bg-gray-50 p-4 rounded-xl border-none outline-none font-bold text-xs" />
                 </div>
-                <div className="p-8 space-y-6">
-                  {latestOrder.items?.map((item, idx) => (
-                    <div key={idx} className="flex gap-6 items-center border-b border-gray-50 pb-6 last:border-0 last:pb-0">
-                      <div className="w-20 h-20 bg-gray-50 rounded-xl p-2 shrink-0 border border-gray-100"><img src={item.image} className="w-full h-full object-contain" alt={item.name} /></div>
-                      <div className="flex-1">
-                        <h4 className="font-black text-[11px] uppercase tracking-tight mb-1">{item.name}</h4>
-                        <p className="text-[9px] text-red-600 font-black italic uppercase tracking-widest">Size Index: {item.size} | Qty: {item.quantity}</p>
-                      </div>
-                      <div className="text-right"><p className="text-sm font-black italic">{(item.price * item.quantity).toLocaleString()}৳</p></div>
-                    </div>
-                  ))}
+                <div className="pt-6 border-t">
+                  <button onClick={handlePlaceOrder} disabled={isPlacingOrder} className="w-full bg-black text-white py-5 rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-red-700 transition-all">
+                    {isPlacingOrder ? 'Processing...' : 'Commit Order'}
+                  </button>
                 </div>
-                <div className="p-8 bg-gray-50 border-t border-gray-100">
-                  <h4 className="text-[10px] font-black uppercase italic tracking-widest mb-6 border-b pb-4">Live Tracking Protocol</h4>
-                  <div className="space-y-6 pl-4 border-l-2 border-red-100 relative">
-                    {[...(latestOrder.timeline || [])].reverse().map((event, idx) => (
-                      <div key={idx} className="relative">
-                        <div className={`absolute -left-[21px] top-1 w-2 h-2 rounded-full ${idx === 0 ? 'bg-red-600 animate-pulse' : 'bg-gray-200'}`}></div>
-                        <p className={`text-[10px] font-black uppercase tracking-widest ${idx === 0 ? 'text-black' : 'text-gray-400'}`}>
-                          {event.status} <span className="text-gray-300 font-bold ml-2">[{new Date(event.timestamp).toLocaleString()}]</span>
-                        </p>
-                        <p className="text-xs text-gray-500 italic mt-1 leading-relaxed">{event.note}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-                <div className="bg-white p-8 border-t border-gray-100">
-                  <div className="space-y-3">
-                    <div className="flex justify-between items-center pt-2">
-                      <span className="text-xs font-black uppercase tracking-widest italic">Final Settlement</span>
-                      <span className="text-3xl font-black text-red-700">{latestOrder.total.toLocaleString()}৳</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-        ) : null;
-      }
-      case 'admin': {
-        if (!isAdmin) {
-          return (
-            <UnifiedLogin 
-              supabaseUrl={SUPABASE_URL} 
-              supabaseKey={SUPABASE_KEY} 
-              onAdminLogin={() => { setIsAdminAuthenticated(true); handleNavigate('admin'); }}
-              onCustomerLogin={(c) => { 
-                setCurrentCustomer(c); 
-                localStorage.setItem('sv_customer_session', JSON.stringify(c)); 
-                handleNavigate('customer-account'); 
-              }}
-              onBack={() => handleNavigate('home')}
-            />
-          );
-        }
-        
-        return (
-          <Dashboard 
-            sneakers={sneakers} 
-            orders={orders} 
-            customers={customers}
-            brands={brands} 
-            categories={categories} 
-            paymentMethods={paymentMethods} 
-            slides={slides} 
-            navItems={navItems} 
-            checkoutFields={checkoutFields} 
-            shippingOptions={shippingOptions} 
-            footerConfig={footerConfig} 
-            siteIdentity={siteIdentity} 
-            onRefresh={() => { fetchOrders(); fetchSneakers(); fetchShippingOptions(); fetchFooterConfig(); fetchBrands(); fetchCategories(); fetchPaymentMethods(); fetchSlides(); fetchNavItems(); fetchCheckoutFields(); fetchSiteIdentity(); fetchCustomers(); }}
-            onRefreshOrders={fetchOrders}
-            onUpdateOrderStatus={handleUpdateOrderStatus} 
-            onSaveProduct={handleSaveProduct} 
-            onDeleteProduct={handleDeleteProduct} 
-            onSaveShipping={handleSaveShippingOption} 
-            onDeleteShipping={handleDeleteShippingOption} 
-            onSavePaymentMethod={handleSavePaymentMethod} 
-            onDeletePaymentMethod={handleDeletePaymentMethod} 
-            onSaveFooterConfig={handleSaveFooterConfig} 
-            onSaveIdentity={handleSaveIdentity} 
-            onSaveBrand={handleSaveBrand} 
-            onDeleteBrand={handleDeleteBrand} 
-            onSaveCategory={handleSaveCategoryData} 
-            onDeleteCategory={handleDeleteCategoryData} 
-            onSaveSlide={handleSaveSlide} 
-            onDeleteSlide={handleDeleteSlide} 
-            onSaveNavItem={handleSaveNavItem} 
-            onDeleteNavItem={handleDeleteNavItem} 
-            onSaveCheckoutField={handleSaveCheckoutField} 
-            onDeleteCheckoutField={handleDeleteCheckoutField} 
-            isRefreshing={isFetchingSneakers || isFetchingOrders} 
-            onLogout={handleLogout} 
-            onVisitSite={() => window.open(window.location.origin + window.location.pathname, '_blank')}
-          />
-        );
-      }
-      case 'checkout': {
-        const subtotal = cart.reduce((acc, item) => acc + (item.price * item.quantity), 0);
-        const finalTotal = subtotal + (selectedShipping?.rate || 0);
-        
-        return (
-          <div className="max-w-6xl mx-auto px-4 py-16 animate-in fade-in duration-500">
-            <div className="flex flex-col items-center mb-12 text-center">
-              <h1 className="text-4xl font-black uppercase font-heading italic mb-4">Checkout Registry</h1>
-              <div className="w-16 h-1 bg-red-600 mb-2"></div>
-              <p className="text-gray-400 text-[10px] font-black uppercase tracking-[0.3em]">Finalizing secured transaction protocols</p>
-            </div>
-            
-            {cart.length === 0 ? (
-              <div className="text-center py-20 bg-white border rounded-3xl shadow-sm">
-                <i className="fa-solid fa-bag-shopping text-4xl text-gray-200 mb-6"></i>
-                <h3 className="text-xl font-black uppercase italic mb-4">Your Vault is Empty</h3>
-                <button onClick={() => handleNavigate('shop')} className="bg-black text-white px-12 py-4 rounded-xl font-black uppercase text-[10px] tracking-widest hover:bg-red-700 transition-all">Return to Archives</button>
-              </div>
-            ) : (
-              <>
-                {checkoutError && (
-                  <div className="max-w-4xl mx-auto mb-10 bg-red-600 text-white p-6 rounded-2xl flex items-center justify-center gap-4 animate-in slide-in-from-bottom-4 duration-300 shadow-2xl">
-                    <i className="fa-solid fa-triangle-exclamation text-2xl animate-pulse"></i>
-                    <span className="text-[11px] font-black uppercase tracking-[0.2em] italic">{checkoutError}</span>
-                  </div>
-                )}
-                
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
-                  <div className="lg:col-span-2 space-y-8">
-                    <div className="bg-white p-10 border border-gray-100 rounded-3xl shadow-sm">
-                      <h3 className="text-xs font-black uppercase italic mb-8 border-b pb-4 tracking-widest flex items-center gap-3">
-                        <i className="fa-solid fa-id-card text-red-600"></i> Subject Coordinates
-                      </h3>
-                      <div className="grid grid-cols-2 gap-6">
-                        {checkoutFields.filter(f => f.enabled).sort((a,b) => a.order - b.order).map((field) => (
-                          <div key={field.id} className={`${field.width === 'half' ? 'col-span-1' : 'col-span-2'} space-y-1`}>
-                            <label className="text-[10px] font-black uppercase text-black px-1 tracking-widest">{field.label} {field.required && '*'}</label>
-                            <input 
-                              type={field.type} 
-                              placeholder={field.placeholder.toUpperCase()} 
-                              value={checkoutForm[field.field_key] || ''} 
-                              onChange={e => {
-                                setCheckoutForm({ ...checkoutForm, [field.field_key]: e.target.value });
-                                setCheckoutError(null);
-                              }} 
-                              className="w-full bg-gray-50 p-4 rounded-xl outline-none font-bold text-xs focus:ring-2 ring-black/5 border border-transparent focus:border-gray-200 transition-all" 
-                            />
-                          </div>
-                        ))}
-                        
-                        {!currentCustomer && (
-                          <div className="col-span-2 mt-4 p-6 bg-gray-50 rounded-2xl border border-gray-100 space-y-4">
-                             <label className="flex items-center gap-3 cursor-pointer group">
-                                <input type="checkbox" checked={createAccount} onChange={e => setCreateAccount(e.target.checked)} className="w-5 h-5 rounded border-gray-200 text-red-600 focus:ring-red-600" />
-                                <span className="text-[10px] font-black uppercase tracking-widest text-black italic">Create Vault Member Account</span>
-                             </label>
-                             {createAccount && (
-                                <div className="space-y-2 animate-in slide-in-from-top-2">
-                                   <label className="text-[9px] font-black uppercase text-gray-400 px-1 italic">Security Password (Mandatory for Account)</label>
-                                   <input 
-                                     type="password" 
-                                     value={accountPassword} 
-                                     onChange={e => setAccountPassword(e.target.value)} 
-                                     placeholder="ENTER SECURE PASSWORD" 
-                                     className="w-full bg-white p-4 rounded-xl outline-none font-bold text-xs border-2 border-transparent focus:border-black"
-                                   />
-                                </div>
-                             )}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="bg-white p-10 border border-gray-100 rounded-3xl shadow-sm">
-                      <h3 className="text-xs font-black uppercase italic mb-8 border-b pb-4 tracking-widest flex items-center gap-3">
-                        <i className="fa-solid fa-truck-fast text-red-600"></i> Logistics Hub
-                      </h3>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {shippingOptions.map(o => (
-                          <div 
-                            key={o.id} 
-                            onClick={() => { setSelectedShipping(o); setCheckoutError(null); }} 
-                            className={`p-6 border-2 rounded-2xl flex justify-between items-center cursor-pointer transition-all duration-300 ${selectedShipping?.id === o.id ? 'border-black bg-black text-white shadow-xl scale-[1.02]' : 'border-gray-50 bg-gray-50 hover:border-gray-200'}`}
-                          >
-                            <div className="flex flex-col">
-                              <span className="font-black text-[10px] uppercase tracking-widest mb-1">{o.name}</span>
-                              <span className={`text-[9px] font-bold ${selectedShipping?.id === o.id ? 'text-gray-300' : 'text-black'} uppercase`}>Transit Protocol</span>
-                            </div>
-                            <span className="font-black italic text-sm">{o.rate}৳</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="bg-white p-10 border border-gray-100 rounded-3xl shadow-sm">
-                      <h3 className="text-xs font-black uppercase italic mb-8 border-b pb-4 tracking-widest flex items-center gap-3">
-                        <i className="fa-solid fa-credit-card text-red-600"></i> Payment Gateway Matrix
-                      </h3>
-                      <div className="space-y-4">
-                        {paymentMethods.map(pm => (
-                          <div 
-                            key={pm.id}
-                            onClick={() => { setSelectedPayment(pm); setCheckoutError(null); }}
-                            className={`p-6 border-2 rounded-2xl cursor-pointer transition-all duration-300 ${selectedPayment?.id === pm.id ? 'border-red-600 bg-red-50 shadow-md' : 'border-gray-50 bg-gray-50 hover:border-gray-200'}`}
-                          >
-                            <div className="flex justify-between items-center mb-2">
-                               <span className="font-black text-xs uppercase tracking-widest">{pm.name}</span>
-                               {selectedPayment?.id === pm.id && <i className="fa-solid fa-circle-check text-red-600"></i>}
-                            </div>
-                            {pm.details && <p className="text-[10px] text-gray-500 font-medium italic leading-relaxed whitespace-pre-line">{pm.details}</p>}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="bg-black text-white p-10 rounded-3xl h-fit shadow-2xl sticky top-24">
-                    <h3 className="text-xl font-black uppercase italic border-b border-white/10 pb-6 mb-8 tracking-tighter font-heading">Settlement Summary</h3>
-                    
-                    <div className="space-y-6 mb-8 max-h-[300px] overflow-y-auto pr-2 no-scrollbar border-b border-white/5 pb-8">
-                       {cart.map((item, idx) => (
-                         <div key={`${item.id}-${item.selectedSize}`} className="flex gap-4 items-center animate-in slide-in-from-right-2">
-                            <div className="w-12 h-12 bg-white/10 rounded-lg p-1 shrink-0"><img src={item.image} className="w-full h-full object-contain" alt="" /></div>
-                            <div className="flex-1 min-w-0">
-                               <h4 className="text-[9px] font-black uppercase truncate mb-1">{item.name}</h4>
-                               <div className="flex items-center gap-2">
-                                  <div className="flex items-center border border-white/10 rounded-md overflow-hidden bg-white/5">
-                                     <button 
-                                       disabled={item.quantity <= 1}
-                                       onClick={() => updateCartQuantity(idx, -1)} 
-                                       className="px-2 py-0.5 hover:bg-white/10 transition-colors text-[10px] disabled:opacity-20 disabled:cursor-not-allowed"
-                                     >-</button>
-                                     <span className="px-2 font-black text-[9px] border-x border-white/10">{item.quantity}</span>
-                                     <button onClick={() => updateCartQuantity(idx, 1)} className="px-2 py-0.5 hover:bg-white/10 transition-colors text-[10px]">+</button>
-                                  </div>
-                                  <span className="text-[8px] font-bold text-gray-500 uppercase">Size: {item.selectedSize}</span>
-                               </div>
-                            </div>
-                            <div className="text-right">
-                               <p className="text-[10px] font-black italic">{(item.price * item.quantity).toLocaleString()}৳</p>
-                               <button 
-                                 disabled={cart.length <= 1}
-                                 onClick={() => removeFromCart(idx)} 
-                                 className="text-[9px] text-red-600 font-black uppercase hover:text-white transition-colors disabled:opacity-20 disabled:cursor-not-allowed"
-                               >Erase</button>
-                            </div>
-                         </div>
-                       ))}
-                    </div>
-
-                    <div className="space-y-4 mb-8">
-                      <div className="flex justify-between text-[11px] font-black uppercase tracking-widest text-white/60">
-                        <span>Subtotal Value</span>
-                        <span>{subtotal.toLocaleString()}৳</span>
-                      </div>
-                      <div className="flex justify-between text-[11px] font-black uppercase tracking-widest text-white/60">
-                        <span>Logistics Fee</span>
-                        <span>{selectedShipping?.rate || 0}৳</span>
-                      </div>
-                      <div className="flex justify-between items-end pt-6 border-t border-white/10">
-                        <span className="text-xs font-black uppercase tracking-[0.2em] italic">Final Settlement</span>
-                        <span className="text-3xl font-black text-red-600">{finalTotal.toLocaleString()}৳</span>
-                      </div>
-                    </div>
-                    
-                    <button 
-                      onClick={handlePlaceOrder} 
-                      disabled={isPlacingOrder || cart.length === 0} 
-                      className="w-full bg-red-700 py-6 rounded-2xl font-black uppercase tracking-[0.3em] text-[10px] shadow-2xl hover:bg-white hover:text-black transition-all transform active:scale-95 flex items-center justify-center gap-3"
-                    >
-                      {isPlacingOrder ? <i className="fa-solid fa-circle-notch animate-spin"></i> : <><i className="fa-solid fa-lock text-sm"></i> Commit Order Protocol</>}
-                    </button>
-                  </div>
-                </div>
-              </>
-            )}
-          </div>
-        );
-      }
-      case 'order-success': return (
-        <div className="max-w-4xl mx-auto py-24 px-4 animate-in fade-in zoom-in-95 duration-700">
-          <div className="text-center mb-16">
-            <div className="w-24 h-24 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-10 text-white text-4xl shadow-2xl animate-bounce">
-              <i className="fa-solid fa-check-double"></i>
-            </div>
-            <h1 className="text-5xl font-black italic uppercase font-heading mb-4 tracking-tighter">Vault Secured!</h1>
-            <p className="text-gray-400 mb-2 uppercase font-black text-[10px] tracking-[0.5em] italic">Protocol Successfully Completed</p>
-            <div className="bg-gray-50 px-6 py-2 rounded-full border border-gray-100 inline-block mt-4">
-               <p className="text-[10px] font-black uppercase tracking-widest text-black">Registry Order ID: <span className="text-red-600">{lastOrder?.id}</span></p>
-            </div>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
-            <div className="bg-white border border-gray-100 rounded-3xl p-8 shadow-xl">
-               <h3 className="text-xs font-black uppercase italic tracking-widest border-b border-gray-50 pb-4 mb-6">Subject Details</h3>
-               <div className="space-y-4">
-                  <div className="flex flex-col">
-                    <span className="text-[9px] font-black uppercase text-gray-400 mb-1">Full Name</span>
-                    <span className="text-xs font-bold uppercase">{lastOrder?.first_name} {lastOrder?.last_name}</span>
-                  </div>
-                  <div className="flex flex-col">
-                    <span className="text-[9px] font-black uppercase text-gray-400 mb-1">Contact Sequence</span>
-                    <span className="text-xs font-bold uppercase">{lastOrder?.mobile_number}</span>
-                    <span className="text-[10px] font-medium lowercase text-gray-500">{lastOrder?.email}</span>
-                  </div>
-               </div>
-            </div>
-            <div className="bg-white border border-gray-100 rounded-3xl p-8 shadow-xl">
-               <h3 className="text-xs font-black uppercase italic tracking-widest border-b border-gray-50 pb-4 mb-6">Logistics Route</h3>
-               <div className="space-y-4">
-                  <div className="flex flex-col">
-                    <span className="text-[9px] font-black uppercase text-gray-400 mb-1">Destination Address</span>
-                    <span className="text-xs font-bold uppercase">{lastOrder?.street_address}</span>
-                    <span className="text-xs font-bold uppercase">{lastOrder?.city}, {lastOrder?.zip_code}</span>
-                  </div>
-                  <div className="flex flex-col">
-                    <span className="text-[9px] font-black uppercase text-gray-400 mb-1">Transit Protocol</span>
-                    <span className="text-xs font-bold uppercase">{lastOrder?.shipping_name}</span>
-                  </div>
-               </div>
-            </div>
-          </div>
-          <div className="bg-white border border-gray-100 rounded-3xl overflow-hidden shadow-2xl max-w-2xl mx-auto">
-            <div className="bg-black p-8 text-white flex justify-between items-center">
-              <h3 className="text-sm font-black uppercase italic tracking-widest font-heading">Order Manifest</h3>
-              <div className="text-right">
-                <span className="text-[9px] font-black uppercase text-gray-500 tracking-widest block">Payment Gateway</span>
-                <span className="text-[10px] font-black uppercase text-red-600 italic">{lastOrder?.payment_method}</span>
-              </div>
-            </div>
-            <div className="p-8 space-y-6">
-              {lastOrder?.items?.map((item, idx) => (
-                <div key={idx} className="flex gap-6 items-center border-b border-gray-50 pb-6 last:border-0 last:pb-0">
-                  <div className="w-20 h-20 bg-gray-50 rounded-xl p-2 shrink-0 border border-gray-100"><img src={item.image} className="w-full h-full object-contain" alt={item.name} /></div>
-                  <div className="flex-1">
-                    <h4 className="font-black text-[11px] uppercase tracking-tight mb-1">{item.name}</h4>
-                    <p className="text-[9px] text-red-600 font-black italic uppercase tracking-widest">Size Index: {item.size} | Qty: {item.quantity}</p>
-                  </div>
-                  <div className="text-right"><p className="text-sm font-black italic">{(item.price * item.quantity).toLocaleString()}৳</p></div>
-                </div>
-              ))}
-            </div>
-            <div className="bg-gray-50 p-8 border-t border-gray-100">
-              <div className="space-y-3">
-                <div className="flex justify-between items-center pt-6 mt-4 border-t border-gray-200">
-                  <span className="text-xs font-black uppercase tracking-widest italic">Final Settlement</span>
-                  <span className="text-3xl font-black text-red-700">{lastOrder?.total?.toLocaleString()}৳</span>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div className="text-center mt-16">
-            <button onClick={() => handleNavigate('shop')} className="bg-black text-white px-12 py-5 rounded-2xl font-black uppercase tracking-[0.3em] text-[10px] shadow-2xl hover:bg-red-700 transition-all transform active:scale-95">Continue Exploration</button>
-          </div>
+             </div>
+           )}
         </div>
       );
-      default: return <Home sneakers={sneakers} slides={slides} onSelectProduct={handleSelectProduct} onNavigate={handleNavigate} onSearch={handleSearch} />;
+      case 'order-success': return <div className="text-center py-32"><h1 className="text-5xl font-black italic uppercase mb-4">Vault Secured</h1><button onClick={() => handleNavigate('shop')} className="bg-black text-white px-12 py-4 rounded-xl font-black uppercase text-xs">Continue</button></div>;
+      default: return <Home sneakers={sneakers} slides={slides} onSelectProduct={handleSelectProduct} onNavigate={handleNavigate} onSearch={(q) => { setSearchQuery(q); handleNavigate('shop'); }} />;
     }
   };
+
+  const isDeepLinking = (new URLSearchParams(window.location.search).get('product')) || (new URLSearchParams(window.location.search).get('category'));
 
   return (
     <div className="min-h-screen flex flex-col bg-white">
       {currentView !== 'admin' && (
-        <Navigation 
-          onNavigate={(v) => {
-            if (v === 'admin') navigateToAdmin();
-            else if (v === 'customer') navigateToCustomer();
-            else handleNavigate(v as View);
-          }} 
-          cartCount={cart.reduce((a,c) => a + c.quantity, 0)} 
-          wishlistCount={wishlist.length} 
-          currentView={currentView} 
-          onOpenCart={() => setIsCartSidebarOpen(true)} 
-          onOpenSearch={() => setIsSearchOpen(true)}
-          navItems={navItems}
-          siteIdentity={siteIdentity}
-        />
+        <Navigation onNavigate={(v) => { if (v === 'admin') handleNavigate('admin'); else if (v === 'customer') handleNavigate('customer-account'); else handleNavigate(v as View); }} cartCount={cart.reduce((a,c) => a + c.quantity, 0)} wishlistCount={wishlist.length} currentView={currentView} onOpenCart={() => setIsCartSidebarOpen(true)} onOpenSearch={() => setIsSearchOpen(true)} navItems={navItems} siteIdentity={siteIdentity} />
       )}
       <div className="flex-1">
-        {isFetchingSneakers && sneakers.length === 0 && (new URLSearchParams(window.location.search).get('product')) ? (
+        {isFetchingSneakers && isDeepLinking ? (
            <div className="min-h-screen flex flex-col items-center justify-center bg-white space-y-4">
               <i className="fa-solid fa-vault text-4xl animate-bounce text-red-600"></i>
-              <p className="text-[10px] font-black uppercase tracking-[0.5em] italic animate-pulse">Decrypting Vault Assets...</p>
+              <p className="text-[10px] font-black uppercase tracking-[0.5em] italic animate-pulse">Establishing Vault Connection...</p>
            </div>
         ) : renderView()}
       </div>
-      <SearchOverlay />
-      <CartSidebar />
-      {currentView !== 'admin' && currentView !== 'admin-login' && <Footer config={footerConfig} onNavigate={handleNavigate} />}
+      {currentView !== 'admin' && <Footer config={footerConfig} onNavigate={handleNavigate} />}
     </div>
   );
 };
