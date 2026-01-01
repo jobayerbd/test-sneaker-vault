@@ -9,7 +9,6 @@ interface AdminOrdersProps {
   searchQuery: string;
   onSearchChange: (query: string) => void;
   onSelectOrder: (order: Order) => void;
-  // New Props for Pagination and Date Filter
   startDate: string;
   onStartDateChange: (date: string) => void;
   endDate: string;
@@ -18,6 +17,8 @@ interface AdminOrdersProps {
   totalPages: number;
   onPageChange: (page: number) => void;
   totalItems: number;
+  onRefresh?: () => void;
+  isRefreshing?: boolean;
 }
 
 const getStatusBadgeStyles = (status: string) => {
@@ -45,18 +46,33 @@ const AdminOrders: React.FC<AdminOrdersProps> = ({
   currentPage,
   totalPages,
   onPageChange,
-  totalItems
+  totalItems,
+  onRefresh,
+  isRefreshing
 }) => {
   return (
     <div className="space-y-8 animate-in fade-in">
       <div className="flex justify-between items-end gap-6 flex-wrap">
         <div>
-          <h1 className="text-3xl font-black uppercase italic font-heading">Protocol Registry</h1>
+          <div className="flex items-center gap-4">
+            <h1 className="text-3xl font-black uppercase italic font-heading">Protocol Registry</h1>
+            <button 
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onRefresh?.();
+              }}
+              className={`w-10 h-10 bg-white border border-gray-100 rounded-xl flex items-center justify-center text-gray-400 hover:text-black hover:border-black transition-all shadow-sm ${isRefreshing ? 'opacity-50 pointer-events-none' : ''}`}
+              title="Sync Manifest"
+            >
+              <i className={`fa-solid fa-sync text-xs ${isRefreshing ? 'animate-spin' : ''}`}></i>
+            </button>
+          </div>
           <p className="text-gray-400 text-xs font-bold uppercase tracking-widest mt-2 italic">Monitoring {totalItems} Transactions</p>
         </div>
         
         <div className="flex flex-wrap gap-4 items-end">
-          {/* Date Filters */}
           <div className="flex flex-col gap-1">
             <label className="text-[9px] font-black uppercase text-gray-400 px-1 italic">Start Date</label>
             <input 
@@ -76,7 +92,6 @@ const AdminOrders: React.FC<AdminOrdersProps> = ({
             />
           </div>
           
-          {/* Status Filter */}
           <div className="flex flex-col gap-1">
             <label className="text-[9px] font-black uppercase text-gray-400 px-1 italic">Status Protocol</label>
             <select 
@@ -89,7 +104,6 @@ const AdminOrders: React.FC<AdminOrdersProps> = ({
             </select>
           </div>
 
-          {/* Search Registry */}
           <div className="flex flex-col gap-1">
              <label className="text-[9px] font-black uppercase text-gray-400 px-1 italic">Search Manifest</label>
              <div className="relative">
@@ -150,7 +164,6 @@ const AdminOrders: React.FC<AdminOrdersProps> = ({
           </tbody>
         </table>
         
-        {/* Pagination Footer */}
         {totalPages > 1 && (
           <div className="bg-gray-50/50 px-8 py-6 flex justify-between items-center border-t border-gray-50">
             <span className="text-[10px] font-black uppercase text-gray-400 italic">
@@ -165,9 +178,7 @@ const AdminOrders: React.FC<AdminOrdersProps> = ({
                 <i className="fa-solid fa-chevron-left text-[10px]"></i>
               </button>
               
-              {/* Simple page numbers */}
               {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => {
-                // Show first, last, and current +/- 1
                 if (p === 1 || p === totalPages || (p >= currentPage - 1 && p <= currentPage + 1)) {
                   return (
                     <button

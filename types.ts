@@ -120,6 +120,7 @@ export interface OrderItem {
 
 export interface Order {
   id: string;
+  customer_id?: string;
   first_name: string;
   last_name: string;
   email: string;
@@ -157,4 +158,16 @@ export interface SiteIdentity {
   tagline: string;
   logo_url: string;
   favicon_url: string;
+}
+
+export interface Customer {
+  id: string;
+  email: string;
+  first_name?: string;
+  last_name?: string;
+  mobile_number?: string;
+  street_address?: string;
+  city?: string;
+  zip_code?: string;
+  created_at?: string;
 }

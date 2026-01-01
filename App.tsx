@@ -5,9 +5,10 @@ import Home from './components/Storefront/Home.tsx';
 import Shop from './components/Storefront/Shop.tsx';
 import ProductDetail from './components/Storefront/ProductDetail.tsx';
 import Dashboard from './components/Admin/Dashboard.tsx';
-import Login from './components/Admin/Login.tsx';
 import Footer from './components/Footer.tsx';
-import { Sneaker, CartItem, Order, OrderStatus, ShippingOption, FooterConfig, TimelineEvent, BrandEntity, Category, PaymentMethod, HomeSlide, NavItem, CheckoutField, SiteIdentity } from './types.ts';
+import UnifiedLogin from './components/Auth/UnifiedLogin.tsx';
+import CustomerPortal from './components/Customer/CustomerPortal.tsx';
+import { Sneaker, CartItem, Order, OrderStatus, ShippingOption, FooterConfig, TimelineEvent, BrandEntity, Category, PaymentMethod, HomeSlide, NavItem, CheckoutField, SiteIdentity, Customer } from './types.ts';
 
 const SUPABASE_URL = 'https://vwbctddmakbnvfxzrjeo.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_8WhV41Km5aj8Dhvu6tUbvA_JnyPoVxu';
@@ -37,12 +38,14 @@ const trackFBPixel = (event: string, params?: any) => {
   }
 };
 
-type View = 'home' | 'shop' | 'admin' | 'cart' | 'pdp' | 'wishlist' | 'checkout' | 'order-success' | 'admin-login';
+type View = 'home' | 'shop' | 'admin' | 'cart' | 'pdp' | 'wishlist' | 'checkout' | 'order-success' | 'admin-login' | 'customer-login' | 'customer-account' | 'order-details-view';
 
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<View>('home');
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
+  const [currentCustomer, setCurrentCustomer] = useState<Customer | null>(null);
   const [selectedProduct, setSelectedProduct] = useState<Sneaker | null>(null);
+  const [viewingOrder, setViewingOrder] = useState<Order | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [wishlist, setWishlist] = useState<Sneaker[]>([]);
@@ -63,34 +66,139 @@ const App: React.FC = () => {
   
   const [isPlacingOrder, setIsPlacingOrder] = useState(false);
   const [isFetchingSneakers, setIsFetchingSneakers] = useState(false);
+  const [isFetchingOrders, setIsFetchingOrders] = useState(false);
   const [isCartSidebarOpen, setIsCartSidebarOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
   const [checkoutForm, setCheckoutForm] = useState<Record<string, any>>({});
+  const [createAccount, setCreateAccount] = useState(false);
+  const [accountPassword, setAccountPassword] = useState('');
 
   const pixelInitialized = useRef(false);
 
-  /**
-   * Safe wrapper for History API pushState to avoid SecurityError in sandboxed environments.
-   */
   const safePushState = (state: any, title: string, url: string) => {
     try {
       window.history.pushState(state, title, url);
     } catch (e) {
-      console.warn('SneakerVault: History pushState blocked by browser security policy. This is expected in some preview environments.', e);
+      console.warn('SneakerVault: History pushState blocked by browser security policy.', e);
     }
   };
 
-  // 1. Initial Data Fetch & Pixel Init
+  const fetchOrders = useCallback(async () => {
+    setIsFetchingOrders(true);
+    try {
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/orders?select=*&order=created_at.desc`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } });
+      if (response.ok) setOrders(await response.json());
+    } catch (err) {} finally { setIsFetchingOrders(false); }
+  }, []);
+
+  const fetchSneakers = useCallback(async () => {
+    setIsFetchingSneakers(true);
+    try {
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/sneakers?select=*&order=name.asc`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } });
+      if (response.ok) setSneakers(await response.json());
+    } finally { setIsFetchingSneakers(false); }
+  }, []);
+
+  const fetchBrands = useCallback(async () => {
+    try {
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/brands?select=*&order=name.asc`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } });
+      if (response.ok) setBrands(await response.json());
+    } catch (err) {}
+  }, []);
+
+  const fetchCategories = useCallback(async () => {
+    try {
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/categories?select=*&order=name.asc`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } });
+      if (response.ok) setCategories(await response.json());
+    } catch (err) {}
+  }, []);
+
+  const fetchPaymentMethods = useCallback(async () => {
+    try {
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/payment_methods?select=*&order=name.asc`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } });
+      if (response.ok) {
+        const data = await response.json();
+        setPaymentMethods(data);
+        if (data.length > 0) setSelectedPayment(data[0]);
+      }
+    } catch (err) {}
+  }, []);
+
+  const fetchSlides = useCallback(async () => {
+    try {
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/home_slides?select=*&order=order.asc`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } });
+      if (response.ok) setSlides(await response.json());
+    } catch (err) {}
+  }, []);
+
+  const fetchNavItems = useCallback(async () => {
+    try {
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/site_navigation?select=*&order=order.asc`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } });
+      if (response.ok) setNavItems(await response.json());
+    } catch (err) {}
+  }, []);
+
+  const fetchCheckoutFields = useCallback(async () => {
+    try {
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/checkout_fields?select=*&order=order.asc`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } });
+      if (response.ok) setCheckoutFields(await response.json());
+    } catch (err) {}
+  }, []);
+
+  const fetchShippingOptions = useCallback(async () => {
+    try {
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/shipping_options?select=*&order=rate.asc`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } });
+      if (response.ok) {
+        const data = await response.json();
+        setShippingOptions(data);
+        if (data.length > 0) setSelectedShipping(data[0]);
+      }
+    } catch (err) {}
+  }, []);
+
+  const fetchFooterConfig = useCallback(async () => {
+    try {
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/site_settings?key=eq.footer&select=data`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } });
+      if (response.ok) {
+        const data = await response.json();
+        if (data[0]) setFooterConfig(data[0].data);
+      }
+    } catch (err) {}
+  }, []);
+
+  const fetchSiteIdentity = useCallback(async () => {
+    try {
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/site_settings?key=eq.identity&select=data`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } });
+      if (response.ok) {
+        const data = await response.json();
+        if (data[0]) setSiteIdentity(data[0].data);
+      }
+    } catch (err) {}
+  }, []);
+
   useEffect(() => {
     fetchSneakers(); fetchOrders(); fetchShippingOptions(); fetchFooterConfig(); 
     fetchBrands(); fetchCategories(); fetchPaymentMethods(); fetchSlides(); 
     fetchNavItems(); fetchCheckoutFields(); fetchSiteIdentity();
     if (localStorage.getItem('sv_admin_session') === 'active') setIsAdminAuthenticated(true);
+    const storedCustomer = localStorage.getItem('sv_customer_session');
+    if (storedCustomer) {
+      const parsed = JSON.parse(storedCustomer);
+      setCurrentCustomer(parsed);
+      setCheckoutForm({
+        first_name: parsed.first_name || '',
+        last_name: parsed.last_name || '',
+        email: parsed.email || '',
+        mobile_number: parsed.mobile_number || '',
+        street_address: parsed.street_address || '',
+        city: parsed.city || '',
+        zip_code: parsed.zip_code || ''
+      });
+    }
   }, []);
 
-  // Sync Identity with Browser Metadata
   useEffect(() => {
     document.title = siteIdentity.title + (siteIdentity.tagline ? ` - ${siteIdentity.tagline}` : '');
     const link = document.querySelector("link[rel~='icon']") as HTMLLinkElement;
@@ -99,7 +207,6 @@ const App: React.FC = () => {
     }
   }, [siteIdentity]);
 
-  // 2. Pixel Script Inserter
   useEffect(() => {
     const pixelId = footerConfig.fb_pixel_id?.trim();
     if (!pixelId || pixelInitialized.current) return;
@@ -114,13 +221,13 @@ const App: React.FC = () => {
     pixelInitialized.current = true;
   }, [footerConfig.fb_pixel_id]);
 
-  // 3. Routing & Deep Linking Hub
   const syncViewFromUrl = useCallback(() => {
     const params = new URLSearchParams(window.location.search);
     const productSlug = params.get('product');
     const categorySlug = params.get('category');
-    const view = params.get('view') as View || 'home';
+    const viewParam = params.get('view') as View;
 
+    // Priority 1: Product Detail View
     if (productSlug && sneakers.length > 0) {
       const product = sneakers.find(s => s.slug === productSlug || s.id === productSlug);
       if (product) {
@@ -130,13 +237,23 @@ const App: React.FC = () => {
       }
     }
 
+    // Priority 2: Category Filter in Shop
     if (categorySlug) {
       setSelectedCategory(categorySlug);
       setCurrentView('shop');
       return;
     }
 
-    setCurrentView(view);
+    // Priority 3: Specific View from URL
+    if (viewParam) {
+      setCurrentView(viewParam);
+      return;
+    }
+
+    // Fallback: Default view (usually 'home')
+    if (!productSlug && !categorySlug && !viewParam) {
+       setCurrentView('home');
+    }
   }, [sneakers]);
 
   useEffect(() => {
@@ -145,33 +262,15 @@ const App: React.FC = () => {
     return () => window.removeEventListener('popstate', syncViewFromUrl);
   }, [syncViewFromUrl]);
 
-  // 4. MASTER PIXEL TRACKER: Watches URL changes
   useEffect(() => {
     const pixelId = footerConfig.fb_pixel_id?.trim();
     if (!pixelId) return;
-
     window.scrollTo({ top: 0, behavior: 'auto' });
-    
-    // Step A: Reset PageView context for the new URL
     trackFBPixel('PageView');
-
-    // Step B: If in PDP, send fresh product data
     if (currentView === 'pdp' && selectedProduct) {
-      trackFBPixel('ViewContent', {
-        content_ids: [String(selectedProduct.id)],
-        content_name: selectedProduct.name,
-        content_type: 'product',
-        value: selectedProduct.price,
-        currency: 'BDT',
-        content_category: selectedProduct.category || 'Sneakers'
-      });
-      console.log(`[PIXEL-SYNC] Tracked: ${selectedProduct.name}`);
+      trackFBPixel('ViewContent', { content_ids: [String(selectedProduct.id)], content_name: selectedProduct.name, content_type: 'product', value: selectedProduct.price, currency: 'BDT', content_category: selectedProduct.category || 'Sneakers' });
     } else if (currentView === 'checkout') {
-      trackFBPixel('InitiateCheckout', {
-        num_items: cart.length,
-        value: cart.reduce((acc, item) => acc + (item.price * item.quantity), 0),
-        currency: 'BDT'
-      });
+      trackFBPixel('InitiateCheckout', { num_items: cart.length, value: cart.reduce((acc, item) => acc + (item.price * item.quantity), 0), currency: 'BDT' });
     }
   }, [selectedProduct?.id, currentView, footerConfig.fb_pixel_id]);
 
@@ -186,167 +285,63 @@ const App: React.FC = () => {
     setCurrentView('pdp');
     setIsCartSidebarOpen(false);
     const slug = sneaker.slug || sneaker.id;
-    safePushState({ view: 'pdp', slug }, '', `${window.location.pathname}?product=${slug}`);
+    // CRITICAL FIX: Ensure 'view=pdp' is in the URL so syncViewFromUrl doesn't default to home
+    safePushState({ view: 'pdp', slug }, '', `${window.location.pathname}?view=pdp&product=${slug}`);
   };
 
   const handleSelectCategory = (slug: string | null) => {
     setSelectedCategory(slug);
     setCurrentView('shop');
-    const queryString = slug ? `?category=${slug}` : `?view=shop`;
+    const queryString = slug ? `?view=shop&category=${slug}` : `?view=shop`;
     safePushState({ view: 'shop', category: slug }, '', window.location.pathname + queryString);
   };
 
-  const fetchSneakers = useCallback(async () => {
-    setIsFetchingSneakers(true);
+  const handleUpdateCustomerProfile = async (updates: Partial<Customer>): Promise<boolean> => {
+    if (!currentCustomer) return false;
     try {
-      const response = await fetch(`${SUPABASE_URL}/rest/v1/sneakers?select=*&order=name.asc`, {
-        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
-      });
-      if (response.ok) setSneakers(await response.json());
-    } finally { setIsFetchingSneakers(false); }
-  }, []);
-
-  const fetchBrands = useCallback(async () => {
-    try {
-      const response = await fetch(`${SUPABASE_URL}/rest/v1/brands?select=*&order=name.asc`, {
-        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
-      });
-      if (response.ok) setBrands(await response.json());
-    } catch (err) {}
-  }, []);
-
-  const fetchCategories = useCallback(async () => {
-    try {
-      const response = await fetch(`${SUPABASE_URL}/rest/v1/categories?select=*&order=name.asc`, {
-        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
-      });
-      if (response.ok) setCategories(await response.json());
-    } catch (err) {}
-  }, []);
-
-  const fetchPaymentMethods = useCallback(async () => {
-    try {
-      const response = await fetch(`${SUPABASE_URL}/rest/v1/payment_methods?select=*&order=name.asc`, {
-        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/customers?id=eq.${currentCustomer.id}`, {
+        method: 'PATCH',
+        headers: {
+          'apikey': SUPABASE_KEY,
+          'Authorization': `Bearer ${SUPABASE_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(updates)
       });
       if (response.ok) {
-        const data = await response.json();
-        setPaymentMethods(data);
-        if (data.length > 0) setSelectedPayment(data[0]);
+        const updated = { ...currentCustomer, ...updates };
+        setCurrentCustomer(updated);
+        localStorage.setItem('sv_customer_session', JSON.stringify(updated));
+        setCheckoutForm({
+          ...checkoutForm,
+          first_name: updated.first_name || checkoutForm.first_name,
+          last_name: updated.last_name || checkoutForm.last_name,
+          mobile_number: updated.mobile_number || checkoutForm.mobile_number,
+          street_address: updated.street_address || checkoutForm.street_address,
+          city: updated.city || checkoutForm.city,
+          zip_code: updated.zip_code || checkoutForm.zip_code
+        });
+        return true;
       }
-    } catch (err) {}
-  }, []);
-
-  const fetchSlides = useCallback(async () => {
-    try {
-      const response = await fetch(`${SUPABASE_URL}/rest/v1/home_slides?select=*&order=order.asc`, {
-        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
-      });
-      if (response.ok) setSlides(await response.json());
-    } catch (err) {}
-  }, []);
-
-  const fetchNavItems = useCallback(async () => {
-    try {
-      const response = await fetch(`${SUPABASE_URL}/rest/v1/site_navigation?select=*&order=order.asc`, {
-        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
-      });
-      if (response.ok) setNavItems(await response.json());
-    } catch (err) {}
-  }, []);
-
-  const fetchCheckoutFields = useCallback(async () => {
-    try {
-      const response = await fetch(`${SUPABASE_URL}/rest/v1/checkout_fields?select=*&order=order.asc`, {
-        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
-      });
-      if (response.ok) setCheckoutFields(await response.json());
-    } catch (err) {}
-  }, []);
-
-  const fetchOrders = useCallback(async () => {
-    try {
-      const response = await fetch(`${SUPABASE_URL}/rest/v1/orders?select=*&order=created_at.desc`, {
-        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
-      });
-      if (response.ok) setOrders(await response.json());
-    } catch (err) {}
-  }, []);
-
-  const fetchShippingOptions = useCallback(async () => {
-    try {
-      const response = await fetch(`${SUPABASE_URL}/rest/v1/shipping_options?select=*&order=rate.asc`, {
-        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
-      });
-      if (response.ok) {
-        const data = await response.json();
-        setShippingOptions(data);
-        if (data.length > 0) setSelectedShipping(data[0]);
-      }
-    } catch (err) {}
-  }, []);
-
-  const fetchFooterConfig = useCallback(async () => {
-    try {
-      const response = await fetch(`${SUPABASE_URL}/rest/v1/site_settings?key=eq.footer&select=data`, {
-        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
-      });
-      if (response.ok) {
-        const data = await response.json();
-        if (data[0]) setFooterConfig(data[0].data);
-      }
-    } catch (err) {}
-  }, []);
-
-  const fetchSiteIdentity = useCallback(async () => {
-    try {
-      const response = await fetch(`${SUPABASE_URL}/rest/v1/site_settings?key=eq.identity&select=data`, {
-        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
-      });
-      if (response.ok) {
-        const data = await response.json();
-        if (data[0]) setSiteIdentity(data[0].data);
-      }
-    } catch (err) {}
-  }, []);
+      return false;
+    } catch (err) { return false; }
+  };
 
   const handleAddToCart = (item: CartItem, shouldCheckout: boolean = false) => {
     setCart(prev => {
       const existing = prev.find(i => i.id === item.id && i.selectedSize === item.selectedSize);
-      if (existing) {
-        return prev.map(i => (i.id === item.id && i.selectedSize === item.selectedSize) ? { ...i, quantity: i.quantity + item.quantity } : i);
-      }
+      if (existing) { return prev.map(i => (i.id === item.id && i.selectedSize === item.selectedSize) ? { ...i, quantity: i.quantity + item.quantity } : i); }
       return [...prev, item];
     });
-    
-    trackFBPixel('AddToCart', { 
-      content_ids: [String(item.id)], 
-      content_name: item.name, 
-      content_type: 'product',
-      value: item.price, 
-      currency: 'BDT' 
-    });
-
-    if (shouldCheckout) {
-      handleNavigate('checkout');
-      setIsCartSidebarOpen(false);
-    } else {
-      setIsCartSidebarOpen(true);
-    }
+    trackFBPixel('AddToCart', { content_ids: [String(item.id)], content_name: item.name, content_type: 'product', value: item.price, currency: 'BDT' });
+    if (shouldCheckout) { handleNavigate('checkout'); setIsCartSidebarOpen(false); } else { setIsCartSidebarOpen(true); }
   };
 
   const toggleWishlist = (sneaker: Sneaker) => {
     setWishlist(prev => {
       const exists = prev.find(s => s.id === sneaker.id);
       if (exists) return prev.filter(s => s.id !== sneaker.id);
-      
-      trackFBPixel('AddToWishlist', {
-        content_ids: [String(sneaker.id)],
-        content_name: sneaker.name,
-        value: sneaker.price,
-        currency: 'BDT'
-      });
-      
+      trackFBPixel('AddToWishlist', { content_ids: [String(sneaker.id)], content_name: sneaker.name, value: sneaker.price, currency: 'BDT' });
       return [...prev, sneaker];
     });
   };
@@ -354,22 +349,11 @@ const App: React.FC = () => {
   const handleUpdateOrderStatus = async (orderId: string, newStatus: OrderStatus) => {
     const order = orders.find(o => o.id === orderId);
     if (!order) return false;
-    const newEvent: TimelineEvent = {
-      status: newStatus,
-      timestamp: new Date().toISOString(),
-      note: `Status protocol updated to ${newStatus}.`
-    };
+    const newEvent: TimelineEvent = { status: newStatus, timestamp: new Date().toISOString(), note: `Status protocol updated to ${newStatus}.` };
     const updatedTimeline = [...(order.timeline || []), newEvent];
     try {
-      const response = await fetch(`${SUPABASE_URL}/rest/v1/orders?id=eq.${orderId}`, {
-        method: 'PATCH',
-        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', 'Prefer': 'return=representation' },
-        body: JSON.stringify({ status: newStatus, timeline: updatedTimeline })
-      });
-      if (response.ok) {
-        setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: newStatus, timeline: updatedTimeline } : o));
-        return true;
-      }
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/orders?id=eq.${orderId}`, { method: 'PATCH', headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', 'Prefer': 'return=representation' }, body: JSON.stringify({ status: newStatus, timeline: updatedTimeline }) });
+      if (response.ok) { setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: newStatus, timeline: updatedTimeline } : o)); return true; }
       return false;
     } catch (err) { return false; }
   };
@@ -385,6 +369,12 @@ const App: React.FC = () => {
       }
     }
 
+    if (createAccount && (!checkoutForm.email || !accountPassword)) {
+      setCheckoutError("AUTH ERROR: EMAIL AND PASSWORD ARE MANDATORY FOR ACCOUNT CREATION");
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
     if (!selectedShipping || !selectedPayment) { 
       setCheckoutError("LOGISTICS ERROR: PROTOCOL NOT INITIALIZED");
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -392,17 +382,61 @@ const App: React.FC = () => {
     }
     
     setIsPlacingOrder(true);
+    let customerId = currentCustomer?.id;
+
+    if (currentCustomer) {
+      const hasChanges = checkoutForm.street_address !== currentCustomer.street_address || 
+                         checkoutForm.city !== currentCustomer.city ||
+                         checkoutForm.zip_code !== currentCustomer.zip_code;
+      if (hasChanges) {
+        await handleUpdateCustomerProfile({
+          street_address: checkoutForm.street_address,
+          city: checkoutForm.city,
+          zip_code: checkoutForm.zip_code,
+          first_name: checkoutForm.first_name,
+          last_name: checkoutForm.last_name,
+          mobile_number: checkoutForm.mobile_number
+        });
+      }
+    }
+
+    if (createAccount && !currentCustomer) {
+      try {
+        const checkResp = await fetch(`${SUPABASE_URL}/rest/v1/customers?email=eq.${checkoutForm.email}&select=id`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } });
+        const existing = await checkResp.json();
+        if (existing.length > 0) {
+          setCheckoutError("REGISTRY ERROR: EMAIL ALREADY LOGGED IN VAULT ARCHIVES");
+          setIsPlacingOrder(false);
+          return;
+        }
+        const newCust = { 
+          email: checkoutForm.email, 
+          password: accountPassword, 
+          first_name: checkoutForm.first_name, 
+          last_name: checkoutForm.last_name, 
+          mobile_number: checkoutForm.mobile_number, 
+          street_address: checkoutForm.street_address, 
+          city: checkoutForm.city, 
+          zip_code: checkoutForm.zip_code
+        };
+        const custResp = await fetch(`${SUPABASE_URL}/rest/v1/customers`, { method: 'POST', headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', 'Prefer': 'return=representation' }, body: JSON.stringify(newCust) });
+        if (custResp.ok) {
+          const savedCust = (await custResp.json())[0];
+          customerId = savedCust.id;
+          setCurrentCustomer(savedCust);
+          localStorage.setItem('sv_customer_session', JSON.stringify(savedCust));
+        }
+      } catch (err) {}
+    }
+
     const subtotal = cart.reduce((acc, item) => acc + (item.price * item.quantity), 0);
     const total = subtotal + selectedShipping.rate;
     const orderId = `ORD-${Math.floor(Math.random() * 90000) + 10000}`;
-    const initialTimeline: TimelineEvent[] = [{
-      status: OrderStatus.PLACED,
-      timestamp: new Date().toISOString(),
-      note: 'Order protocol initiated and secured.'
-    }];
+    const initialTimeline: TimelineEvent[] = [{ status: OrderStatus.PLACED, timestamp: new Date().toISOString(), note: 'Order protocol initiated and secured.' }];
     
     const newOrder = {
       id: orderId, 
+      customer_id: customerId,
       first_name: checkoutForm.first_name || 'Guest', 
       last_name: checkoutForm.last_name || '', 
       email: checkoutForm.email || 'guest@sneakervault.bd', 
@@ -420,11 +454,7 @@ const App: React.FC = () => {
     };
     
     try {
-      const response = await fetch(`${SUPABASE_URL}/rest/v1/orders`, {
-        method: 'POST',
-        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', 'Prefer': 'return=representation' },
-        body: JSON.stringify(newOrder)
-      });
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/orders`, { method: 'POST', headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', 'Prefer': 'return=representation' }, body: JSON.stringify(newOrder) });
       if (response.ok) {
         const saved = (await response.json())[0];
         trackFBPixel('Purchase', { value: total, currency: 'BDT', content_ids: cart.map(item => String(item.id)), content_type: 'product', num_items: cart.length });
@@ -432,12 +462,8 @@ const App: React.FC = () => {
         setLastOrder(saved);
         setCart([]);
         handleNavigate('order-success');
-      } else {
-        setCheckoutError("SERVER ERROR: VAULT CONNECTION TIMEOUT");
-      }
-    } catch (err) { 
-      setCheckoutError("CRITICAL SYSTEM ERROR: TRANSACTION FAILED");
-    } finally { setIsPlacingOrder(false); }
+      } else { setCheckoutError("SERVER ERROR: VAULT CONNECTION TIMEOUT"); }
+    } catch (err) { setCheckoutError("CRITICAL SYSTEM ERROR: TRANSACTION FAILED"); } finally { setIsPlacingOrder(false); }
   };
 
   const handleSaveCheckoutField = async (data: Partial<CheckoutField>): Promise<boolean> => {
@@ -445,11 +471,7 @@ const App: React.FC = () => {
     const url = isUpdate ? `${SUPABASE_URL}/rest/v1/checkout_fields?id=eq.${data.id}` : `${SUPABASE_URL}/rest/v1/checkout_fields`;
     const method = isUpdate ? 'PATCH' : 'POST';
     try {
-      const response = await fetch(url, {
-        method,
-        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify(data)
-      });
+      const response = await fetch(url, { method, headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
       if (response.ok) { fetchCheckoutFields(); return true; }
       return false;
     } catch (err) { return false; }
@@ -457,10 +479,7 @@ const App: React.FC = () => {
 
   const handleDeleteCheckoutField = async (id: string): Promise<boolean> => {
     try {
-      const response = await fetch(`${SUPABASE_URL}/rest/v1/checkout_fields?id=eq.${id}`, {
-        method: 'DELETE',
-        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Prefer': 'return=representation' }
-      });
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/checkout_fields?id=eq.${id}`, { method: 'DELETE', headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Prefer': 'return=representation' } });
       if (response.ok || response.status === 204) { await fetchCheckoutFields(); return true; }
       return false;
     } catch (err) { return false; }
@@ -471,11 +490,7 @@ const App: React.FC = () => {
     const url = isUpdate ? `${SUPABASE_URL}/rest/v1/home_slides?id=eq.${data.id}` : `${SUPABASE_URL}/rest/v1/home_slides`;
     const method = isUpdate ? 'PATCH' : 'POST';
     try {
-      const response = await fetch(url, {
-        method,
-        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify(data)
-      });
+      const response = await fetch(url, { method, headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
       if (response.ok) { fetchSlides(); return true; }
       return false;
     } catch (err) { return false; }
@@ -483,10 +498,7 @@ const App: React.FC = () => {
 
   const handleDeleteSlide = async (id: string): Promise<boolean> => {
     try {
-      const response = await fetch(`${SUPABASE_URL}/rest/v1/home_slides?id=eq.${id}`, {
-        method: 'DELETE',
-        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
-      });
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/home_slides?id=eq.${id}`, { method: 'DELETE', headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } });
       if (response.ok) { fetchSlides(); return true; }
       return false;
     } catch (err) { return false; }
@@ -497,11 +509,7 @@ const App: React.FC = () => {
     const url = isUpdate ? `${SUPABASE_URL}/rest/v1/site_navigation?id=eq.${data.id}` : `${SUPABASE_URL}/rest/v1/site_navigation`;
     const method = isUpdate ? 'PATCH' : 'POST';
     try {
-      const response = await fetch(url, {
-        method,
-        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify(data)
-      });
+      const response = await fetch(url, { method, headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
       if (response.ok) { fetchNavItems(); return true; }
       return false;
     } catch (err) { return false; }
@@ -509,10 +517,7 @@ const App: React.FC = () => {
 
   const handleDeleteNavItem = async (id: string): Promise<boolean> => {
     try {
-      const response = await fetch(`${SUPABASE_URL}/rest/v1/site_navigation?id=eq.${id}`, {
-        method: 'DELETE',
-        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Prefer': 'return=representation' }
-      });
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/site_navigation?id=eq.${id}`, { method: 'DELETE', headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Prefer': 'return=representation' } });
       if (response.ok || response.status === 204) { await fetchNavItems(); return true; }
       return false;
     } catch (err) { return false; }
@@ -523,11 +528,7 @@ const App: React.FC = () => {
     const url = isUpdate ? `${SUPABASE_URL}/rest/v1/sneakers?id=eq.${data.id}` : `${SUPABASE_URL}/rest/v1/sneakers`;
     const method = isUpdate ? 'PATCH' : 'POST';
     try {
-      const response = await fetch(url, {
-        method,
-        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify(data)
-      });
+      const response = await fetch(url, { method, headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
       if (response.ok) { fetchSneakers(); return true; }
       return false;
     } catch (err) { return false; }
@@ -535,10 +536,7 @@ const App: React.FC = () => {
 
   const handleDeleteProduct = async (id: string): Promise<boolean> => {
     try {
-      const response = await fetch(`${SUPABASE_URL}/rest/v1/sneakers?id=eq.${id}`, {
-        method: 'DELETE',
-        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
-      });
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/sneakers?id=eq.${id}`, { method: 'DELETE', headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } });
       if (response.ok) { fetchSneakers(); return true; }
       return false;
     } catch (err) { return false; }
@@ -549,11 +547,7 @@ const App: React.FC = () => {
     const url = isUpdate ? `${SUPABASE_URL}/rest/v1/brands?id=eq.${data.id}` : `${SUPABASE_URL}/rest/v1/brands`;
     const method = isUpdate ? 'PATCH' : 'POST';
     try {
-      const response = await fetch(url, {
-        method,
-        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify(data)
-      });
+      const response = await fetch(url, { method, headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
       if (response.ok) { fetchBrands(); return true; }
       return false;
     } catch (err) { return false; }
@@ -561,10 +555,7 @@ const App: React.FC = () => {
 
   const handleDeleteBrand = async (id: string): Promise<boolean> => {
     try {
-      const response = await fetch(`${SUPABASE_URL}/rest/v1/brands?id=eq.${id}`, {
-        method: 'DELETE',
-        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
-      });
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/brands?id=eq.${id}`, { method: 'DELETE', headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } });
       if (response.ok) { fetchBrands(); return true; }
       return false;
     } catch (err) { return false; }
@@ -575,11 +566,7 @@ const App: React.FC = () => {
     const url = isUpdate ? `${SUPABASE_URL}/rest/v1/categories?id=eq.${data.id}` : `${SUPABASE_URL}/rest/v1/categories`;
     const method = isUpdate ? 'PATCH' : 'POST';
     try {
-      const response = await fetch(url, {
-        method,
-        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify(data)
-      });
+      const response = await fetch(url, { method, headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
       if (response.ok) { fetchCategories(); return true; }
       return false;
     } catch (err) { return false; }
@@ -587,10 +574,7 @@ const App: React.FC = () => {
 
   const handleDeleteCategoryData = async (id: string): Promise<boolean> => {
     try {
-      const response = await fetch(`${SUPABASE_URL}/rest/v1/categories?id=eq.${id}`, {
-        method: 'DELETE',
-        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
-      });
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/categories?id=eq.${id}`, { method: 'DELETE', headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } });
       if (response.ok) { fetchCategories(); return true; }
       return false;
     } catch (err) { return false; }
@@ -601,11 +585,7 @@ const App: React.FC = () => {
     const url = isUpdate ? `${SUPABASE_URL}/rest/v1/shipping_options?id=eq.${data.id}` : `${SUPABASE_URL}/rest/v1/shipping_options`;
     const method = isUpdate ? 'PATCH' : 'POST';
     try {
-      const response = await fetch(url, {
-        method,
-        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify(data)
-      });
+      const response = await fetch(url, { method, headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
       if (response.ok) { fetchShippingOptions(); return true; }
       return false;
     } catch (err) { return false; }
@@ -613,10 +593,7 @@ const App: React.FC = () => {
 
   const handleDeleteShippingOption = async (id: string): Promise<boolean> => {
     try {
-      const response = await fetch(`${SUPABASE_URL}/rest/v1/shipping_options?id=eq.${id}`, {
-        method: 'DELETE',
-        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
-      });
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/shipping_options?id=eq.${id}`, { method: 'DELETE', headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } });
       if (response.ok) { fetchShippingOptions(); return true; }
       return false;
     } catch (err) { return false; }
@@ -627,11 +604,7 @@ const App: React.FC = () => {
     const url = isUpdate ? `${SUPABASE_URL}/rest/v1/payment_methods?id=eq.${data.id}` : `${SUPABASE_URL}/rest/v1/payment_methods`;
     const method = isUpdate ? 'PATCH' : 'POST';
     try {
-      const response = await fetch(url, {
-        method,
-        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify(data)
-      });
+      const response = await fetch(url, { method, headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
       if (response.ok) { fetchPaymentMethods(); return true; }
       return false;
     } catch (err) { return false; }
@@ -639,10 +612,7 @@ const App: React.FC = () => {
 
   const handleDeletePaymentMethod = async (id: string): Promise<boolean> => {
     try {
-      const response = await fetch(`${SUPABASE_URL}/rest/v1/payment_methods?id=eq.${id}`, {
-        method: 'DELETE',
-        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
-      });
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/payment_methods?id=eq.${id}`, { method: 'DELETE', headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } });
       if (response.ok) { fetchPaymentMethods(); return true; }
       return false;
     } catch (err) { return false; }
@@ -650,11 +620,7 @@ const App: React.FC = () => {
 
   const handleSaveFooterConfig = async (config: FooterConfig): Promise<boolean> => {
     try {
-      const response = await fetch(`${SUPABASE_URL}/rest/v1/site_settings?key=eq.footer`, {
-        method: 'PATCH',
-        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ data: config })
-      });
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/site_settings?key=eq.footer`, { method: 'PATCH', headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ data: config }) });
       if (response.ok) { setFooterConfig(config); return true; }
       return false;
     } catch (err) { return false; }
@@ -662,32 +628,19 @@ const App: React.FC = () => {
 
   const handleSaveIdentity = async (config: SiteIdentity): Promise<boolean> => {
     try {
-      const response = await fetch(`${SUPABASE_URL}/rest/v1/site_settings?key=eq.identity`, {
-        method: 'PATCH',
-        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ data: config })
-      });
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/site_settings?key=eq.identity`, { method: 'PATCH', headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ data: config }) });
       if (response.ok) { setSiteIdentity(config); return true; }
       return false;
     } catch (err) { return false; }
   };
 
-  const handleLogout = () => { 
-    localStorage.removeItem('sv_admin_session'); 
-    setIsAdminAuthenticated(false); 
-    handleNavigate('home'); 
-  };
+  const handleLogout = () => { localStorage.removeItem('sv_admin_session'); setIsAdminAuthenticated(false); handleNavigate('home'); };
+  const handleCustomerLogout = () => { localStorage.removeItem('sv_customer_session'); setCurrentCustomer(null); handleNavigate('home'); };
 
-  const navigateToAdmin = () => {
-    if (isAdminAuthenticated) handleNavigate('admin');
-    else handleNavigate('admin-login');
-  };
+  const navigateToAdmin = () => { if (isAdminAuthenticated) handleNavigate('admin'); else handleNavigate('admin-login'); };
+  const navigateToCustomer = () => { if (currentCustomer) handleNavigate('customer-account'); else handleNavigate('customer-login'); };
 
-  const handleSearch = (query: string) => {
-    setSearchQuery(query);
-    setIsSearchOpen(false);
-    handleNavigate('shop');
-  };
+  const handleSearch = (query: string) => { setSearchQuery(query); setIsSearchOpen(false); handleNavigate('shop'); };
 
   const SearchOverlay = () => {
     const [localQuery, setLocalQuery] = useState('');
@@ -697,21 +650,8 @@ const App: React.FC = () => {
         <div className="max-w-4xl w-full mx-auto flex flex-col items-center">
           <p className="text-red-600 text-[10px] md:text-xs font-black uppercase tracking-[0.5em] mb-8 italic">Archive Search Protocol</p>
           <div className="w-full relative">
-            <input 
-              autoFocus={isSearchOpen}
-              type="text" 
-              value={localQuery}
-              onChange={(e) => setLocalQuery(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleSearch(localQuery)}
-              placeholder="ENTER ASSET NAME..." 
-              className="w-full bg-transparent border-b-4 border-white/20 focus:border-red-600 outline-none text-white text-4xl md:text-7xl font-black italic uppercase font-heading py-8 transition-colors"
-            />
-            <button 
-              onClick={() => handleSearch(localQuery)}
-              className="absolute right-0 bottom-8 text-white text-4xl hover:text-red-600 transition-colors"
-            >
-              <i className="fa-solid fa-arrow-right-long"></i>
-            </button>
+            <input autoFocus={isSearchOpen} type="text" value={localQuery} onChange={(e) => setLocalQuery(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleSearch(localQuery)} placeholder="ENTER ASSET NAME..." className="w-full bg-transparent border-b-4 border-white/20 focus:border-red-600 outline-none text-white text-4xl md:text-7xl font-black italic uppercase font-heading py-8 transition-colors" />
+            <button onClick={() => handleSearch(localQuery)} className="absolute right-0 bottom-8 text-white text-4xl hover:text-red-600 transition-colors"><i className="fa-solid fa-arrow-right-long"></i></button>
           </div>
         </div>
       </div>
@@ -741,17 +681,9 @@ const App: React.FC = () => {
                     <p className="text-[10px] text-red-600 font-black mb-4 italic">SIZE Index: {item.selectedSize}</p>
                     <div className="flex justify-between items-center mt-auto">
                       <div className="flex items-center border border-gray-100 rounded-lg bg-gray-50 overflow-hidden h-8">
-                        <button onClick={() => {
-                           const n = [...cart];
-                           n[idx].quantity = Math.max(1, n[idx].quantity - 1);
-                           setCart(n);
-                        }} className="px-3 hover:bg-white">-</button>
+                        <button onClick={() => { const n = [...cart]; n[idx].quantity = Math.max(1, n[idx].quantity - 1); setCart(n); }} className="px-3 hover:bg-white">-</button>
                         <span className="px-2 font-black text-xs">{item.quantity}</span>
-                        <button onClick={() => {
-                           const n = [...cart];
-                           n[idx].quantity += 1;
-                           setCart(n);
-                        }} className="px-3 hover:bg-white">+</button>
+                        <button onClick={() => { const n = [...cart]; n[idx].quantity += 1; setCart(n); }} className="px-3 hover:bg-white">+</button>
                       </div>
                       <p className="text-xs font-black italic text-black">{(item.price * item.quantity).toLocaleString()}৳</p>
                     </div>
@@ -762,13 +694,7 @@ const App: React.FC = () => {
             <div className="p-8 bg-white border-t border-gray-100">
                <div className="flex justify-between mb-2"><span className="text-[10px] font-black uppercase text-gray-400">Inventory Value</span><span className="text-sm font-black italic">{total.toLocaleString()}৳</span></div>
                <div className="flex justify-between mb-6 pt-2 border-t border-gray-50"><span className="text-sm font-black uppercase">Final Settlement</span><span className="text-2xl font-black text-red-700">{total.toLocaleString()}৳</span></div>
-               <button 
-                 disabled={cart.length === 0}
-                 onClick={() => { handleNavigate('checkout'); setIsCartSidebarOpen(false); }} 
-                 className="w-full bg-black text-white py-5 rounded-xl font-black uppercase tracking-[0.2em] text-xs shadow-xl hover:bg-red-700 transition-all active:scale-95 disabled:opacity-30"
-               >
-                 Initialize Checkout
-               </button>
+               <button disabled={cart.length === 0} onClick={() => { handleNavigate('checkout'); setIsCartSidebarOpen(false); }} className="w-full bg-black text-white py-5 rounded-xl font-black uppercase tracking-[0.2em] text-xs shadow-xl hover:bg-red-700 transition-all active:scale-95 disabled:opacity-30">Initialize Checkout</button>
             </div>
            </div>
         </div>
@@ -781,8 +707,124 @@ const App: React.FC = () => {
       case 'home': return <Home sneakers={sneakers} slides={slides} onSelectProduct={handleSelectProduct} onNavigate={handleNavigate} onSearch={handleSearch} />;
       case 'shop': return <Shop sneakers={sneakers} onSelectProduct={handleSelectProduct} searchQuery={searchQuery} onClearSearch={() => setSearchQuery('')} categoryFilter={selectedCategory} onCategoryChange={handleSelectCategory} />;
       case 'pdp': return selectedProduct ? <ProductDetail sneaker={selectedProduct} onAddToCart={handleAddToCart} onBack={() => handleNavigate('shop')} onToggleWishlist={toggleWishlist} isInWishlist={wishlist.some(s => s.id === selectedProduct.id)} onSelectProduct={handleSelectProduct} /> : <Home sneakers={sneakers} slides={slides} onSelectProduct={handleSelectProduct} onNavigate={handleNavigate} onSearch={handleSearch} />;
-      case 'admin-login': return <Login supabaseUrl={SUPABASE_URL} supabaseKey={SUPABASE_KEY} onLoginSuccess={() => { setIsAdminAuthenticated(true); handleNavigate('admin'); }} />;
-      case 'admin': return <Dashboard sneakers={sneakers} orders={orders} brands={brands} categories={categories} paymentMethods={paymentMethods} slides={slides} navItems={navItems} checkoutFields={checkoutFields} shippingOptions={shippingOptions} footerConfig={footerConfig} siteIdentity={siteIdentity} onRefresh={() => { fetchOrders(); fetchSneakers(); fetchShippingOptions(); fetchFooterConfig(); fetchBrands(); fetchCategories(); fetchPaymentMethods(); fetchSlides(); fetchNavItems(); fetchCheckoutFields(); fetchSiteIdentity(); }} onUpdateOrderStatus={handleUpdateOrderStatus} onSaveProduct={handleSaveProduct} onDeleteProduct={handleDeleteProduct} onSaveShipping={handleSaveShippingOption} onDeleteShipping={handleDeleteShippingOption} onSavePaymentMethod={handleSavePaymentMethod} onDeletePaymentMethod={handleDeletePaymentMethod} onSaveFooterConfig={handleSaveFooterConfig} onSaveIdentity={handleSaveIdentity} onSaveBrand={handleSaveBrand} onDeleteBrand={handleDeleteBrand} onSaveCategory={handleSaveCategoryData} onDeleteCategory={handleDeleteCategoryData} onSaveSlide={handleSaveSlide} onDeleteSlide={handleDeleteSlide} onSaveNavItem={handleSaveNavItem} onDeleteNavItem={handleDeleteNavItem} onSaveCheckoutField={handleSaveCheckoutField} onDeleteCheckoutField={handleDeleteCheckoutField} isRefreshing={isFetchingSneakers} onLogout={handleLogout} />;
+      case 'admin-login':
+      case 'customer-login': return (
+        <UnifiedLogin 
+          supabaseUrl={SUPABASE_URL} 
+          supabaseKey={SUPABASE_KEY} 
+          onAdminLogin={() => { setIsAdminAuthenticated(true); handleNavigate('admin'); }}
+          onCustomerLogin={(c) => { 
+            setCurrentCustomer(c); 
+            localStorage.setItem('sv_customer_session', JSON.stringify(c)); 
+            setCheckoutForm({
+              first_name: c.first_name || '',
+              last_name: c.last_name || '',
+              email: c.email || '',
+              mobile_number: c.mobile_number || '',
+              street_address: c.street_address || '',
+              city: c.city || '',
+              zip_code: c.zip_code || ''
+            });
+            handleNavigate('customer-account'); 
+          }}
+          onBack={() => handleNavigate('home')}
+        />
+      );
+      case 'customer-account': return currentCustomer ? <CustomerPortal customer={currentCustomer} orders={orders} onLogout={handleCustomerLogout} onUpdateProfile={handleUpdateCustomerProfile} onSelectOrder={(o) => { setViewingOrder(o); handleNavigate('order-details-view'); }} /> : (
+        <UnifiedLogin 
+          supabaseUrl={SUPABASE_URL} 
+          supabaseKey={SUPABASE_KEY} 
+          onAdminLogin={() => { setIsAdminAuthenticated(true); handleNavigate('admin'); }}
+          onCustomerLogin={(c) => { setCurrentCustomer(c); localStorage.setItem('sv_customer_session', JSON.stringify(c)); handleNavigate('customer-account'); }}
+          onBack={() => handleNavigate('home')}
+        />
+      );
+      case 'order-details-view': return viewingOrder ? (
+          <div className="max-w-4xl mx-auto py-16 px-4 animate-in fade-in duration-500">
+            <button onClick={() => handleNavigate('customer-account')} className="text-gray-400 font-black uppercase text-[10px] tracking-widest hover:text-black mb-8"><i className="fa-solid fa-arrow-left mr-2"></i> Dashboard</button>
+            <div className="bg-white border border-gray-100 rounded-3xl overflow-hidden shadow-2xl">
+              <div className="bg-black p-8 text-white flex justify-between items-center">
+                <div>
+                  <h3 className="text-sm font-black uppercase italic tracking-widest font-heading">Registry Manifest</h3>
+                  <p className="text-[10px] text-gray-500 mt-1 uppercase font-bold">{viewingOrder.id}</p>
+                </div>
+                <span className="text-[10px] font-black uppercase text-red-600 italic px-4 py-2 bg-white/5 rounded-xl">{viewingOrder.status}</span>
+              </div>
+              <div className="p-8 space-y-6">
+                {viewingOrder.items?.map((item, idx) => (
+                  <div key={idx} className="flex gap-6 items-center border-b border-gray-50 pb-6 last:border-0 last:pb-0">
+                    <div className="w-20 h-20 bg-gray-50 rounded-xl p-2 shrink-0 border border-gray-100"><img src={item.image} className="w-full h-full object-contain" alt={item.name} /></div>
+                    <div className="flex-1">
+                      <h4 className="font-black text-[11px] uppercase tracking-tight mb-1">{item.name}</h4>
+                      <p className="text-[9px] text-red-600 font-black italic uppercase tracking-widest">Size Index: {item.size} | Qty: {item.quantity}</p>
+                    </div>
+                    <div className="text-right"><p className="text-sm font-black italic">{(item.price * item.quantity).toLocaleString()}৳</p></div>
+                  </div>
+                ))}
+              </div>
+              <div className="p-8 bg-gray-50 border-t border-gray-100">
+                <h4 className="text-[10px] font-black uppercase italic tracking-widest mb-6 border-b pb-4">Timeline Protocol</h4>
+                <div className="space-y-6 pl-4 border-l-2 border-red-100 relative">
+                  {(viewingOrder.timeline || []).reverse().map((event, idx) => (
+                    <div key={idx} className="relative">
+                      <div className={`absolute -left-[21px] top-1 w-2 h-2 rounded-full ${idx === 0 ? 'bg-red-600 animate-pulse' : 'bg-gray-200'}`}></div>
+                      <p className={`text-[10px] font-black uppercase tracking-widest ${idx === 0 ? 'text-black' : 'text-gray-400'}`}>
+                        {event.status} <span className="text-gray-300 font-bold ml-2">[{new Date(event.timestamp).toLocaleString()}]</span>
+                      </p>
+                      <p className="text-xs text-gray-500 italic mt-1 leading-relaxed">{event.note}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="bg-white p-8 border-t border-gray-100">
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center pt-2">
+                    <span className="text-xs font-black uppercase tracking-widest italic">Final Settlement</span>
+                    <span className="text-3xl font-black text-red-700">{viewingOrder.total.toLocaleString()}৳</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+      ) : null;
+      case 'admin': return (
+        <Dashboard 
+          sneakers={sneakers} 
+          orders={orders} 
+          brands={brands} 
+          categories={categories} 
+          paymentMethods={paymentMethods} 
+          slides={slides} 
+          navItems={navItems} 
+          checkoutFields={checkoutFields} 
+          shippingOptions={shippingOptions} 
+          footerConfig={footerConfig} 
+          siteIdentity={siteIdentity} 
+          onRefresh={() => { fetchOrders(); fetchSneakers(); fetchShippingOptions(); fetchFooterConfig(); fetchBrands(); fetchCategories(); fetchPaymentMethods(); fetchSlides(); fetchNavItems(); fetchCheckoutFields(); fetchSiteIdentity(); }}
+          onRefreshOrders={fetchOrders}
+          onUpdateOrderStatus={handleUpdateOrderStatus} 
+          onSaveProduct={handleSaveProduct} 
+          onDeleteProduct={handleDeleteProduct} 
+          onSaveShipping={handleSaveShippingOption} 
+          onDeleteShipping={handleDeleteShippingOption} 
+          onSavePaymentMethod={handleSavePaymentMethod} 
+          onDeletePaymentMethod={handleDeletePaymentMethod} 
+          onSaveFooterConfig={handleSaveFooterConfig} 
+          onSaveIdentity={handleSaveIdentity} 
+          onSaveBrand={handleSaveBrand} 
+          onDeleteBrand={handleDeleteBrand} 
+          onSaveCategory={handleSaveCategoryData} 
+          onDeleteCategory={handleDeleteCategoryData} 
+          onSaveSlide={handleSaveSlide} 
+          onDeleteSlide={handleDeleteSlide} 
+          onSaveNavItem={handleSaveNavItem} 
+          onDeleteNavItem={handleDeleteNavItem} 
+          onSaveCheckoutField={handleSaveCheckoutField} 
+          onDeleteCheckoutField={handleDeleteCheckoutField} 
+          isRefreshing={isFetchingSneakers || isFetchingOrders} 
+          onLogout={handleLogout} 
+        />
+      );
       case 'checkout': return (
         <div className="max-w-6xl mx-auto px-4 py-16 animate-in fade-in duration-500">
           <div className="flex flex-col items-center mb-12 text-center">
@@ -816,6 +858,28 @@ const App: React.FC = () => {
                       />
                     </div>
                   ))}
+                  
+                  {!currentCustomer && (
+                    <div className="col-span-2 mt-4 p-6 bg-gray-50 rounded-2xl border border-gray-100 space-y-4">
+                       <label className="flex items-center gap-3 cursor-pointer group">
+                          <input type="checkbox" checked={createAccount} onChange={e => setCreateAccount(e.target.checked)} className="w-5 h-5 rounded border-gray-200 text-red-600 focus:ring-red-600" />
+                          <span className="text-[10px] font-black uppercase tracking-widest text-black italic">Create Vault Member Account</span>
+                       </label>
+                       {createAccount && (
+                          <div className="space-y-2 animate-in slide-in-from-top-2">
+                             <label className="text-[9px] font-black uppercase text-gray-400 px-1 italic">Security Password (Mandatory for Account)</label>
+                             <input 
+                               type="password" 
+                               value={accountPassword} 
+                               onChange={e => setAccountPassword(e.target.value)} 
+                               placeholder="ENTER SECURE PASSWORD" 
+                               className="w-full bg-white p-4 rounded-xl outline-none font-bold text-xs border-2 border-transparent focus:border-black"
+                             />
+                             <p className="text-[8px] text-gray-400 font-bold uppercase italic mt-1 px-1">Note: Email protocol becomes mandatory if account creation is active.</p>
+                          </div>
+                       )}
+                    </div>
+                  )}
                 </div>
               </div>
               <div className="bg-white p-10 border border-gray-100 rounded-3xl shadow-sm">
@@ -894,9 +958,7 @@ const App: React.FC = () => {
                <p className="text-[10px] font-black uppercase tracking-widest text-black">Registry Order ID: <span className="text-red-600">{lastOrder?.id}</span></p>
             </div>
           </div>
-          
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
-            {/* Subject Coordinates Details */}
             <div className="bg-white border border-gray-100 rounded-3xl p-8 shadow-xl">
                <h3 className="text-xs font-black uppercase italic tracking-widest border-b border-gray-50 pb-4 mb-6">Subject Details</h3>
                <div className="space-y-4">
@@ -911,8 +973,6 @@ const App: React.FC = () => {
                   </div>
                </div>
             </div>
-
-            {/* Logistics Route Details */}
             <div className="bg-white border border-gray-100 rounded-3xl p-8 shadow-xl">
                <h3 className="text-xs font-black uppercase italic tracking-widest border-b border-gray-50 pb-4 mb-6">Logistics Route</h3>
                <div className="space-y-4">
@@ -928,7 +988,6 @@ const App: React.FC = () => {
                </div>
             </div>
           </div>
-
           <div className="bg-white border border-gray-100 rounded-3xl overflow-hidden shadow-2xl max-w-2xl mx-auto">
             <div className="bg-black p-8 text-white flex justify-between items-center">
               <h3 className="text-sm font-black uppercase italic tracking-widest font-heading">Order Manifest</h3>
@@ -953,14 +1012,6 @@ const App: React.FC = () => {
             </div>
             <div className="bg-gray-50 p-8 border-t border-gray-100">
               <div className="space-y-3">
-                <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-gray-400">
-                  <span>Subtotal Protocol</span>
-                  <span>{lastOrder?.items?.reduce((acc, item) => acc + (item.price * item.quantity), 0).toLocaleString()}৳</span>
-                </div>
-                <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-gray-400">
-                  <span>Logistics Fee ({lastOrder?.shipping_name})</span>
-                  <span>{lastOrder?.shipping_rate?.toLocaleString()}৳</span>
-                </div>
                 <div className="flex justify-between items-center pt-6 mt-4 border-t border-gray-200">
                   <span className="text-xs font-black uppercase tracking-widest italic">Final Settlement</span>
                   <span className="text-3xl font-black text-red-700">{lastOrder?.total?.toLocaleString()}৳</span>
@@ -981,7 +1032,11 @@ const App: React.FC = () => {
     <div className="min-h-screen flex flex-col bg-white">
       {currentView !== 'admin' && (
         <Navigation 
-          onNavigate={(v) => v === 'admin' ? navigateToAdmin() : handleNavigate(v as View)} 
+          onNavigate={(v) => {
+            if (v === 'admin') navigateToAdmin();
+            else if (v === 'customer') navigateToCustomer();
+            else handleNavigate(v as View);
+          }} 
           cartCount={cart.reduce((a,c) => a + c.quantity, 0)} 
           wishlistCount={wishlist.length} 
           currentView={currentView} 

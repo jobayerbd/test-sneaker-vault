@@ -30,6 +30,7 @@ interface DashboardProps {
   footerConfig: FooterConfig;
   siteIdentity: SiteIdentity;
   onRefresh?: () => void;
+  onRefreshOrders?: () => void;
   onUpdateOrderStatus: (orderId: string, newStatus: OrderStatus) => Promise<boolean>;
   onSaveProduct: (productData: Partial<Sneaker>) => Promise<boolean>;
   onDeleteProduct: (id: string) => Promise<boolean>;
@@ -55,7 +56,7 @@ interface DashboardProps {
 
 const Dashboard: React.FC<DashboardProps> = (props) => {
   const { 
-    orders, sneakers, brands, categories, paymentMethods, slides, navItems, checkoutFields, shippingOptions = [], footerConfig, siteIdentity, onRefresh, onUpdateOrderStatus, 
+    orders, sneakers, brands, categories, paymentMethods, slides, navItems, checkoutFields, shippingOptions = [], footerConfig, siteIdentity, onRefresh, onRefreshOrders, onUpdateOrderStatus, 
     onSaveProduct, onDeleteProduct, onSaveShipping, onDeleteShipping, 
     onSavePaymentMethod, onDeletePaymentMethod,
     onSaveFooterConfig, onSaveIdentity,
@@ -72,23 +73,18 @@ const Dashboard: React.FC<DashboardProps> = (props) => {
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
   
-  // New States for Filtering & Pagination
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
-  // Reset pagination when filters change
   useEffect(() => {
     setCurrentPage(1);
   }, [statusFilter, searchQuery, startDate, endDate]);
 
   const filteredOrders = useMemo(() => {
     let result = orders.filter(o => {
-      // Status Filter
       const matchesStatus = statusFilter === 'ALL' || o.status === statusFilter;
-      
-      // Date Filter
       const orderDate = o.created_at ? new Date(o.created_at) : null;
       let matchesDate = true;
       if (orderDate) {
@@ -103,8 +99,6 @@ const Dashboard: React.FC<DashboardProps> = (props) => {
           matchesDate = matchesDate && orderDate <= end;
         }
       }
-
-      // Search Filter
       const fullName = `${o.first_name} ${o.last_name}`.toLowerCase();
       const matchesSearch = o.id.toLowerCase().includes(searchQuery.toLowerCase()) || 
                            fullName.includes(searchQuery.toLowerCase()) || 
@@ -163,6 +157,8 @@ const Dashboard: React.FC<DashboardProps> = (props) => {
             totalPages={totalPages}
             onPageChange={setCurrentPage}
             totalItems={filteredOrders.length}
+            onRefresh={onRefreshOrders}
+            isRefreshing={isRefreshing}
           />
         );
       case 'order-detail':

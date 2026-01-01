@@ -27,7 +27,6 @@ const Navigation: React.FC<NavigationProps> = ({ onNavigate, cartCount, wishlist
     <nav className="sticky top-0 z-50 bg-white border-b border-gray-100 shadow-sm">
       <div className="max-w-7xl mx-auto px-4">
         <div className="flex justify-between items-center h-16">
-          {/* Mobile Menu Button */}
           <button 
             onClick={() => setIsMobileMenuOpen(true)}
             className="lg:hidden text-gray-600 hover:text-black transition-colors"
@@ -35,7 +34,6 @@ const Navigation: React.FC<NavigationProps> = ({ onNavigate, cartCount, wishlist
             <i className="fa-solid fa-bars-staggered text-xl"></i>
           </button>
 
-          {/* Logo */}
           <button 
             onClick={() => onNavigate('home')}
             className="flex items-center"
@@ -49,7 +47,6 @@ const Navigation: React.FC<NavigationProps> = ({ onNavigate, cartCount, wishlist
             )}
           </button>
 
-          {/* Desktop Nav */}
           <div className="hidden lg:flex items-center space-x-10">
             {activeNavItems.map((item) => (
               <button 
@@ -62,7 +59,6 @@ const Navigation: React.FC<NavigationProps> = ({ onNavigate, cartCount, wishlist
             ))}
           </div>
 
-          {/* Icons */}
           <div className="flex items-center space-x-3 md:space-x-5">
             <button 
               onClick={onOpenSearch}
@@ -70,7 +66,7 @@ const Navigation: React.FC<NavigationProps> = ({ onNavigate, cartCount, wishlist
             >
               <i className="fa-solid fa-magnifying-glass text-lg"></i>
             </button>
-            <button onClick={() => onNavigate('admin')} className="text-gray-600 hover:text-black">
+            <button onClick={() => onNavigate('customer')} className="text-gray-600 hover:text-black">
               <i className="fa-regular fa-user text-xl"></i>
             </button>
             <button 
@@ -85,7 +81,6 @@ const Navigation: React.FC<NavigationProps> = ({ onNavigate, cartCount, wishlist
         </div>
       </div>
 
-      {/* Mobile Sidebar */}
       <div 
         className={`fixed inset-0 bg-black/60 z-[60] transition-opacity duration-300 lg:hidden ${isMobileMenuOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`} 
         onClick={() => setIsMobileMenuOpen(false)} 
@@ -122,6 +117,13 @@ const Navigation: React.FC<NavigationProps> = ({ onNavigate, cartCount, wishlist
 
             <div className="pt-8 border-t border-gray-100 space-y-4">
                <p className="text-gray-400 text-[9px] font-black uppercase tracking-[0.4em] italic mb-6">User Protocol</p>
+               <button 
+                 onClick={() => handleMobileNav('customer')}
+                 className="w-full text-left text-xs font-black uppercase tracking-widest flex items-center gap-3"
+               >
+                 <i className="fa-solid fa-circle-user text-red-600"></i>
+                 Member Portal
+               </button>
                <button 
                  onClick={() => handleMobileNav('admin')}
                  className="w-full text-left text-xs font-black uppercase tracking-widest flex items-center gap-3"
