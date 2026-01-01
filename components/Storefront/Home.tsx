@@ -12,16 +12,14 @@ interface HomeProps {
 }
 
 const Home: React.FC<HomeProps> = ({ sneakers, slides, onSelectProduct, onNavigate }) => {
-  // 1. New Arrivals: Automatically sort by most recent additions
   const newArrivals = [...sneakers].sort((a, b) => {
     return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
   }).slice(0, 8);
 
-  // 2. Featured Sections (Managed via Admin)
   const sections = [
     { 
       id: 'drops',
-      title: "HYPE DROPS", 
+      title: "SPECIAL OFFERS", 
       subtitle: "EXCLUSIVE LIMITED RELEASES", 
       data: sneakers.filter(s => s.is_drop),
       isCarousel: true 
@@ -46,7 +44,7 @@ const Home: React.FC<HomeProps> = ({ sneakers, slides, onSelectProduct, onNaviga
           alt={sneaker.name} 
         />
         {sneaker.is_drop && (
-          <div className="absolute top-4 left-4 bg-red-600 text-[9px] text-white font-black px-3 py-1.5 uppercase tracking-widest italic animate-pulse shadow-xl">Vault Priority</div>
+          <div className="absolute top-4 left-4 bg-red-600 text-[9px] text-white font-black px-3 py-1.5 uppercase tracking-widest italic animate-pulse shadow-xl">Featured</div>
         )}
       </div>
       
@@ -67,14 +65,12 @@ const Home: React.FC<HomeProps> = ({ sneakers, slides, onSelectProduct, onNaviga
         const scrollAmount = current.clientWidth;
         
         if (direction === 'right') {
-          // If we are at the end, wrap back to start
           if (current.scrollLeft + current.clientWidth >= current.scrollWidth - 20) {
             current.scrollTo({ left: 0, behavior: 'smooth' });
           } else {
             current.scrollBy({ left: scrollAmount, behavior: 'smooth' });
           }
         } else {
-          // If at start, jump to end
           if (current.scrollLeft <= 10) {
             current.scrollTo({ left: current.scrollWidth, behavior: 'smooth' });
           } else {
@@ -84,7 +80,6 @@ const Home: React.FC<HomeProps> = ({ sneakers, slides, onSelectProduct, onNaviga
       }
     };
 
-    // Automatic Sliding Logic with Hover Pause
     useEffect(() => {
       if (isPaused || data.length === 0) return;
       
@@ -101,11 +96,9 @@ const Home: React.FC<HomeProps> = ({ sneakers, slides, onSelectProduct, onNaviga
         onMouseEnter={() => setIsPaused(true)}
         onMouseLeave={() => setIsPaused(false)}
       >
-        {/* Navigation Arrows */}
         <button 
           onClick={() => scroll('left')}
           className="absolute left-0 top-1/2 -translate-y-1/2 z-10 w-12 h-12 bg-black/90 text-white rounded-full opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center -translate-x-6 hover:bg-red-700 shadow-2xl active:scale-90"
-          aria-label="Scroll Left"
         >
           <i className="fa-solid fa-chevron-left text-sm"></i>
         </button>
@@ -122,12 +115,10 @@ const Home: React.FC<HomeProps> = ({ sneakers, slides, onSelectProduct, onNaviga
         <button 
           onClick={() => scroll('right')}
           className="absolute right-0 top-1/2 -translate-y-1/2 z-10 w-12 h-12 bg-black/90 text-white rounded-full opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center translate-x-6 hover:bg-red-700 shadow-2xl active:scale-90"
-          aria-label="Scroll Right"
         >
           <i className="fa-solid fa-chevron-right text-sm"></i>
         </button>
 
-        {/* Tactical Progress Bar */}
         <div className="absolute bottom-6 left-1/2 -translate-x-1/2 w-32 h-[2px] bg-gray-100 rounded-full overflow-hidden">
           <div className={`h-full bg-red-600 transition-all duration-[4000ms] ease-linear ${isPaused ? 'w-0 opacity-0' : 'w-full opacity-100'}`}></div>
         </div>
@@ -137,17 +128,14 @@ const Home: React.FC<HomeProps> = ({ sneakers, slides, onSelectProduct, onNaviga
 
   return (
     <div className="bg-white">
-      {/* Dynamic Hero Slider */}
       <HeroSlider slides={slides} onNavigate={onNavigate} />
 
       <div className="max-w-7xl mx-auto px-4 py-12 space-y-32">
-        
-        {/* Automatic New Arrivals Section (Standard Grid) */}
         <section className="flex flex-col items-center">
-          <div className="text-center mb-16 animate-in fade-in slide-in-from-bottom-4 duration-700">
+          <div className="text-center mb-16">
             <h2 className="text-2xl font-black text-black font-heading italic tracking-[0.4em] uppercase">NEW ARRIVALS</h2>
             <div className="w-16 h-[4px] bg-red-700 mx-auto mt-4 mb-4"></div>
-            <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em] italic">FRESH ASSETS JUST SECURED IN THE VAULT</p>
+            <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em] italic">FRESH STYLES ADDED TO OUR COLLECTION</p>
           </div>
 
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 md:gap-8 w-full">
@@ -160,13 +148,12 @@ const Home: React.FC<HomeProps> = ({ sneakers, slides, onSelectProduct, onNaviga
             onClick={() => onNavigate('shop')}
             className="mt-16 px-12 py-4 border-2 border-black text-black text-[11px] font-black uppercase tracking-[0.4em] hover:bg-black hover:text-white transition-all italic shadow-lg active:scale-95"
           >
-            Explore All Assets
+            Shop All Products
           </button>
         </section>
 
-        {/* Managed Featured Sections (Carousel Layout) */}
         {sections.map((section, idx) => (
-          <section key={idx} className="flex flex-col w-full animate-in fade-in duration-1000" style={{ animationDelay: `${idx * 200}ms` }}>
+          <section key={idx} className="flex flex-col w-full">
             <div className="flex justify-between items-end mb-12 px-2">
               <div>
                 <h2 className="text-3xl font-black text-red-700 font-heading italic tracking-[0.2em] uppercase">{section.title}</h2>
@@ -177,7 +164,7 @@ const Home: React.FC<HomeProps> = ({ sneakers, slides, onSelectProduct, onNaviga
                 onClick={() => onNavigate('shop')}
                 className="text-[10px] font-black uppercase tracking-widest text-black border-b-2 border-transparent hover:border-red-600 transition-all pb-1 hidden sm:block"
               >
-                View Registry
+                View All
               </button>
             </div>
 
@@ -185,7 +172,7 @@ const Home: React.FC<HomeProps> = ({ sneakers, slides, onSelectProduct, onNaviga
               <Carousel data={section.data} />
             ) : (
               <div className="py-20 bg-gray-50 border border-dashed rounded-3xl text-center text-[10px] font-black uppercase text-gray-400 italic tracking-widest">
-                No active assets in this protocol.
+                No products found in this section.
               </div>
             )}
           </section>

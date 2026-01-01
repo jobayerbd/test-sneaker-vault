@@ -13,35 +13,35 @@ interface AdminSidebarProps {
 const AdminSidebar: React.FC<AdminSidebarProps> = ({ currentView, onNavigate, onLogout, onVisitSite, siteIdentity }) => {
   const sections = [
     {
-      label: 'COMMAND',
+      label: 'REPORTS',
       items: [
-        { id: 'overview', icon: 'fa-gauge-high', label: 'Intelligence' },
-        { id: 'orders', icon: 'fa-folder-tree', label: 'Order Registry' },
-        { id: 'customers', icon: 'fa-users', label: 'Member Directory' },
+        { id: 'overview', icon: 'fa-gauge-high', label: 'Overview' },
+        { id: 'orders', icon: 'fa-folder-tree', label: 'Orders' },
+        { id: 'customers', icon: 'fa-users', label: 'Customers' },
       ]
     },
     {
-      label: 'ARCHIVES',
+      label: 'INVENTORY',
       items: [
-        { id: 'inventory', icon: 'fa-cubes-stacked', label: 'Asset Bank' },
+        { id: 'inventory', icon: 'fa-cubes-stacked', label: 'Product List' },
         { id: 'brands', icon: 'fa-tags', label: 'Brands' },
         { id: 'categories', icon: 'fa-layer-group', label: 'Categories' },
       ]
     },
     {
-      label: 'DESIGN',
+      label: 'APPEARANCE',
       items: [
-        { id: 'identity', icon: 'fa-fingerprint', label: 'Site Identity' },
-        { id: 'slider', icon: 'fa-images', label: 'Slider Hub' },
-        { id: 'menu', icon: 'fa-bars', label: 'Menu Hub' },
-        { id: 'home-layout', icon: 'fa-house-laptop', label: 'Home Layout' },
+        { id: 'identity', icon: 'fa-fingerprint', label: 'Site Branding' },
+        { id: 'slider', icon: 'fa-images', label: 'Slider Settings' },
+        { id: 'menu', icon: 'fa-bars', label: 'Navigation Menu' },
+        { id: 'home-layout', icon: 'fa-house-laptop', label: 'Home Page' },
       ]
     },
     {
-      label: 'CORE',
+      label: 'SYSTEM',
       items: [
-        { id: 'checkout-config', icon: 'fa-list-check', label: 'Checkout Schema' },
-        { id: 'settings', icon: 'fa-gears', label: 'Infrastructure' }
+        { id: 'checkout-config', icon: 'fa-list-check', label: 'Checkout Fields' },
+        { id: 'settings', icon: 'fa-gears', label: 'Settings' }
       ]
     }
   ];
@@ -62,12 +62,12 @@ const AdminSidebar: React.FC<AdminSidebarProps> = ({ currentView, onNavigate, on
           </div>
         ) : (
           <div className="inline-block p-4 bg-black rounded-3xl mb-4 shadow-2xl">
-            <i className="fa-solid fa-vault text-white text-3xl"></i>
+            <i className="fa-solid fa-store text-white text-3xl"></i>
           </div>
         )}
         
         <p className="text-[9px] font-black text-gray-400 uppercase tracking-[0.4em] mt-1 italic">
-          {siteIdentity.tagline || 'Security Core'}
+          {siteIdentity.tagline || 'Admin Panel'}
         </p>
       </div>
 
@@ -77,7 +77,7 @@ const AdminSidebar: React.FC<AdminSidebarProps> = ({ currentView, onNavigate, on
           className="w-full bg-red-50 text-red-600 border border-red-100 py-3 rounded-xl text-[9px] font-black uppercase tracking-[0.2em] flex items-center justify-center gap-3 hover:bg-red-600 hover:text-white transition-all shadow-sm"
         >
           <i className="fa-solid fa-arrow-up-right-from-square"></i>
-          Visit Storefront
+          View Store
         </button>
       </div>
       
@@ -106,7 +106,7 @@ const AdminSidebar: React.FC<AdminSidebarProps> = ({ currentView, onNavigate, on
         className="pt-6 border-t border-gray-50 flex items-center space-x-4 px-6 py-4 rounded-2xl text-[10px] font-black uppercase text-red-600 hover:bg-red-50 transition-all group"
       >
         <i className="fa-solid fa-sign-out-alt w-5 text-sm"></i>
-        <span>Log Off Protocol</span>
+        <span>Logout</span>
       </button>
     </aside>
   );

@@ -38,16 +38,16 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
   return (
     <div className="max-w-6xl mx-auto px-4 py-16 animate-in fade-in duration-500">
       <div className="flex flex-col items-center mb-12 text-center">
-        <h1 className="text-4xl font-black uppercase font-heading italic mb-4">Checkout Registry</h1>
+        <h1 className="text-4xl font-black uppercase font-heading italic mb-4">Checkout</h1>
         <div className="w-16 h-1 bg-red-600 mb-2"></div>
-        <p className="text-gray-400 text-[10px] font-black uppercase tracking-[0.3em]">Finalizing secured transaction protocols</p>
+        <p className="text-gray-400 text-[10px] font-black uppercase tracking-[0.3em]">Fill in your details to complete the order</p>
       </div>
       
       {cart.length === 0 ? (
         <div className="text-center py-20 bg-white border rounded-3xl shadow-sm">
           <i className="fa-solid fa-bag-shopping text-4xl text-gray-200 mb-6"></i>
-          <h3 className="text-xl font-black uppercase italic mb-4">Your Vault is Empty</h3>
-          <button onClick={() => onNavigate('shop')} className="bg-black text-white px-12 py-4 rounded-xl font-black uppercase text-[10px] tracking-widest hover:bg-red-700 transition-all">Return to Archives</button>
+          <h3 className="text-xl font-black uppercase italic mb-4">Your Cart is Empty</h3>
+          <button onClick={() => onNavigate('shop')} className="bg-black text-white px-12 py-4 rounded-xl font-black uppercase text-[10px] tracking-widest hover:bg-red-700 transition-all">Back to Shop</button>
         </div>
       ) : (
         <>
@@ -62,7 +62,7 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
             <div className="lg:col-span-2 space-y-8">
               <div className="bg-white p-10 border border-gray-100 rounded-3xl shadow-sm">
                 <h3 className="text-xs font-black uppercase italic mb-8 border-b pb-4 tracking-widest flex items-center gap-3">
-                  <i className="fa-solid fa-id-card text-red-600"></i> Subject Coordinates
+                  <i className="fa-solid fa-id-card text-red-600"></i> Shipping Details
                 </h3>
                 <div className="grid grid-cols-2 gap-6">
                   {checkoutFields.filter(f => f.enabled).sort((a,b) => a.order - b.order).map((field) => (
@@ -82,16 +82,16 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
                     <div className="col-span-2 mt-4 p-6 bg-gray-50 rounded-2xl border border-gray-100 space-y-4">
                        <label className="flex items-center gap-3 cursor-pointer group">
                           <input type="checkbox" checked={createAccount} onChange={e => onToggleCreateAccount(e.target.checked)} className="w-5 h-5 rounded border-gray-200 text-red-600 focus:ring-red-600" />
-                          <span className="text-[10px] font-black uppercase tracking-widest text-black italic">Create Vault Member Account</span>
+                          <span className="text-[10px] font-black uppercase tracking-widest text-black italic">Create an Account</span>
                        </label>
                        {createAccount && (
                           <div className="space-y-2 animate-in slide-in-from-top-2">
-                             <label className="text-[9px] font-black uppercase text-gray-400 px-1 italic">Security Password (Mandatory for Account)</label>
+                             <label className="text-[9px] font-black uppercase text-gray-400 px-1 italic">Account Password</label>
                              <input 
                                type="password" 
                                value={accountPassword} 
                                onChange={e => onPasswordChange(e.target.value)} 
-                               placeholder="ENTER SECURE PASSWORD" 
+                               placeholder="ENTER PASSWORD" 
                                className="w-full bg-white p-4 rounded-xl outline-none font-bold text-xs border-2 border-transparent focus:border-black"
                              />
                           </div>
@@ -103,7 +103,7 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
 
               <div className="bg-white p-10 border border-gray-100 rounded-3xl shadow-sm">
                 <h3 className="text-xs font-black uppercase italic mb-8 border-b pb-4 tracking-widest flex items-center gap-3">
-                  <i className="fa-solid fa-truck-fast text-red-600"></i> Logistics Hub
+                  <i className="fa-solid fa-truck-fast text-red-600"></i> Shipping Methods
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {shippingOptions.map(o => (
@@ -114,7 +114,7 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
                     >
                       <div className="flex flex-col">
                         <span className="font-black text-[10px] uppercase tracking-widest mb-1">{o.name}</span>
-                        <span className={`text-[9px] font-bold ${selectedShipping?.id === o.id ? 'text-gray-300' : 'text-black'} uppercase`}>Transit Protocol</span>
+                        <span className={`text-[9px] font-bold ${selectedShipping?.id === o.id ? 'text-gray-300' : 'text-black'} uppercase`}>Delivery Option</span>
                       </div>
                       <span className="font-black italic text-sm">{o.rate}৳</span>
                     </div>
@@ -124,7 +124,7 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
 
               <div className="bg-white p-10 border border-gray-100 rounded-3xl shadow-sm">
                 <h3 className="text-xs font-black uppercase italic mb-8 border-b pb-4 tracking-widest flex items-center gap-3">
-                  <i className="fa-solid fa-credit-card text-red-600"></i> Payment Gateway Matrix
+                  <i className="fa-solid fa-credit-card text-red-600"></i> Payment Methods
                 </h3>
                 <div className="space-y-4">
                   {paymentMethods.map(pm => (
@@ -145,7 +145,7 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
             </div>
 
             <div className="bg-black text-white p-10 rounded-3xl h-fit shadow-2xl sticky top-24">
-              <h3 className="text-xl font-black uppercase italic border-b border-white/10 pb-6 mb-8 tracking-tighter font-heading">Settlement Summary</h3>
+              <h3 className="text-xl font-black uppercase italic border-b border-white/10 pb-6 mb-8 tracking-tighter font-heading">Order Summary</h3>
               
               <div className="space-y-6 mb-8 max-h-[300px] overflow-y-auto pr-2 no-scrollbar border-b border-white/5 pb-8">
                  {cart.map((item, idx) => (
@@ -172,7 +172,7 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
                            disabled={cart.length <= 1}
                            onClick={() => onRemoveFromCart(idx)} 
                            className="text-[9px] text-red-600 font-black uppercase hover:text-white transition-colors disabled:opacity-20 disabled:cursor-not-allowed"
-                         >Erase</button>
+                         >Remove</button>
                       </div>
                    </div>
                  ))}
@@ -180,15 +180,15 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
 
               <div className="space-y-4 mb-8">
                 <div className="flex justify-between text-[11px] font-black uppercase tracking-widest text-white/60">
-                  <span>Subtotal Value</span>
+                  <span>Subtotal</span>
                   <span>{subtotal.toLocaleString()}৳</span>
                 </div>
                 <div className="flex justify-between text-[11px] font-black uppercase tracking-widest text-white/60">
-                  <span>Logistics Fee</span>
+                  <span>Shipping Fee</span>
                   <span>{selectedShipping?.rate || 0}৳</span>
                 </div>
                 <div className="flex justify-between items-end pt-6 border-t border-white/10">
-                  <span className="text-xs font-black uppercase tracking-[0.2em] italic">Final Settlement</span>
+                  <span className="text-xs font-black uppercase tracking-[0.2em] italic">Total Amount</span>
                   <span className="text-3xl font-black text-red-600">{finalTotal.toLocaleString()}৳</span>
                 </div>
               </div>
@@ -198,7 +198,7 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
                 disabled={isPlacingOrder || cart.length === 0} 
                 className="w-full bg-red-700 py-6 rounded-2xl font-black uppercase tracking-[0.3em] text-[10px] shadow-2xl hover:bg-white hover:text-black transition-all transform active:scale-95 flex items-center justify-center gap-3"
               >
-                {isPlacingOrder ? <i className="fa-solid fa-circle-notch animate-spin"></i> : <><i className="fa-solid fa-lock text-sm"></i> Commit Order Protocol</>}
+                {isPlacingOrder ? <i className="fa-solid fa-circle-notch animate-spin"></i> : <><i className="fa-solid fa-lock text-sm"></i> Place Order</>}
               </button>
             </div>
           </div>

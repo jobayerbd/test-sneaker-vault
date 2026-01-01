@@ -63,10 +63,11 @@ const Navigation: React.FC<NavigationProps> = ({ onNavigate, cartCount, wishlist
             <button 
               onClick={onOpenSearch}
               className="text-gray-600 hover:text-black transition-colors"
+              title="Search Products"
             >
               <i className="fa-solid fa-magnifying-glass text-lg"></i>
             </button>
-            <button onClick={() => onNavigate('customer')} className="text-gray-600 hover:text-black">
+            <button onClick={() => onNavigate('customer')} className="text-gray-600 hover:text-black" title="My Account">
               <i className="fa-regular fa-user text-xl"></i>
             </button>
             <button 
@@ -74,7 +75,7 @@ const Navigation: React.FC<NavigationProps> = ({ onNavigate, cartCount, wishlist
               className="flex items-center space-x-2 border border-gray-200 px-2 md:px-3 py-1.5 rounded-sm hover:border-black transition-colors"
             >
               <i className="fa-solid fa-bag-shopping text-gray-800"></i>
-              <span className="hidden sm:inline text-xs font-bold text-gray-800 italic">{cartCount} Secured</span>
+              <span className="hidden sm:inline text-xs font-bold text-gray-800 italic">{cartCount} Items</span>
               <span className="sm:hidden text-xs font-bold text-gray-800">{cartCount}</span>
             </button>
           </div>
@@ -89,11 +90,7 @@ const Navigation: React.FC<NavigationProps> = ({ onNavigate, cartCount, wishlist
         <div className="flex flex-col h-full shadow-2xl">
           <div className="p-8 bg-black text-white flex justify-between items-center">
             <span className="text-xl font-black font-heading tracking-tighter italic">
-              {siteIdentity.logo_url ? (
-                 <img src={siteIdentity.logo_url} alt={siteIdentity.title} className="h-6 w-auto brightness-0 invert" />
-              ) : (
-                <>VAULT<span className="text-red-600 text-sm ml-1 uppercase not-italic tracking-widest font-sans font-black">Menu</span></>
-              )}
+              Menu
             </span>
             <button onClick={() => setIsMobileMenuOpen(false)} className="hover:rotate-90 transition-transform">
               <i className="fa-solid fa-xmark text-xl"></i>
@@ -102,7 +99,7 @@ const Navigation: React.FC<NavigationProps> = ({ onNavigate, cartCount, wishlist
           
           <div className="flex-1 overflow-y-auto p-8 space-y-8">
             <div className="space-y-4">
-              <p className="text-red-600 text-[9px] font-black uppercase tracking-[0.4em] italic mb-6">Navigation Index</p>
+              <p className="text-red-600 text-[9px] font-black uppercase tracking-[0.4em] italic mb-6">Navigation</p>
               {activeNavItems.map((item) => (
                 <button 
                   key={item.id}
@@ -116,35 +113,34 @@ const Navigation: React.FC<NavigationProps> = ({ onNavigate, cartCount, wishlist
             </div>
 
             <div className="pt-8 border-t border-gray-100 space-y-4">
-               <p className="text-gray-400 text-[9px] font-black uppercase tracking-[0.4em] italic mb-6">User Protocol</p>
+               <p className="text-gray-400 text-[9px] font-black uppercase tracking-[0.4em] italic mb-6">User Options</p>
                <button 
                  onClick={() => handleMobileNav('customer')}
                  className="w-full text-left text-xs font-black uppercase tracking-widest flex items-center gap-3"
                >
                  <i className="fa-solid fa-circle-user text-red-600"></i>
-                 Member Portal
+                 My Account
                </button>
                <button 
                  onClick={() => handleMobileNav('admin')}
                  className="w-full text-left text-xs font-black uppercase tracking-widest flex items-center gap-3"
                >
                  <i className="fa-solid fa-shield-halved text-red-600"></i>
-                 Admin Console
+                 Admin Dashboard
                </button>
                <button 
                  onClick={onOpenSearch}
                  className="w-full text-left text-xs font-black uppercase tracking-widest flex items-center gap-3"
                >
                  <i className="fa-solid fa-magnifying-glass text-red-600"></i>
-                 Asset Scan
+                 Search Products
                </button>
             </div>
           </div>
 
           <div className="p-8 bg-gray-50 border-t border-gray-100">
             <p className="text-[9px] text-gray-400 font-bold uppercase tracking-widest leading-relaxed">
-              {siteIdentity.title.toUpperCase()} OS v2.0<br/>
-              Status: System Online
+              Store Status: Online
             </p>
           </div>
         </div>

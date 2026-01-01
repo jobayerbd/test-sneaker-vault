@@ -16,8 +16,8 @@ import { Sneaker, CartItem, Order, OrderStatus, ShippingOption, FooterConfig, Br
 
 const DEFAULT_FOOTER: FooterConfig = {
   store_name: "SNEAKERVAULT",
-  description: "The ultimate destination for sneaker enthusiasts. Authenticated grails, high-traffic drops, and a community built on passion.",
-  copyright: "© 2024 SNEAKERVAULT. ALL RIGHTS RESERVED. AUTHENTICATED PROTOCOL.",
+  description: "The ultimate destination for sneaker enthusiasts. High-quality products and a community built on passion.",
+  copyright: "© 2024 SNEAKERVAULT. ALL RIGHTS RESERVED.",
   facebook_url: "#",
   instagram_url: "#",
   twitter_url: "#",
@@ -26,7 +26,7 @@ const DEFAULT_FOOTER: FooterConfig = {
 
 const DEFAULT_IDENTITY: SiteIdentity = {
   title: "SneakerVault",
-  tagline: "Premium Footwear Protocol",
+  tagline: "Premium Footwear Store",
   logo_url: "",
   favicon_url: ""
 };
@@ -51,6 +51,7 @@ const App: React.FC = () => {
   const [wishlist, setWishlist] = useState<Sneaker[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [sneakers, setSneakers] = useState<Sneaker[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
   const [brands, setBrands] = useState<BrandEntity[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
@@ -79,15 +80,16 @@ const App: React.FC = () => {
     try {
       window.history.pushState(state, title, url);
     } catch (e) {
-      console.warn('Vault: History state push failed.', e);
+      console.warn('History state push failed.', e);
     }
   };
 
   const fetchData = useCallback(async () => {
     setIsFetchingSneakers(true);
-    const [s, o, b, c, pm, sl, ni, cf, sh, f, id] = await Promise.all([
+    const [s, o, cust, b, c, pm, sl, ni, cf, sh, f, id] = await Promise.all([
       vaultApi.fetchSneakers(),
       vaultApi.fetchOrders(),
+      vaultApi.fetchCustomers(),
       vaultApi.fetchBrands(),
       vaultApi.fetchCategories(),
       vaultApi.fetchPaymentMethods(),
@@ -101,6 +103,7 @@ const App: React.FC = () => {
 
     setSneakers(s);
     setOrders(o);
+    setCustomers(cust);
     setBrands(b);
     setCategories(c);
     setPaymentMethods(pm);
@@ -211,11 +214,11 @@ const App: React.FC = () => {
     const enabledFields = checkoutFields.filter(f => f.enabled);
     for (const field of enabledFields) {
       if (field.required && !checkoutForm[field.field_key]) {
-        setCheckoutError(`REGISTRY ERROR: [${field.label.toUpperCase()}] IS MANDATORY`);
+        setCheckoutError(`ERROR: [${field.label.toUpperCase()}] IS REQUIRED`);
         return;
       }
     }
-    if (!selectedShipping || !selectedPayment) { setCheckoutError("LOGISTICS ERROR: PROTOCOL NOT INITIALIZED"); return; }
+    if (!selectedShipping || !selectedPayment) { setCheckoutError("ERROR: SHIPPING OR PAYMENT NOT SELECTED"); return; }
     
     setIsPlacingOrder(true);
     const orderId = `ORD-${Math.floor(Math.random() * 90000) + 10000}`;
@@ -231,10 +234,10 @@ const App: React.FC = () => {
 
     const saved = await vaultApi.createOrder(newOrder);
     if (saved) {
-      await vaultApi.createTimelineEvent(orderId, OrderStatus.PLACED, 'Order protocol initiated and secured in vault archives.');
+      await vaultApi.createTimelineEvent(orderId, OrderStatus.PLACED, 'Order has been placed successfully.');
       setLastOrder(saved); setCart([]); handleNavigate('order-success');
     } else {
-      setCheckoutError("SERVER ERROR: VAULT CONNECTION TIMEOUT");
+      setCheckoutError("SERVER ERROR: FAILED TO PLACE ORDER");
     }
     setIsPlacingOrder(false);
   };
@@ -250,8 +253,8 @@ const App: React.FC = () => {
       case 'shop': return <Shop sneakers={sneakers} onSelectProduct={handleSelectProduct} searchQuery={searchQuery} onClearSearch={() => setSearchQuery('')} categoryFilter={selectedCategory} onCategoryChange={handleSelectCategory} />;
       case 'pdp': return selectedProduct ? <ProductDetail sneaker={selectedProduct} onAddToCart={handleAddToCart} onBack={() => handleNavigate('shop')} onToggleWishlist={(s) => setWishlist(p => p.find(x => x.id === s.id) ? p.filter(x => x.id !== s.id) : [...p, s])} isInWishlist={wishlist.some(s => s.id === selectedProduct.id)} onSelectProduct={handleSelectProduct} /> : (
         <div className="min-h-[80vh] flex flex-col items-center justify-center bg-white space-y-4">
-           <i className="fa-solid fa-vault text-4xl animate-bounce text-red-600"></i>
-           <p className="text-[10px] font-black uppercase tracking-[0.5em] italic">Decrypting Asset Metadata...</p>
+           <i className="fa-solid fa-spinner animate-spin text-4xl text-red-600"></i>
+           <p className="text-[10px] font-black uppercase tracking-[0.5em]">Loading Product...</p>
         </div>
       );
       case 'admin-login':
@@ -259,7 +262,7 @@ const App: React.FC = () => {
       case 'customer-account': return currentCustomer ? <CustomerPortal customer={currentCustomer} orders={orders} onLogout={handleCustomerLogout} onUpdateProfile={async (u) => vaultApi.updateCustomer(currentCustomer.id, u)} onSelectOrder={(o) => { setViewingOrder(o); handleNavigate('order-details-view'); }} /> : <UnifiedLogin supabaseUrl={'https://vwbctddmakbnvfxzrjeo.supabase.co'} supabaseKey={'sb_publishable_8WhV41Km5aj8Dhvu6tUbvA_JnyPoVxu'} onAdminLogin={() => { setIsAdminAuthenticated(true); handleNavigate('admin'); }} onCustomerLogin={(c) => { setCurrentCustomer(c); handleNavigate('customer-account'); }} onBack={() => handleNavigate('home')} />;
       case 'admin': 
         if (!isActuallyAdmin) return <UnifiedLogin supabaseUrl={'https://vwbctddmakbnvfxzrjeo.supabase.co'} supabaseKey={'sb_publishable_8WhV41Km5aj8Dhvu6tUbvA_JnyPoVxu'} onAdminLogin={() => { setIsAdminAuthenticated(true); handleNavigate('admin'); }} onCustomerLogin={() => {}} onBack={() => handleNavigate('home')} />;
-        return <Dashboard sneakers={sneakers} orders={orders} customers={[]} brands={brands} categories={categories} paymentMethods={paymentMethods} slides={slides} navItems={navItems} checkoutFields={checkoutFields} shippingOptions={shippingOptions} footerConfig={footerConfig} siteIdentity={siteIdentity} onRefresh={fetchData} onRefreshOrders={fetchData} onUpdateOrderStatus={async (id, s) => true} onSaveProduct={async (d) => true} onDeleteProduct={async (i) => true} onSaveShipping={async (o) => true} onDeleteShipping={async (i) => true} onSavePaymentMethod={async (m) => true} onDeletePaymentMethod={async (i) => true} onSaveFooterConfig={async (c) => true} onSaveIdentity={async (i) => true} onSaveBrand={async (b) => true} onDeleteBrand={async (i) => true} onSaveCategory={async (c) => true} onDeleteCategory={async (i) => true} onSaveSlide={async (s) => true} onDeleteSlide={async (i) => true} onSaveNavItem={async (n) => true} onDeleteNavItem={async (i) => true} onSaveCheckoutField={async (f) => true} onDeleteCheckoutField={async (i) => true} onLogout={handleLogout} onVisitSite={() => window.open(window.location.origin, '_blank')} />;
+        return <Dashboard sneakers={sneakers} orders={orders} customers={customers} brands={brands} categories={categories} paymentMethods={paymentMethods} slides={slides} navItems={navItems} checkoutFields={checkoutFields} shippingOptions={shippingOptions} footerConfig={footerConfig} siteIdentity={siteIdentity} onRefresh={fetchData} onRefreshOrders={fetchData} onUpdateOrderStatus={async (id, s) => true} onSaveProduct={async (d) => true} onDeleteProduct={async (i) => true} onSaveShipping={async (o) => true} onDeleteShipping={async (i) => true} onSavePaymentMethod={async (m) => true} onDeletePaymentMethod={async (i) => true} onSaveFooterConfig={async (c) => true} onSaveIdentity={async (i) => true} onSaveBrand={async (b) => true} onDeleteBrand={async (i) => true} onSaveCategory={async (c) => true} onDeleteCategory={async (i) => true} onSaveSlide={async (s) => true} onDeleteSlide={async (i) => true} onSaveNavItem={async (n) => true} onDeleteNavItem={async (i) => true} onSaveCheckoutField={async (f) => true} onDeleteCheckoutField={async (i) => true} onLogout={handleLogout} onVisitSite={() => window.open(window.location.origin, '_blank')} />;
       case 'checkout': return (
         <CheckoutPage 
           cart={cart} 
@@ -304,8 +307,8 @@ const App: React.FC = () => {
       <div className="flex-1">
         {isFetchingSneakers && isDeepLinking ? (
            <div className="min-h-screen flex flex-col items-center justify-center bg-white space-y-4">
-              <i className="fa-solid fa-vault text-4xl animate-bounce text-red-600"></i>
-              <p className="text-[10px] font-black uppercase tracking-[0.5em] italic animate-pulse">Establishing Vault Connection...</p>
+              <i className="fa-solid fa-spinner animate-spin text-4xl text-red-600"></i>
+              <p className="text-[10px] font-black uppercase tracking-[0.5em] animate-pulse">Connecting to Store...</p>
            </div>
         ) : renderView()}
       </div>

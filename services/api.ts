@@ -21,6 +21,11 @@ export const vaultApi = {
     return resp.ok ? await resp.json() : [];
   },
 
+  fetchCustomers: async () => {
+    const resp = await fetch(`${SUPABASE_URL}/rest/v1/customers?select=*&order=created_at.desc`, { headers });
+    return resp.ok ? await resp.json() : [];
+  },
+
   fetchBrands: async () => {
     const resp = await fetch(`${SUPABASE_URL}/rest/v1/brands?select=*&order=name.asc`, { headers });
     return resp.ok ? await resp.json() : [];
