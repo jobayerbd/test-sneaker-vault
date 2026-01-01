@@ -68,7 +68,7 @@ const Dashboard: React.FC<DashboardProps> = (props) => {
   } = props;
 
   const [subView, setSubView] = useState<AdminSubView>('overview');
-  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [editingProduct, setEditingProduct] = useState<Partial<Sneaker> | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
@@ -77,6 +77,11 @@ const Dashboard: React.FC<DashboardProps> = (props) => {
   const [endDate, setEndDate] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
+
+  // Derive the active order from the current orders list to ensure reactivity
+  const activeOrder = useMemo(() => {
+    return orders.find(o => o.id === selectedOrderId) || null;
+  }, [orders, selectedOrderId]);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -115,7 +120,7 @@ const Dashboard: React.FC<DashboardProps> = (props) => {
   }, [filteredOrders, currentPage]);
 
   const handleSelectOrder = (order: Order) => {
-    setSelectedOrder(order);
+    setSelectedOrderId(order.id);
     setSubView('order-detail');
   };
 
@@ -162,7 +167,7 @@ const Dashboard: React.FC<DashboardProps> = (props) => {
           />
         );
       case 'order-detail':
-        return selectedOrder ? <AdminOrderDetail order={selectedOrder} onBack={() => setSubView('orders')} onUpdateStatus={onUpdateOrderStatus} /> : null;
+        return activeOrder ? <AdminOrderDetail order={activeOrder} onBack={() => setSubView('orders')} onUpdateStatus={onUpdateOrderStatus} /> : null;
       case 'home-layout':
         return <AdminHomeManagement sneakers={sneakers} onUpdateProduct={onSaveProduct} />;
       case 'brands':

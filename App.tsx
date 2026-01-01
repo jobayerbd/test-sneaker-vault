@@ -88,7 +88,9 @@ const App: React.FC = () => {
   const fetchOrders = useCallback(async () => {
     setIsFetchingOrders(true);
     try {
-      const response = await fetch(`${SUPABASE_URL}/rest/v1/orders?select=*&order=created_at.desc`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } });
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/orders?select=*&order=created_at.desc`, { 
+        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } 
+      });
       if (response.ok) setOrders(await response.json());
     } catch (err) {} finally { setIsFetchingOrders(false); }
   }, []);
@@ -342,21 +344,28 @@ const App: React.FC = () => {
   };
 
   const handleUpdateOrderStatus = async (orderId: string, newStatus: OrderStatus) => {
-    // 1. Find the local order state
-    const order = orders.find(o => o.id === orderId);
-    if (!order) return false;
-
-    // 2. Create a new event and update the timeline array
-    const newEvent: TimelineEvent = { 
-      status: newStatus, 
-      timestamp: new Date().toISOString(), 
-      note: `Status protocol updated to ${newStatus} via Command Center.` 
-    };
-    const updatedTimeline = [...(order.timeline || []), newEvent];
-
     try {
-      // 3. SECURE DATABASE SYNC (Persist status and full timeline JSON)
-      const response = await fetch(`${SUPABASE_URL}/rest/v1/orders?id=eq.${orderId}`, { 
+      // 1. ATOMIC FETCH: Get current state from database to avoid stale local state issues
+      const getResponse = await fetch(`${SUPABASE_URL}/rest/v1/orders?id=eq.${orderId}&select=timeline`, {
+        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
+      });
+      
+      if (!getResponse.ok) return false;
+      const orderData = await getResponse.json();
+      if (!orderData || orderData.length === 0) return false;
+      
+      const currentTimeline = orderData[0].timeline || [];
+      
+      // 2. Prepare updated timeline with new event
+      const newEvent: TimelineEvent = { 
+        status: newStatus, 
+        timestamp: new Date().toISOString(), 
+        note: `Status protocol updated to ${newStatus} via Vault Command Center.` 
+      };
+      const updatedTimeline = [...currentTimeline, newEvent];
+
+      // 3. SECURE DATABASE SYNC: Update both status and cumulative timeline
+      const patchResponse = await fetch(`${SUPABASE_URL}/rest/v1/orders?id=eq.${orderId}`, { 
         method: 'PATCH', 
         headers: { 
           'apikey': SUPABASE_KEY, 
@@ -370,13 +379,16 @@ const App: React.FC = () => {
         }) 
       });
 
-      if (response.ok) { 
-        // 4. Update local state to reflect change immediately in UI
-        setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: newStatus, timeline: updatedTimeline } : o)); 
+      if (patchResponse.ok) { 
+        // 4. Update global app state
+        await fetchOrders(); 
         return true; 
       }
       return false;
-    } catch (err) { return false; }
+    } catch (err) { 
+      console.error("Vault Persistence Error:", err);
+      return false; 
+    }
   };
 
   const handlePlaceOrder = async () => {
@@ -453,7 +465,7 @@ const App: React.FC = () => {
     const subtotal = cart.reduce((acc, item) => acc + (item.price * item.quantity), 0);
     const total = subtotal + selectedShipping.rate;
     const orderId = `ORD-${Math.floor(Math.random() * 90000) + 10000}`;
-    const initialTimeline: TimelineEvent[] = [{ status: OrderStatus.PLACED, timestamp: new Date().toISOString(), note: 'Order protocol initiated and secured in vault.' }];
+    const initialTimeline: TimelineEvent[] = [{ status: OrderStatus.PLACED, timestamp: new Date().toISOString(), note: 'Order protocol initiated and secured.' }];
     
     const newOrder = {
       id: orderId, 
@@ -761,7 +773,6 @@ const App: React.FC = () => {
         />
       );
       case 'order-details-view': {
-        // Find the latest order object from the central orders array to ensure status updates are reflected
         const latestOrder = viewingOrder ? (orders.find(o => o.id === viewingOrder.id) || viewingOrder) : null;
         
         return latestOrder ? (
@@ -787,7 +798,6 @@ const App: React.FC = () => {
                     </div>
                   ))}
                 </div>
-                {/* PERSISTENT TIMELINE VIEW FOR CUSTOMERS */}
                 <div className="p-8 bg-gray-50 border-t border-gray-100">
                   <h4 className="text-[10px] font-black uppercase italic tracking-widest mb-6 border-b pb-4">Live Tracking Protocol</h4>
                   <div className="space-y-6 pl-4 border-l-2 border-red-100 relative">
@@ -800,9 +810,6 @@ const App: React.FC = () => {
                         <p className="text-xs text-gray-500 italic mt-1 leading-relaxed">{event.note}</p>
                       </div>
                     ))}
-                    {(!latestOrder.timeline || latestOrder.timeline.length === 0) && (
-                       <p className="text-[10px] text-gray-400 font-black uppercase italic">Protocol logs currently initializing...</p>
-                    )}
                   </div>
                 </div>
                 <div className="bg-white p-8 border-t border-gray-100">

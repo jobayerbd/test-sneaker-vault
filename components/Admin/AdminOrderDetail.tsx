@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Order, OrderStatus, TimelineEvent } from '../../types.ts';
 
 interface AdminOrderDetailProps {
@@ -23,32 +23,67 @@ const AdminOrderDetail: React.FC<AdminOrderDetailProps> = ({ order: initialOrder
   const [order, setOrder] = useState<Order>(initialOrder);
   const [pendingStatus, setPendingStatus] = useState<OrderStatus>(initialOrder.status);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+
+  // Sync local state when parent order data changes (e.g. from fetchOrders in App.tsx)
+  useEffect(() => {
+    setOrder(initialOrder);
+    setPendingStatus(initialOrder.status);
+  }, [initialOrder]);
+
+  // Auto-clear notification after 5 seconds
+  useEffect(() => {
+    if (notification) {
+      const timer = setTimeout(() => setNotification(null), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [notification]);
 
   const subtotal = order.items?.reduce((acc, item) => acc + (item.price * item.quantity), 0) || 0;
 
   const handleUpdate = async () => {
     setIsUpdating(true);
+    setNotification(null);
+    
+    // Directly call the parent update function which patches the DB and refreshes state
     const success = await onUpdateStatus(order.id, pendingStatus);
+    
     if (success) {
-      const newEvent: TimelineEvent = {
-        status: pendingStatus,
-        timestamp: new Date().toISOString(),
-        note: `Order protocol updated to ${pendingStatus} manually from Command Center.`
-      };
-      setOrder({
-        ...order,
-        status: pendingStatus,
-        timeline: [...(order.timeline || []), newEvent]
+      setNotification({
+        type: 'success',
+        message: 'VAULT SYNCED: STATUS SECURED IN DATABASE'
       });
-      alert('VAULT UPDATED: Order status and timeline synced successfully.');
     } else {
-      alert('ERROR: Connection failed. Could not sync vault.');
+      setNotification({
+        type: 'error',
+        message: 'VAULT ERROR: DATABASE PROTOCOL FAILED'
+      });
     }
     setIsUpdating(false);
   };
 
   return (
-    <div className="space-y-8 animate-in fade-in">
+    <div className="space-y-8 animate-in fade-in relative">
+      {/* Tactical UI Notification System */}
+      {notification && (
+        <div className={`fixed top-8 right-8 z-[100] max-w-sm w-full p-6 rounded-2xl border-l-4 shadow-2xl animate-in slide-in-from-right-4 duration-300 ${
+          notification.type === 'success' ? 'bg-black text-white border-green-500' : 'bg-red-600 text-white border-white'
+        }`}>
+          <div className="flex items-center gap-4">
+            <div className={`w-10 h-10 rounded-full flex items-center justify-center ${notification.type === 'success' ? 'bg-green-500/20' : 'bg-white/20'}`}>
+              <i className={`fa-solid ${notification.type === 'success' ? 'fa-circle-check' : 'fa-triangle-exclamation'}`}></i>
+            </div>
+            <div className="flex-1">
+              <p className="text-[10px] font-black uppercase tracking-widest italic">{notification.type === 'success' ? 'Protocol Online' : 'System Alert'}</p>
+              <p className="text-xs font-bold leading-tight mt-0.5">{notification.message}</p>
+            </div>
+            <button onClick={() => setNotification(null)} className="opacity-40 hover:opacity-100 transition-opacity">
+              <i className="fa-solid fa-xmark"></i>
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="flex justify-between items-center">
         <button 
           onClick={onBack} 
@@ -89,7 +124,6 @@ const AdminOrderDetail: React.FC<AdminOrderDetailProps> = ({ order: initialOrder
               ))}
             </div>
 
-            {/* Financial Settlement Breakdown */}
             <div className="mt-10 pt-10 border-t-2 border-dashed border-gray-100 space-y-3">
               <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-gray-400">
                 <span>Subtotal Protocol</span>
@@ -136,7 +170,14 @@ const AdminOrderDetail: React.FC<AdminOrderDetailProps> = ({ order: initialOrder
 
         {/* Intelligence Controls & Data */}
         <div className="space-y-8">
-          <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-xl">
+          <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-xl overflow-hidden relative">
+            {/* Database Sync Overlay */}
+            {isUpdating && (
+              <div className="absolute inset-0 bg-white/60 backdrop-blur-[2px] z-10 flex flex-col items-center justify-center">
+                 <i className="fa-solid fa-circle-notch animate-spin text-red-600 text-2xl mb-2"></i>
+                 <p className="text-[8px] font-black uppercase tracking-widest">Syncing Vault...</p>
+              </div>
+            )}
             <h3 className="text-[10px] font-black uppercase text-red-600 mb-6 italic tracking-widest">Protocol Intelligence</h3>
             <div className="space-y-4">
               <div className="bg-gray-50 p-4 rounded-xl border border-gray-100">
