@@ -8,11 +8,11 @@ import Dashboard from './components/Admin/Dashboard.tsx';
 import Footer from './components/Footer.tsx';
 import UnifiedLogin from './components/Auth/UnifiedLogin.tsx';
 import CustomerPortal from './components/Customer/CustomerPortal.tsx';
+import CheckoutPage from './components/Storefront/CheckoutPage.tsx';
+import OrderSuccess from './components/Storefront/OrderSuccess.tsx';
 import { updateBrowserIdentity } from './services/identityService.ts';
-import { Sneaker, CartItem, Order, OrderStatus, ShippingOption, FooterConfig, TimelineEvent, BrandEntity, Category, PaymentMethod, HomeSlide, NavItem, CheckoutField, SiteIdentity, Customer } from './types.ts';
-
-const SUPABASE_URL = 'https://vwbctddmakbnvfxzrjeo.supabase.co';
-const SUPABASE_KEY = 'sb_publishable_8WhV41Km5aj8Dhvu6tUbvA_JnyPoVxu';
+import { vaultApi } from './services/api.ts';
+import { Sneaker, CartItem, Order, OrderStatus, ShippingOption, FooterConfig, BrandEntity, Category, PaymentMethod, HomeSlide, NavItem, CheckoutField, SiteIdentity, Customer } from './types.ts';
 
 const DEFAULT_FOOTER: FooterConfig = {
   store_name: "SNEAKERVAULT",
@@ -34,7 +34,6 @@ const DEFAULT_IDENTITY: SiteIdentity = {
 type View = 'home' | 'shop' | 'admin' | 'cart' | 'pdp' | 'wishlist' | 'checkout' | 'order-success' | 'admin-login' | 'customer-login' | 'customer-account' | 'order-details-view';
 
 const App: React.FC = () => {
-  // 1. Initial State Resolution
   const getInitialView = (): View => {
     const params = new URLSearchParams(window.location.search);
     if (params.get('product')) return 'pdp';
@@ -52,7 +51,6 @@ const App: React.FC = () => {
   const [wishlist, setWishlist] = useState<Sneaker[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [sneakers, setSneakers] = useState<Sneaker[]>([]);
-  const [customers, setCustomers] = useState<Customer[]>([]);
   const [brands, setBrands] = useState<BrandEntity[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
@@ -74,6 +72,8 @@ const App: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
   const [checkoutForm, setCheckoutForm] = useState<Record<string, any>>({});
+  const [createAccount, setCreateAccount] = useState(false);
+  const [accountPassword, setAccountPassword] = useState('');
 
   const safePushState = (state: any, title: string, url: string) => {
     try {
@@ -83,81 +83,40 @@ const App: React.FC = () => {
     }
   };
 
-  // 2. Data Fetching Protocols
-  const fetchSneakers = useCallback(async () => {
+  const fetchData = useCallback(async () => {
     setIsFetchingSneakers(true);
-    try {
-      const response = await fetch(`${SUPABASE_URL}/rest/v1/sneakers?select=*&order=name.asc`, { 
-        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } 
-      });
-      if (response.ok) {
-        const data = await response.json();
-        setSneakers(data);
-      }
-    } catch (err) {
-      console.error("Vault retrieval error:", err);
-    } finally {
-      setIsFetchingSneakers(false);
-    }
+    const [s, o, b, c, pm, sl, ni, cf, sh, f, id] = await Promise.all([
+      vaultApi.fetchSneakers(),
+      vaultApi.fetchOrders(),
+      vaultApi.fetchBrands(),
+      vaultApi.fetchCategories(),
+      vaultApi.fetchPaymentMethods(),
+      vaultApi.fetchSlides(),
+      vaultApi.fetchNavItems(),
+      vaultApi.fetchCheckoutFields(),
+      vaultApi.fetchShippingOptions(),
+      vaultApi.fetchSiteSettings('footer'),
+      vaultApi.fetchSiteSettings('identity')
+    ]);
+
+    setSneakers(s);
+    setOrders(o);
+    setBrands(b);
+    setCategories(c);
+    setPaymentMethods(pm);
+    if (pm.length > 0) setSelectedPayment(pm[0]);
+    setSlides(sl);
+    setNavItems(ni);
+    setCheckoutFields(cf);
+    setShippingOptions(sh);
+    if (sh.length > 0) setSelectedShipping(sh[0]);
+    if (f) setFooterConfig(f);
+    if (id) setSiteIdentity(id);
+    setIsFetchingSneakers(false);
   }, []);
 
-  const fetchOrders = useCallback(async () => {
-    setIsFetchingOrders(true);
-    try {
-      const response = await fetch(`${SUPABASE_URL}/rest/v1/orders?select=*,timeline:order_timeline(status,note,timestamp)&order=created_at.desc`, { 
-        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } 
-      });
-      if (response.ok) setOrders(await response.json());
-    } finally { setIsFetchingOrders(false); }
-  }, []);
-
-  const fetchGlobalConfigs = useCallback(async () => {
-    const headers = { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` };
-    try {
-      const [brandResp, catResp, payResp, slideResp, navResp, checkResp, shipResp, footerResp, identityResp] = await Promise.all([
-        fetch(`${SUPABASE_URL}/rest/v1/brands?select=*&order=name.asc`, { headers }),
-        fetch(`${SUPABASE_URL}/rest/v1/categories?select=*&order=name.asc`, { headers }),
-        fetch(`${SUPABASE_URL}/rest/v1/payment_methods?select=*&order=name.asc`, { headers }),
-        fetch(`${SUPABASE_URL}/rest/v1/home_slides?select=*&order=order.asc`, { headers }),
-        fetch(`${SUPABASE_URL}/rest/v1/site_navigation?select=*&order=order.asc`, { headers }),
-        fetch(`${SUPABASE_URL}/rest/v1/checkout_fields?select=*&order=order.asc`, { headers }),
-        fetch(`${SUPABASE_URL}/rest/v1/shipping_options?select=*&order=rate.asc`, { headers }),
-        fetch(`${SUPABASE_URL}/rest/v1/site_settings?key=eq.footer&select=data`, { headers }),
-        fetch(`${SUPABASE_URL}/rest/v1/site_settings?key=eq.identity&select=data`, { headers })
-      ]);
-
-      if (brandResp.ok) setBrands(await brandResp.json());
-      if (catResp.ok) setCategories(await catResp.json());
-      if (payResp.ok) {
-        const data = await payResp.json();
-        setPaymentMethods(data);
-        if (data.length > 0) setSelectedPayment(data[0]);
-      }
-      if (slideResp.ok) setSlides(await slideResp.json());
-      if (navResp.ok) setNavItems(await navResp.json());
-      if (checkResp.ok) setCheckoutFields(await checkResp.json());
-      if (shipResp.ok) {
-        const data = await shipResp.json();
-        setShippingOptions(data);
-        if (data.length > 0) setSelectedShipping(data[0]);
-      }
-      if (footerResp.ok) {
-        const data = await footerResp.json();
-        if (data[0]) setFooterConfig(data[0].data);
-      }
-      if (identityResp.ok) {
-        const data = await identityResp.json();
-        if (data[0]) setSiteIdentity(data[0].data);
-      }
-    } catch (err) {}
-  }, []);
-
-  // 3. Lifecycle Protocols
   useEffect(() => {
-    fetchSneakers();
-    fetchOrders();
-    fetchGlobalConfigs();
-    
+    fetchData();
     const stored = localStorage.getItem('sv_customer_session');
     if (stored) {
       const parsed = JSON.parse(stored);
@@ -174,35 +133,26 @@ const App: React.FC = () => {
     updateBrowserIdentity(siteIdentity);
   }, [siteIdentity]);
 
-  // 4. URL Synchronization & Deep Linking Resolve
   const syncViewFromUrl = useCallback(() => {
     const params = new URLSearchParams(window.location.search);
     const productSlug = params.get('product');
     const categorySlug = params.get('category');
     const viewParam = params.get('view') as View;
 
-    // A. Admin Security Lock
     if (viewParam === 'admin') {
-      const isLogged = localStorage.getItem('sv_admin_session') === 'active';
-      if (!isLogged) {
+      if (localStorage.getItem('sv_admin_session') !== 'active') {
         setCurrentView('admin-login');
         return;
       }
     }
 
-    // B. PDP Resolve Logic
     if (productSlug) {
       if (sneakers.length > 0) {
-        const product = sneakers.find(s => 
-          s.slug === productSlug || 
-          s.id === productSlug || 
-          s.name.toLowerCase().replace(/\s+/g, '-') === productSlug.toLowerCase()
-        );
+        const product = sneakers.find(s => s.slug === productSlug || s.id === productSlug || s.name.toLowerCase().replace(/\s+/g, '-') === productSlug.toLowerCase());
         if (product) {
           setSelectedProduct(product);
           setCurrentView('pdp');
         } else if (!isFetchingSneakers) {
-          // Only redirect to home if we are SURE it doesn't exist
           setCurrentView('home');
           safePushState({}, '', window.location.pathname);
         }
@@ -210,23 +160,9 @@ const App: React.FC = () => {
       return; 
     }
 
-    // C. Category Resolve
-    if (categorySlug) {
-      setSelectedCategory(categorySlug);
-      setCurrentView('shop');
-      return;
-    }
-
-    // D. Standard View Resolve
-    if (viewParam) {
-      setCurrentView(viewParam);
-      return;
-    }
-
-    // E. Default Home
-    if (!productSlug && !categorySlug && !viewParam) {
-       setCurrentView('home');
-    }
+    if (categorySlug) { setSelectedCategory(categorySlug); setCurrentView('shop'); return; }
+    if (viewParam) { setCurrentView(viewParam); return; }
+    if (!productSlug && !categorySlug && !viewParam) { setCurrentView('home'); }
   }, [sneakers, isFetchingSneakers]);
 
   useEffect(() => {
@@ -235,7 +171,6 @@ const App: React.FC = () => {
     return () => window.removeEventListener('popstate', syncViewFromUrl);
   }, [syncViewFromUrl]);
 
-  // 5. Navigation Handlers
   const handleNavigate = (view: View, params: string = '') => {
     if (view === 'admin' && !isAdminAuthenticated && localStorage.getItem('sv_admin_session') !== 'active') {
       setCurrentView('admin-login');
@@ -271,6 +206,39 @@ const App: React.FC = () => {
     if (shouldCheckout) { handleNavigate('checkout'); setIsCartSidebarOpen(false); } else { setIsCartSidebarOpen(true); }
   };
 
+  const handlePlaceOrder = async () => {
+    setCheckoutError(null);
+    const enabledFields = checkoutFields.filter(f => f.enabled);
+    for (const field of enabledFields) {
+      if (field.required && !checkoutForm[field.field_key]) {
+        setCheckoutError(`REGISTRY ERROR: [${field.label.toUpperCase()}] IS MANDATORY`);
+        return;
+      }
+    }
+    if (!selectedShipping || !selectedPayment) { setCheckoutError("LOGISTICS ERROR: PROTOCOL NOT INITIALIZED"); return; }
+    
+    setIsPlacingOrder(true);
+    const orderId = `ORD-${Math.floor(Math.random() * 90000) + 10000}`;
+    const total = cart.reduce((acc, item) => acc + (item.price * item.quantity), 0) + selectedShipping.rate;
+    
+    const newOrder = {
+      id: orderId, customer_id: currentCustomer?.id, first_name: checkoutForm.first_name, last_name: checkoutForm.last_name, 
+      email: checkoutForm.email, mobile_number: checkoutForm.mobile_number, street_address: checkoutForm.street_address, 
+      city: checkoutForm.city, zip_code: checkoutForm.zip_code, total, status: OrderStatus.PLACED, 
+      shipping_name: selectedShipping.name, shipping_rate: selectedShipping.rate, payment_method: selectedPayment.name, 
+      items: cart.map(item => ({ sneakerId: item.id, name: item.name, image: item.image, size: item.selectedSize, quantity: item.quantity, price: item.price }))
+    };
+
+    const saved = await vaultApi.createOrder(newOrder);
+    if (saved) {
+      await vaultApi.createTimelineEvent(orderId, OrderStatus.PLACED, 'Order protocol initiated and secured in vault archives.');
+      setLastOrder(saved); setCart([]); handleNavigate('order-success');
+    } else {
+      setCheckoutError("SERVER ERROR: VAULT CONNECTION TIMEOUT");
+    }
+    setIsPlacingOrder(false);
+  };
+
   const handleLogout = () => { localStorage.removeItem('sv_admin_session'); setIsAdminAuthenticated(false); handleNavigate('home'); };
   const handleCustomerLogout = () => { localStorage.removeItem('sv_customer_session'); setCurrentCustomer(null); handleNavigate('home'); };
 
@@ -287,30 +255,41 @@ const App: React.FC = () => {
         </div>
       );
       case 'admin-login':
-      case 'customer-login': return <UnifiedLogin supabaseUrl={SUPABASE_URL} supabaseKey={SUPABASE_KEY} onAdminLogin={() => { setIsAdminAuthenticated(true); handleNavigate('admin'); }} onCustomerLogin={(c) => { setCurrentCustomer(c); localStorage.setItem('sv_customer_session', JSON.stringify(c)); handleNavigate('customer-account'); }} onBack={() => handleNavigate('home')} />;
-      case 'customer-account': return currentCustomer ? <CustomerPortal customer={currentCustomer} orders={orders} onLogout={handleCustomerLogout} onUpdateProfile={async (u) => true} onSelectOrder={(o) => { setViewingOrder(o); handleNavigate('order-details-view'); }} /> : <UnifiedLogin supabaseUrl={SUPABASE_URL} supabaseKey={SUPABASE_KEY} onAdminLogin={() => { setIsAdminAuthenticated(true); handleNavigate('admin'); }} onCustomerLogin={(c) => { setCurrentCustomer(c); handleNavigate('customer-account'); }} onBack={() => handleNavigate('home')} />;
+      case 'customer-login': return <UnifiedLogin supabaseUrl={'https://vwbctddmakbnvfxzrjeo.supabase.co'} supabaseKey={'sb_publishable_8WhV41Km5aj8Dhvu6tUbvA_JnyPoVxu'} onAdminLogin={() => { setIsAdminAuthenticated(true); handleNavigate('admin'); }} onCustomerLogin={(c) => { setCurrentCustomer(c); localStorage.setItem('sv_customer_session', JSON.stringify(c)); handleNavigate('customer-account'); }} onBack={() => handleNavigate('home')} />;
+      case 'customer-account': return currentCustomer ? <CustomerPortal customer={currentCustomer} orders={orders} onLogout={handleCustomerLogout} onUpdateProfile={async (u) => vaultApi.updateCustomer(currentCustomer.id, u)} onSelectOrder={(o) => { setViewingOrder(o); handleNavigate('order-details-view'); }} /> : <UnifiedLogin supabaseUrl={'https://vwbctddmakbnvfxzrjeo.supabase.co'} supabaseKey={'sb_publishable_8WhV41Km5aj8Dhvu6tUbvA_JnyPoVxu'} onAdminLogin={() => { setIsAdminAuthenticated(true); handleNavigate('admin'); }} onCustomerLogin={(c) => { setCurrentCustomer(c); handleNavigate('customer-account'); }} onBack={() => handleNavigate('home')} />;
       case 'admin': 
-        if (!isActuallyAdmin) return <UnifiedLogin supabaseUrl={SUPABASE_URL} supabaseKey={SUPABASE_KEY} onAdminLogin={() => { setIsAdminAuthenticated(true); handleNavigate('admin'); }} onCustomerLogin={() => {}} onBack={() => handleNavigate('home')} />;
-        return <Dashboard sneakers={sneakers} orders={orders} customers={[]} brands={brands} categories={categories} paymentMethods={paymentMethods} slides={slides} navItems={navItems} checkoutFields={checkoutFields} shippingOptions={shippingOptions} footerConfig={footerConfig} siteIdentity={siteIdentity} onRefresh={() => { fetchOrders(); fetchSneakers(); }} onRefreshOrders={fetchOrders} onUpdateOrderStatus={async (id, s) => true} onSaveProduct={async (d) => true} onDeleteProduct={async (i) => true} onSaveShipping={async (o) => true} onDeleteShipping={async (i) => true} onSavePaymentMethod={async (m) => true} onDeletePaymentMethod={async (i) => true} onSaveFooterConfig={async (c) => true} onSaveIdentity={async (i) => true} onSaveBrand={async (b) => true} onDeleteBrand={async (i) => true} onSaveCategory={async (c) => true} onDeleteCategory={async (i) => true} onSaveSlide={async (s) => true} onDeleteSlide={async (i) => true} onSaveNavItem={async (n) => true} onDeleteNavItem={async (i) => true} onSaveCheckoutField={async (f) => true} onDeleteCheckoutField={async (i) => true} onLogout={handleLogout} onVisitSite={() => window.open(window.location.origin, '_blank')} />;
+        if (!isActuallyAdmin) return <UnifiedLogin supabaseUrl={'https://vwbctddmakbnvfxzrjeo.supabase.co'} supabaseKey={'sb_publishable_8WhV41Km5aj8Dhvu6tUbvA_JnyPoVxu'} onAdminLogin={() => { setIsAdminAuthenticated(true); handleNavigate('admin'); }} onCustomerLogin={() => {}} onBack={() => handleNavigate('home')} />;
+        return <Dashboard sneakers={sneakers} orders={orders} customers={[]} brands={brands} categories={categories} paymentMethods={paymentMethods} slides={slides} navItems={navItems} checkoutFields={checkoutFields} shippingOptions={shippingOptions} footerConfig={footerConfig} siteIdentity={siteIdentity} onRefresh={fetchData} onRefreshOrders={fetchData} onUpdateOrderStatus={async (id, s) => true} onSaveProduct={async (d) => true} onDeleteProduct={async (i) => true} onSaveShipping={async (o) => true} onDeleteShipping={async (i) => true} onSavePaymentMethod={async (m) => true} onDeletePaymentMethod={async (i) => true} onSaveFooterConfig={async (c) => true} onSaveIdentity={async (i) => true} onSaveBrand={async (b) => true} onDeleteBrand={async (i) => true} onSaveCategory={async (c) => true} onDeleteCategory={async (i) => true} onSaveSlide={async (s) => true} onDeleteSlide={async (i) => true} onSaveNavItem={async (n) => true} onDeleteNavItem={async (i) => true} onSaveCheckoutField={async (f) => true} onDeleteCheckoutField={async (i) => true} onLogout={handleLogout} onVisitSite={() => window.open(window.location.origin, '_blank')} />;
       case 'checkout': return (
-        <div className="max-w-4xl mx-auto py-16 px-4">
-           <h2 className="text-3xl font-black uppercase italic font-heading mb-10">Checkout Protocol</h2>
-           {cart.length === 0 ? <p className="text-[10px] font-black uppercase text-gray-400">Bag is empty.</p> : (
-             <div className="bg-white p-8 border rounded-3xl shadow-xl space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                   <input type="text" placeholder="FIRST NAME" onChange={e => setCheckoutForm({...checkoutForm, first_name: e.target.value})} className="bg-gray-50 p-4 rounded-xl border-none outline-none font-bold text-xs" />
-                   <input type="text" placeholder="MOBILE" onChange={e => setCheckoutForm({...checkoutForm, mobile_number: e.target.value})} className="bg-gray-50 p-4 rounded-xl border-none outline-none font-bold text-xs" />
-                </div>
-                <div className="pt-6 border-t">
-                  <button onClick={async () => { setIsPlacingOrder(true); setTimeout(() => { setCart([]); handleNavigate('order-success'); setIsPlacingOrder(false); }, 1500); }} disabled={isPlacingOrder} className="w-full bg-black text-white py-5 rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-red-700 transition-all">
-                    {isPlacingOrder ? 'Syncing...' : 'Commit Order'}
-                  </button>
-                </div>
-             </div>
-           )}
-        </div>
+        <CheckoutPage 
+          cart={cart} 
+          checkoutFields={checkoutFields} 
+          shippingOptions={shippingOptions} 
+          paymentMethods={paymentMethods} 
+          selectedShipping={selectedShipping} 
+          selectedPayment={selectedPayment} 
+          checkoutForm={checkoutForm} 
+          checkoutError={checkoutError} 
+          isPlacingOrder={isPlacingOrder} 
+          createAccount={createAccount} 
+          accountPassword={accountPassword} 
+          currentCustomer={currentCustomer}
+          onFormChange={(f, v) => setCheckoutForm({...checkoutForm, [f]: v})}
+          onShippingChange={setSelectedShipping}
+          onPaymentChange={setSelectedPayment}
+          onToggleCreateAccount={setCreateAccount}
+          onPasswordChange={setAccountPassword}
+          onUpdateCartQuantity={(idx, delta) => {
+            const newCart = [...cart];
+            newCart[idx].quantity = Math.max(1, newCart[idx].quantity + delta);
+            setCart(newCart);
+          }}
+          onRemoveFromCart={(idx) => setCart(cart.filter((_, i) => i !== idx))}
+          onPlaceOrder={handlePlaceOrder}
+          onNavigate={handleNavigate}
+        />
       );
-      case 'order-success': return <div className="text-center py-32"><h1 className="text-5xl font-black italic uppercase mb-4">Vault Secured</h1><button onClick={() => handleNavigate('shop')} className="bg-black text-white px-12 py-4 rounded-xl font-black uppercase text-xs">Continue</button></div>;
+      case 'order-success': return <OrderSuccess lastOrder={lastOrder} onNavigate={handleNavigate} />;
       default: return <Home sneakers={sneakers} slides={slides} onSelectProduct={handleSelectProduct} onNavigate={handleNavigate} onSearch={(q) => { setSearchQuery(q); handleNavigate('shop'); }} />;
     }
   };
