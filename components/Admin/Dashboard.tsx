@@ -148,7 +148,15 @@ const Dashboard: React.FC<DashboardProps> = (props) => {
       case 'customers':
         return <AdminCustomers customers={customers} orders={orders} isRefreshing={isRefreshing} />;
       case 'product-form':
-        return editingProduct ? <AdminProductForm product={editingProduct} brands={brands} categories={categories} onSave={async (data) => { const s = await onSaveProduct(data); if(s) setSubView('inventory'); return s; }} onCancel={() => setSubView('inventory')} /> : null;
+        return editingProduct ? (
+          <AdminProductForm 
+            product={editingProduct} 
+            brands={brands} 
+            categories={categories} 
+            onSave={onSaveProduct} 
+            onCancel={() => setSubView('inventory')} 
+          />
+        ) : null;
       case 'orders': 
         return (
           <AdminOrders 

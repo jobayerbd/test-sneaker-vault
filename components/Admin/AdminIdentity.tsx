@@ -10,13 +10,20 @@ interface AdminIdentityProps {
 const AdminIdentity: React.FC<AdminIdentityProps> = ({ identity, onSave }) => {
   const [form, setForm] = useState<SiteIdentity>({ ...identity });
   const [isSaving, setIsSaving] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
   const logoInputRef = useRef<HTMLInputElement>(null);
   const faviconInputRef = useRef<HTMLInputElement>(null);
 
-  // Sync internal form when identity prop changes from vault
   useEffect(() => {
     setForm({ ...identity });
   }, [identity]);
+
+  useEffect(() => {
+    if (showSuccess) {
+      const timer = setTimeout(() => setShowSuccess(false), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [showSuccess]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, field: 'logo_url' | 'favicon_url') => {
     const file = e.target.files?.[0];
@@ -30,17 +37,36 @@ const AdminIdentity: React.FC<AdminIdentityProps> = ({ identity, onSave }) => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSaving(true);
+    setShowSuccess(false);
     const success = await onSave(form);
     if (success) {
-      alert('IDENTITY SYNCED: Site branding protocol updated successfully.');
-    } else {
-      alert('SYNC ERROR: Failed to update site identity in vault.');
+      setShowSuccess(true);
     }
     setIsSaving(false);
   };
 
   return (
-    <div className="space-y-8 animate-in fade-in pb-20">
+    <div className="space-y-8 animate-in fade-in pb-20 relative">
+      {/* Success Notification Bar */}
+      {showSuccess && (
+        <div className="fixed bottom-10 left-1/2 -translate-x-1/2 z-[100] w-full max-w-md px-6 animate-in slide-in-from-bottom-10 duration-500">
+          <div className="bg-black text-white border-l-4 border-green-500 p-5 rounded-2xl shadow-2xl flex items-center justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <div className="w-10 h-10 bg-green-500/20 rounded-full flex items-center justify-center text-green-500">
+                <i className="fa-solid fa-circle-check"></i>
+              </div>
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-widest italic text-green-500">Identity Secure</p>
+                <p className="text-xs font-bold leading-tight">VAULT SYNCHRONIZED: BRAND PROTOCOLS PERSISTED</p>
+              </div>
+            </div>
+            <button onClick={() => setShowSuccess(false)} className="text-gray-500 hover:text-white transition-colors">
+              <i className="fa-solid fa-xmark"></i>
+            </button>
+          </div>
+        </div>
+      )}
+
       <div>
         <h1 className="text-3xl font-black uppercase italic font-heading">Site Identity</h1>
         <p className="text-gray-400 text-xs font-bold uppercase tracking-widest mt-2 italic">Global Branding & Metadata Protocols</p>
@@ -49,7 +75,6 @@ const AdminIdentity: React.FC<AdminIdentityProps> = ({ identity, onSave }) => {
       <div className="bg-white p-10 rounded-3xl border border-gray-100 shadow-xl max-w-4xl">
         <form onSubmit={handleSubmit} className="space-y-10">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            {/* Text Metadata */}
             <div className="space-y-6">
               <div>
                 <label className="text-[10px] font-black uppercase text-gray-400 block mb-2 px-1">Site Title Protocol</label>
@@ -73,9 +98,7 @@ const AdminIdentity: React.FC<AdminIdentityProps> = ({ identity, onSave }) => {
               </div>
             </div>
 
-            {/* Visual Assets */}
             <div className="space-y-8">
-              {/* Logo Manager */}
               <div>
                 <label className="text-[10px] font-black uppercase text-gray-400 block mb-3 px-1">Primary Brand Mark (Logo)</label>
                 <div className="flex items-center gap-6">
@@ -112,7 +135,6 @@ const AdminIdentity: React.FC<AdminIdentityProps> = ({ identity, onSave }) => {
                 </div>
               </div>
 
-              {/* Favicon Manager */}
               <div>
                 <label className="text-[10px] font-black uppercase text-gray-400 block mb-3 px-1">Browser Identity (Favicon)</label>
                 <div className="flex items-center gap-6">

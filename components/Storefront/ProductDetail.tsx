@@ -2,10 +2,10 @@
 import React, { useState, useEffect } from 'react';
 import { Sneaker, CartItem } from '../../types.ts';
 import { generateHypeDescription } from '../../services/geminiService.ts';
-import { MOCK_SNEAKERS } from '../../constants.tsx';
 
 interface ProductDetailProps {
   sneaker: Sneaker;
+  sneakers: Sneaker[]; // Added to provide real related products
   onAddToCart: (item: CartItem, shouldCheckout?: boolean) => void;
   onBack: () => void;
   onToggleWishlist: (sneaker: Sneaker) => void;
@@ -15,6 +15,7 @@ interface ProductDetailProps {
 
 const ProductDetail: React.FC<ProductDetailProps> = ({ 
   sneaker, 
+  sneakers,
   onAddToCart, 
   onBack, 
   onToggleWishlist, 
@@ -42,12 +43,11 @@ const ProductDetail: React.FC<ProductDetailProps> = ({
     setSelectedSize('');
     setQuantity(1);
     setError(null);
-  }, [sneaker]);
+  }, [sneaker.id]); // Use ID as dependency to handle sneaker updates correctly
 
   const handleAction = (directToCheckout: boolean = false) => {
     if (!selectedSize) {
       setError('ERROR: PLEASE SELECT A SIZE');
-      // Auto clear after 3 seconds
       setTimeout(() => setError(null), 3000);
       return;
     }
@@ -62,22 +62,21 @@ const ProductDetail: React.FC<ProductDetailProps> = ({
   };
 
   const navigateToCategory = (cat: string) => {
-    // We use the browser history API to trigger the category filter in App.tsx
     const queryString = `?category=${cat.toLowerCase().replace(/\s+/g, '-')}`;
     try {
-      if (window.location.protocol === 'blob:') {
-        console.warn('History state push blocked due to blob: protocol context.');
-        return;
-      }
+      if (window.location.protocol === 'blob:') return;
       window.history.pushState({ view: 'shop', category: cat.toLowerCase() }, '', window.location.pathname + queryString);
-      // Force a popstate event to trigger App.tsx routing logic
       window.dispatchEvent(new PopStateEvent('popstate'));
     } catch (e) {
       console.warn('SneakerVault: Deep-link history blocked.', e);
     }
   };
 
-  const relatedProducts = MOCK_SNEAKERS.filter(s => s.id !== sneaker.id).slice(0, 4);
+  const relatedProducts = sneakers.filter(s => s.id !== sneaker.id).slice(0, 4);
+
+  const discountPercentage = sneaker.original_price && sneaker.original_price > sneaker.price
+    ? Math.round(((sneaker.original_price - sneaker.price) / sneaker.original_price) * 100)
+    : 0;
 
   return (
     <div className="bg-white min-h-screen animate-in fade-in duration-500">
@@ -121,7 +120,7 @@ const ProductDetail: React.FC<ProductDetailProps> = ({
                 </div>
               )}
 
-              {/* Mobile Thumbnails Overlay - Minimalist Style, Left-Aligned */}
+              {/* Mobile Thumbnails Overlay */}
               <div className="lg:hidden absolute bottom-4 left-0 right-0 px-4 z-20 animate-in slide-in-from-bottom-4 duration-700 delay-300">
                 <div className="flex space-x-2 overflow-x-auto pb-2 no-scrollbar scroll-smooth justify-start">
                   {[sneaker.image, ...sneaker.gallery].map((img, idx) => (
@@ -153,10 +152,15 @@ const ProductDetail: React.FC<ProductDetailProps> = ({
               </button>
             </div>
 
+            {/* Price Display Logic */}
             <div className="flex items-center space-x-4 mb-8">
-              <span className="text-2xl font-black text-black italic">{sneaker.price}৳</span>
-              <span className="text-sm text-gray-300 line-through font-bold">{(sneaker.price * 1.5).toFixed(0)}৳</span>
-              <span className="bg-black text-white text-[9px] font-black px-2 py-1 uppercase tracking-widest rounded">33% OFF</span>
+              <span className="text-3xl font-black text-black italic">{sneaker.price.toLocaleString()}৳</span>
+              {sneaker.original_price && sneaker.original_price > sneaker.price && (
+                <>
+                  <span className="text-sm text-gray-300 line-through font-bold">{sneaker.original_price.toLocaleString()}৳</span>
+                  <span className="bg-red-600 text-white text-[9px] font-black px-2 py-1 uppercase tracking-widest rounded shadow-lg shadow-red-600/10">-{discountPercentage}%</span>
+                </>
+              )}
             </div>
 
             <div className="mb-8">
@@ -189,7 +193,6 @@ const ProductDetail: React.FC<ProductDetailProps> = ({
             </div>
 
             <div className="flex flex-col gap-4 mb-10">
-              {/* Custom In-Page Alert */}
               {error && (
                 <div className="bg-red-600 text-white p-3 rounded-xl flex items-center justify-center gap-3 animate-in slide-in-from-top-2 duration-300">
                   <i className="fa-solid fa-triangle-exclamation animate-pulse"></i>
@@ -199,34 +202,15 @@ const ProductDetail: React.FC<ProductDetailProps> = ({
 
               {/* Quantity Selector */}
               <div className="flex items-center border-2 border-gray-100 h-16 rounded-full overflow-hidden bg-gray-50/50">
-                <button 
-                  onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                  className="w-16 h-full hover:bg-white transition-colors font-black text-xl"
-                >-</button>
-                <div className="flex-1 text-center font-black text-base tracking-widest">
-                  {quantity}
-                </div>
-                <button 
-                  onClick={() => setQuantity(quantity + 1)}
-                  className="w-16 h-full hover:bg-white transition-colors font-black text-xl"
-                >+</button>
+                <button onClick={() => setQuantity(Math.max(1, quantity - 1))} className="w-16 h-full hover:bg-white transition-colors font-black text-xl">-</button>
+                <div className="flex-1 text-center font-black text-base tracking-widest">{quantity}</div>
+                <button onClick={() => setQuantity(quantity + 1)} className="w-16 h-full hover:bg-white transition-colors font-black text-xl">+</button>
               </div>
               
               {/* Action Buttons */}
               <div className="flex flex-row gap-2 sm:gap-4 h-16">
-                <button 
-                  onClick={() => handleAction(false)}
-                  className="flex-1 h-full bg-white border-2 border-black text-black font-black uppercase text-[9px] sm:text-[11px] tracking-widest hover:bg-black hover:text-white transition-all duration-300 rounded-full flex items-center justify-center px-1"
-                >
-                  ADD TO CART
-                </button>
-                
-                <button 
-                  onClick={() => handleAction(true)}
-                  className="flex-1 h-full bg-red-700 text-white font-black uppercase text-[9px] sm:text-[11px] tracking-widest hover:bg-black transition-all duration-300 rounded-full shadow-lg shadow-red-700/10 active:scale-95 flex items-center justify-center px-1"
-                >
-                  BUY NOW
-                </button>
+                <button onClick={() => handleAction(false)} className="flex-1 h-full bg-white border-2 border-black text-black font-black uppercase text-[9px] sm:text-[11px] tracking-widest hover:bg-black hover:text-white transition-all duration-300 rounded-full flex items-center justify-center px-1">ADD TO CART</button>
+                <button onClick={() => handleAction(true)} className="flex-1 h-full bg-red-700 text-white font-black uppercase text-[9px] sm:text-[11px] tracking-widest hover:bg-black transition-all duration-300 rounded-full shadow-lg shadow-red-700/10 active:scale-95 flex items-center justify-center px-1">BUY NOW</button>
               </div>
             </div>
 
@@ -235,23 +219,6 @@ const ProductDetail: React.FC<ProductDetailProps> = ({
                 <div className="flex items-center"><i className="fa-solid fa-truck-fast text-red-600 mr-2"></i> Fast Delivery</div>
                 <div className="flex items-center"><i className="fa-solid fa-shield-check text-red-600 mr-2"></i> Authentic</div>
                 <div className="flex items-center"><i className="fa-solid fa-rotate text-red-600 mr-2"></i> Easy Returns</div>
-              </div>
-              <div className="text-[9px] text-gray-400 uppercase font-black tracking-widest leading-relaxed">
-                <p className="mb-1">PRODUCT ID: {sneaker.id}</p>
-                <div className="flex flex-wrap items-center gap-x-2">
-                  <span>CATEGORIES:</span>
-                  {(sneaker.categories || [sneaker.category || 'GENERAL']).map((cat, idx) => (
-                    <button 
-                      key={idx} 
-                      onClick={() => navigateToCategory(cat)}
-                      className="text-red-600 hover:text-black transition-colors underline underline-offset-2"
-                    >
-                      {cat.toUpperCase()}
-                    </button>
-                  ))}
-                  <span className="text-gray-200">|</span>
-                  <span>{sneaker.brand || 'STORE'}</span>
-                </div>
               </div>
             </div>
           </div>
@@ -300,11 +267,7 @@ const ProductDetail: React.FC<ProductDetailProps> = ({
           </div>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-8">
             {relatedProducts.map(s => (
-              <div 
-                key={s.id} 
-                onClick={() => onSelectProduct(s)}
-                className="group cursor-pointer"
-              >
+              <div key={s.id} onClick={() => onSelectProduct(s)} className="group cursor-pointer">
                 <div className="relative aspect-[4/5] overflow-hidden border border-gray-100 mb-4 bg-white rounded-2xl">
                   <img src={s.image} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" alt={s.name} />
                 </div>

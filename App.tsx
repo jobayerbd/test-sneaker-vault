@@ -113,16 +113,16 @@ const App: React.FC = () => {
     setBrands(b || []);
     setCategories(c || []);
     setPaymentMethods(pm || []);
-    if (pm && pm.length > 0) setSelectedPayment(pm[0]);
+    if (pm && pm.length > 0 && !selectedPayment) setSelectedPayment(pm[0]);
     setSlides(sl || []);
     setNavItems(ni || []);
     setCheckoutFields(cf || []);
     setShippingOptions(sh || []);
-    if (sh && sh.length > 0) setSelectedShipping(sh[0]);
+    if (sh && sh.length > 0 && !selectedShipping) setSelectedShipping(sh[0]);
     if (f) setFooterConfig(f);
     if (id) setSiteIdentity(id);
     setIsFetchingSneakers(false);
-  }, []);
+  }, [selectedPayment, selectedShipping]);
 
   useEffect(() => {
     fetchData();
@@ -146,37 +146,39 @@ const App: React.FC = () => {
     updateBrowserIdentity(siteIdentity);
   }, [siteIdentity]);
 
+  // STABLE ROUTING: syncViewFromUrl should only depend on basic triggers, not the loaded data itself.
   const syncViewFromUrl = useCallback(() => {
     const params = new URLSearchParams(window.location.search);
-    const productSlug = params.get('product');
-    const categorySlug = params.get('category');
     const viewParam = params.get('view') as View;
 
     if (viewParam === 'admin') {
       if (localStorage.getItem('sv_admin_session') !== 'active') {
         setCurrentView('admin-login');
-        return;
+      } else {
+        setCurrentView('admin');
       }
+      return;
     }
 
-    if (productSlug) {
-      if (sneakers.length > 0) {
-        const product = sneakers.find(s => s.slug === productSlug || s.id === productSlug || s.name.toLowerCase().replace(/\s+/g, '-') === productSlug.toLowerCase());
-        if (product) {
-          setSelectedProduct(product);
-          setCurrentView('pdp');
-        } else if (!isFetchingSneakers) {
-          setCurrentView('home');
-          safePushState({}, '', window.location.pathname);
-        }
-      }
+    if (viewParam) { 
+      setCurrentView(viewParam); 
       return; 
     }
+    
+    if (!window.location.search || window.location.search === '?') {
+       setCurrentView('home'); 
+    }
+  }, []);
 
-    if (categorySlug) { setSelectedCategory(categorySlug); setCurrentView('shop'); return; }
-    if (viewParam) { setCurrentView(viewParam); return; }
-    if (!productSlug && !categorySlug && !viewParam) { setCurrentView('home'); }
-  }, [sneakers, isFetchingSneakers]);
+  // Separate effect to handle PDP deep linking once sneakers are loaded
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const productSlug = params.get('product');
+    if (productSlug && sneakers.length > 0 && currentView === 'pdp') {
+      const product = sneakers.find(s => s.slug === productSlug || s.id === productSlug || s.name.toLowerCase().replace(/\s+/g, '-') === productSlug.toLowerCase());
+      if (product) setSelectedProduct(product);
+    }
+  }, [sneakers, currentView]);
 
   useEffect(() => {
     syncViewFromUrl();
@@ -305,23 +307,125 @@ const App: React.FC = () => {
   const handleLogout = () => { localStorage.removeItem('sv_admin_session'); setIsAdminAuthenticated(false); handleNavigate('home'); };
   const handleCustomerLogout = () => { localStorage.removeItem('sv_customer_session'); setCurrentCustomer(null); handleNavigate('home'); };
 
+  // Admin Protocol Handlers
+  const handleSaveProduct = async (data: Partial<Sneaker>) => {
+    const success = await vaultApi.saveProduct(data);
+    if (success) {
+      // Re-fetch data silently without resetting the view
+      await fetchData();
+    }
+    return success;
+  };
+
+  const handleDeleteProduct = async (id: string) => {
+    const success = await vaultApi.deleteProduct(id);
+    if (success) await fetchData();
+    return success;
+  };
+
+  const handleUpdateOrderStatus = async (id: string, s: OrderStatus) => {
+    const success = await vaultApi.updateOrderStatus(id, s);
+    if (success) {
+      await vaultApi.createTimelineEvent(id, s, `Status updated to ${s} by Administrator.`);
+      await fetchData();
+    }
+    return success;
+  };
+
+  const handleSaveBrand = async (b: Partial<BrandEntity>) => {
+    const success = await vaultApi.saveBrand(b);
+    if (success) await fetchData();
+    return success;
+  };
+
+  const handleDeleteBrand = async (id: string) => {
+    const success = await vaultApi.deleteBrand(id);
+    if (success) await fetchData();
+    return success;
+  };
+
+  const handleSaveCategory = async (c: Partial<Category>) => {
+    const success = await vaultApi.saveCategory(c);
+    if (success) await fetchData();
+    return success;
+  };
+
+  const handleDeleteCategory = async (id: string) => {
+    const success = await vaultApi.deleteCategory(id);
+    if (success) await fetchData();
+    return success;
+  };
+
+  const handleSaveSlide = async (s: Partial<HomeSlide>) => {
+    const success = await vaultApi.saveSlide(s);
+    if (success) await fetchData();
+    return success;
+  };
+
+  const handleDeleteSlide = async (id: string) => {
+    const success = await vaultApi.deleteSlide(id);
+    if (success) await fetchData();
+    return success;
+  };
+
+  const handleSaveNavItem = async (n: Partial<NavItem>) => {
+    const success = await vaultApi.saveNavItem(n);
+    if (success) await fetchData();
+    return success;
+  };
+
+  const handleDeleteNavItem = async (id: string) => {
+    const success = await vaultApi.deleteNavItem(id);
+    if (success) await fetchData();
+    return success;
+  };
+
+  const handleSaveShipping = async (o: Partial<ShippingOption>) => {
+    const success = await vaultApi.saveShippingOption(o);
+    if (success) await fetchData();
+    return success;
+  };
+
+  const handleDeleteShipping = async (id: string) => {
+    const success = await vaultApi.deleteShippingOption(id);
+    if (success) await fetchData();
+    return success;
+  };
+
+  const handleSavePaymentMethod = async (m: Partial<PaymentMethod>) => {
+    const success = await vaultApi.savePaymentMethod(m);
+    if (success) await fetchData();
+    return success;
+  };
+
+  const handleDeletePaymentMethod = async (id: string) => {
+    const success = await vaultApi.deletePaymentMethod(id);
+    if (success) await fetchData();
+    return success;
+  };
+
   const handleSaveCheckoutField = async (field: Partial<CheckoutField>) => {
     const success = await vaultApi.saveCheckoutField(field);
-    if (success) {
-      const updatedFields = await vaultApi.fetchCheckoutFields();
-      setCheckoutFields(updatedFields);
-      return true;
-    }
-    return false;
+    if (success) await fetchData();
+    return success;
   };
 
   const handleDeleteCheckoutField = async (id: string) => {
     const success = await vaultApi.deleteCheckoutField(id);
-    if (success) {
-      setCheckoutFields(prev => prev.filter(f => f.id !== id));
-      return true;
-    }
-    return false;
+    if (success) await fetchData();
+    return success;
+  };
+
+  const handleSaveFooterConfig = async (c: FooterConfig) => {
+    const success = await vaultApi.saveSiteSettings('footer', c);
+    if (success) await fetchData();
+    return success;
+  };
+
+  const handleSaveIdentity = async (i: SiteIdentity) => {
+    const success = await vaultApi.saveSiteSettings('identity', i);
+    if (success) await fetchData();
+    return success;
   };
 
   const renderView = () => {
@@ -330,7 +434,7 @@ const App: React.FC = () => {
     switch (currentView) {
       case 'home': return <Home sneakers={sneakers} slides={slides} onSelectProduct={handleSelectProduct} onNavigate={handleNavigate} onSearch={(q) => { setSearchQuery(q); handleNavigate('shop'); }} />;
       case 'shop': return <Shop sneakers={sneakers} onSelectProduct={handleSelectProduct} searchQuery={searchQuery} onClearSearch={() => setSearchQuery('')} categoryFilter={selectedCategory} onCategoryChange={handleSelectCategory} />;
-      case 'pdp': return selectedProduct ? <ProductDetail sneaker={selectedProduct} onAddToCart={handleAddToCart} onBack={() => handleNavigate('shop')} onToggleWishlist={(s) => setWishlist(p => p.find(x => x.id === s.id) ? p.filter(x => x.id !== s.id) : [...p, s])} isInWishlist={wishlist.some(s => s.id === selectedProduct.id)} onSelectProduct={handleSelectProduct} /> : (
+      case 'pdp': return selectedProduct ? <ProductDetail sneaker={selectedProduct} sneakers={sneakers} onAddToCart={handleAddToCart} onBack={() => handleNavigate('shop')} onToggleWishlist={(s) => setWishlist(p => p.find(x => x.id === s.id) ? p.filter(x => x.id !== s.id) : [...p, s])} isInWishlist={wishlist.some(s => s.id === selectedProduct.id)} onSelectProduct={handleSelectProduct} /> : (
         <div className="min-h-[80vh] flex flex-col items-center justify-center bg-white space-y-4">
            <i className="fa-solid fa-spinner animate-spin text-4xl text-red-600"></i>
            <p className="text-[10px] font-black uppercase tracking-[0.5em]">Loading Product...</p>
@@ -341,7 +445,7 @@ const App: React.FC = () => {
       case 'customer-account': return currentCustomer ? <CustomerPortal customer={currentCustomer} orders={orders} onLogout={handleCustomerLogout} onUpdateProfile={async (u) => vaultApi.updateCustomer(currentCustomer.id, u)} onSelectOrder={(o) => { setViewingOrder(o); handleNavigate('order-details-view'); }} /> : <UnifiedLogin supabaseUrl={'https://vwbctddmakbnvfxzrjeo.supabase.co'} supabaseKey={'sb_publishable_8WhV41Km5aj8Dhvu6tUbvA_JnyPoVxu'} onAdminLogin={() => { setIsAdminAuthenticated(true); handleNavigate('admin'); }} onCustomerLogin={(c) => { setCurrentCustomer(c); handleNavigate('customer-account'); }} onBack={() => handleNavigate('home')} />;
       case 'admin': 
         if (!isActuallyAdmin) return <UnifiedLogin supabaseUrl={'https://vwbctddmakbnvfxzrjeo.supabase.co'} supabaseKey={'sb_publishable_8WhV41Km5aj8Dhvu6tUbvA_JnyPoVxu'} onAdminLogin={() => { setIsAdminAuthenticated(true); handleNavigate('admin'); }} onCustomerLogin={() => {}} onBack={() => handleNavigate('home')} />;
-        return <Dashboard sneakers={sneakers} orders={orders} customers={customers} brands={brands} categories={categories} paymentMethods={paymentMethods} slides={slides} navItems={navItems} checkoutFields={checkoutFields} shippingOptions={shippingOptions} footerConfig={footerConfig} siteIdentity={siteIdentity} onRefresh={fetchData} onRefreshOrders={fetchData} onUpdateOrderStatus={async (id, s) => true} onSaveProduct={async (d) => true} onDeleteProduct={async (i) => true} onSaveShipping={async (o) => true} onDeleteShipping={async (i) => true} onSavePaymentMethod={async (m) => true} onDeletePaymentMethod={async (i) => true} onSaveFooterConfig={async (c) => true} onSaveIdentity={async (i) => true} onSaveBrand={async (b) => true} onDeleteBrand={async (i) => true} onSaveCategory={async (c) => true} onDeleteCategory={async (i) => true} onSaveSlide={async (s) => true} onDeleteSlide={async (i) => true} onSaveNavItem={async (n) => true} onDeleteNavItem={async (i) => true} onSaveCheckoutField={handleSaveCheckoutField} onDeleteCheckoutField={handleDeleteCheckoutField} onLogout={handleLogout} onVisitSite={() => window.open(window.location.origin, '_blank')} />;
+        return <Dashboard sneakers={sneakers} orders={orders} customers={customers} brands={brands} categories={categories} paymentMethods={paymentMethods} slides={slides} navItems={navItems} checkoutFields={checkoutFields} shippingOptions={shippingOptions} footerConfig={footerConfig} siteIdentity={siteIdentity} onRefresh={fetchData} onRefreshOrders={fetchData} onUpdateOrderStatus={handleUpdateOrderStatus} onSaveProduct={handleSaveProduct} onDeleteProduct={handleDeleteProduct} onSaveShipping={handleSaveShipping} onDeleteShipping={handleDeleteShipping} onSavePaymentMethod={handleSavePaymentMethod} onDeletePaymentMethod={handleDeletePaymentMethod} onSaveFooterConfig={handleSaveFooterConfig} onSaveIdentity={handleSaveIdentity} onSaveBrand={handleSaveBrand} onDeleteBrand={handleDeleteBrand} onSaveCategory={handleSaveCategory} onDeleteCategory={handleDeleteCategory} onSaveSlide={handleSaveSlide} onDeleteSlide={handleDeleteSlide} onSaveNavItem={handleSaveNavItem} onDeleteNavItem={handleDeleteNavItem} onSaveCheckoutField={handleSaveCheckoutField} onDeleteCheckoutField={handleDeleteCheckoutField} onLogout={handleLogout} onVisitSite={() => window.open(window.location.origin, '_blank')} />;
       case 'checkout': return (
         <CheckoutPage 
           cart={cart} 

@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ShippingOption, FooterConfig, PaymentMethod } from '../../types.ts';
 
 interface AdminSettingsProps {
@@ -29,9 +29,17 @@ const AdminSettings: React.FC<AdminSettingsProps> = ({
   const [isSavingShipping, setIsSavingShipping] = useState(false);
   const [isSavingPayment, setIsSavingPayment] = useState(false);
   const [isSavingFooter, setIsSavingFooter] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
 
   // Custom Delete Confirmation State
   const [deleteConfirmation, setDeleteConfirmation] = useState<{ id: string; type: 'logistics' | 'gateway'; name: string } | null>(null);
+
+  useEffect(() => {
+    if (showSuccess) {
+      const timer = setTimeout(() => setShowSuccess(false), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [showSuccess]);
 
   const triggerDelete = async () => {
     if (!deleteConfirmation) return;
@@ -44,8 +52,39 @@ const AdminSettings: React.FC<AdminSettingsProps> = ({
     setDeleteConfirmation(null);
   };
 
+  const handleSaveFooter = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSavingFooter(true);
+    setShowSuccess(false);
+    const success = await onSaveFooterConfig(footerForm);
+    if (success) {
+      setShowSuccess(true);
+    }
+    setIsSavingFooter(false);
+  };
+
   return (
     <div className="space-y-12 animate-in fade-in pb-20 relative">
+      {/* Success Notification Bar */}
+      {showSuccess && (
+        <div className="fixed bottom-10 left-1/2 -translate-x-1/2 z-[100] w-full max-w-md px-6 animate-in slide-in-from-bottom-10 duration-500">
+          <div className="bg-black text-white border-l-4 border-green-500 p-5 rounded-2xl shadow-2xl flex items-center justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <div className="w-10 h-10 bg-green-500/20 rounded-full flex items-center justify-center text-green-500">
+                <i className="fa-solid fa-circle-check"></i>
+              </div>
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-widest italic text-green-500">System Secure</p>
+                <p className="text-xs font-bold leading-tight">VAULT SYNCHRONIZED: SETTINGS PERSISTED</p>
+              </div>
+            </div>
+            <button onClick={() => setShowSuccess(false)} className="text-gray-500 hover:text-white transition-colors">
+              <i className="fa-solid fa-xmark"></i>
+            </button>
+          </div>
+        </div>
+      )}
+
       <h1 className="text-3xl font-black uppercase italic font-heading">Protocol Infrastructure</h1>
       
       {/* Custom Confirmation Modal */}
@@ -121,7 +160,7 @@ const AdminSettings: React.FC<AdminSettingsProps> = ({
                 <input type="text" placeholder="METHOD NAME" value={editingShipping.name} onChange={e => setEditingShipping({...editingShipping, name: e.target.value})} className="w-full bg-white/5 p-4 rounded-xl font-bold uppercase text-xs outline-none focus:ring-1 ring-red-600" />
                 <input type="number" placeholder="RATE (৳)" value={editingShipping.rate} onChange={e => setEditingShipping({...editingShipping, rate: Number(e.target.value)})} className="w-full bg-gray-50 p-4 rounded-xl font-bold text-xs outline-none focus:ring-1 ring-red-600" />
                 <div className="flex gap-3">
-                  <button onClick={async () => { setIsSavingShipping(true); if(await onSaveShipping(editingShipping)) setEditingShipping(null); setIsSavingShipping(false); }} className="flex-1 bg-red-700 py-3 rounded-xl font-black text-[10px] uppercase">Commit</button>
+                  <button onClick={async () => { setIsSavingShipping(true); if(await onSaveShipping(editingShipping)) { setEditingShipping(null); setShowSuccess(true); } setIsSavingShipping(false); }} className="flex-1 bg-red-700 py-3 rounded-xl font-black text-[10px] uppercase">Commit</button>
                   <button onClick={() => setEditingShipping(null)} className="flex-1 bg-white/10 py-3 rounded-xl font-black text-[10px] uppercase">Cancel</button>
                 </div>
               </div>
@@ -172,7 +211,7 @@ const AdminSettings: React.FC<AdminSettingsProps> = ({
                 <input type="text" placeholder="GATEWAY NAME (e.g. bKash)" value={editingPayment.name} onChange={e => setEditingPayment({...editingPayment, name: e.target.value})} className="w-full bg-white/5 p-4 rounded-xl font-bold uppercase text-xs outline-none focus:ring-1 ring-red-600" />
                 <textarea placeholder="INSTRUCTIONS / DETAILS" value={editingPayment.details} onChange={e => setEditingPayment({...editingPayment, details: e.target.value})} className="w-full bg-white/5 p-4 rounded-xl font-bold text-xs outline-none focus:ring-1 ring-red-600 resize-none h-20" />
                 <div className="flex gap-3">
-                  <button onClick={async () => { setIsSavingPayment(true); if(await onSavePaymentMethod(editingPayment)) setEditingPayment(null); setIsSavingPayment(false); }} className="flex-1 bg-red-700 py-3 rounded-xl font-black text-[10px] uppercase">Sync Protocol</button>
+                  <button onClick={async () => { setIsSavingPayment(true); if(await onSavePaymentMethod(editingPayment)) { setEditingPayment(null); setShowSuccess(true); } setIsSavingPayment(false); }} className="flex-1 bg-red-700 py-3 rounded-xl font-black text-[10px] uppercase">Sync Protocol</button>
                   <button onClick={() => setEditingPayment(null)} className="flex-1 bg-white/10 py-3 rounded-xl font-black text-[10px] uppercase">Cancel</button>
                 </div>
               </div>
@@ -184,7 +223,7 @@ const AdminSettings: React.FC<AdminSettingsProps> = ({
         <div className="space-y-8 lg:col-span-2">
           <h3 className="text-[10px] font-black uppercase text-red-600 italic tracking-widest">Storefront Identity Protocol</h3>
           <div className="bg-white p-10 rounded-3xl border border-gray-100 shadow-xl">
-            <form onSubmit={async (e) => { e.preventDefault(); setIsSavingFooter(true); if(await onSaveFooterConfig(footerForm)) alert('SYNCED: Storefront updated.'); setIsSavingFooter(false); }} className="space-y-8">
+            <form onSubmit={handleSaveFooter} className="space-y-8">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <div className="space-y-4">
                   <div>
