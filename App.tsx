@@ -358,71 +358,40 @@ const App: React.FC = () => {
   };
 
   /**
-   * REWRITTEN CORE: Order Status and Timeline Protocol
-   * This function ensures that status updates are strictly persisted 
-   * to the database and history is never overwritten by stale local data.
+   * REWRITTEN ORDER STATUS UPDATE PROTOCOL
+   * Uses SQL RPC function for server-side processing to ensure data integrity.
    */
   const handleUpdateOrderStatus = async (orderId: string, newStatus: OrderStatus) => {
-    console.log(`Vault Execution: Syncing Order [${orderId}] to status [${newStatus}]`);
+    console.log(`Command Center: Initializing Database-Side Update for Order [${orderId}]`);
     
     try {
-      // 1. GET FRESH DATA FROM VAULT: Direct database query to get latest timeline
-      // Using raw string for orderId to avoid double-encoding issues with hyphens
-      const getResponse = await fetch(`${SUPABASE_URL}/rest/v1/orders?id=eq.${orderId}&select=timeline`, {
-        headers: { 
-          'apikey': SUPABASE_KEY, 
-          'Authorization': `Bearer ${SUPABASE_KEY}` 
-        }
-      });
-      
-      if (!getResponse.ok) {
-        console.error("Vault DB Access Error");
-        return false;
-      }
-      
-      const remoteData = await getResponse.json();
-      if (!remoteData || remoteData.length === 0) {
-        console.error("Vault Record Not Found:", orderId);
-        return false;
-      }
-
-      // 2. CONSTRUCT UPDATE: Retrieve current timeline and append new status event
-      const currentTimeline = Array.isArray(remoteData[0].timeline) ? remoteData[0].timeline : [];
-      const newEvent: TimelineEvent = { 
-        status: newStatus, 
-        timestamp: new Date().toISOString(), 
-        note: `Status updated to ${newStatus} via Administrative Command Center.` 
-      };
-      const updatedTimeline = [...currentTimeline, newEvent];
-
-      // 3. PERSISTENCE LAYER: Save the new status and updated timeline array
-      const patchResponse = await fetch(`${SUPABASE_URL}/rest/v1/orders?id=eq.${orderId}`, { 
-        method: 'PATCH', 
-        headers: { 
-          'apikey': SUPABASE_KEY, 
-          'Authorization': `Bearer ${SUPABASE_KEY}`, 
-          'Content-Type': 'application/json', 
-          'Prefer': 'return=representation' 
-        }, 
-        body: JSON.stringify({ 
-          status: newStatus, 
-          timeline: updatedTimeline 
-        }) 
+      const rpcUrl = `${SUPABASE_URL}/rest/v1/rpc/update_order_status_secure`;
+      const response = await fetch(rpcUrl, {
+        method: 'POST',
+        headers: {
+          'apikey': SUPABASE_KEY,
+          'Authorization': `Bearer ${SUPABASE_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          p_order_id: orderId,
+          p_new_status: newStatus,
+          p_note: `Manual Protocol: Status updated to ${newStatus} via Command Center.`
+        })
       });
 
-      if (patchResponse.ok) { 
-        console.log("Vault Success: DB state fully synchronized.");
-        // 4. GLOBAL SYNC: Re-fetch orders to update state across the entire application
-        await fetchOrders(); 
-        return true; 
+      if (response.ok) {
+        console.log("Vault Success: DB-side update completed and verified.");
+        await fetchOrders(); // Full global refresh
+        return true;
       } else {
-        const errorDetail = await patchResponse.text();
-        console.error("Vault Persistence Failure:", errorDetail);
+        const errorText = await response.text();
+        console.error("Vault SQL Execution Error:", errorText);
         return false;
       }
-    } catch (err) { 
-      console.error("CRITICAL VAULT SYNC FAILURE:", err);
-      return false; 
+    } catch (err) {
+      console.error("CRITICAL VAULT RPC FAILURE:", err);
+      return false;
     }
   };
 
