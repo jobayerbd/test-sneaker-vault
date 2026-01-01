@@ -43,7 +43,7 @@ type View = 'home' | 'shop' | 'admin' | 'cart' | 'pdp' | 'wishlist' | 'checkout'
 
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<View>('home');
-  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(localStorage.getItem('sv_admin_session') === 'active');
+  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(() => localStorage.getItem('sv_admin_session') === 'active');
   const [currentCustomer, setCurrentCustomer] = useState<Customer | null>(null);
   const [selectedProduct, setSelectedProduct] = useState<Sneaker | null>(null);
   const [viewingOrder, setViewingOrder] = useState<Order | null>(null);
@@ -67,7 +67,7 @@ const App: React.FC = () => {
   const [siteIdentity, setSiteIdentity] = useState<SiteIdentity>(DEFAULT_IDENTITY);
   
   const [isPlacingOrder, setIsPlacingOrder] = useState(false);
-  const [isFetchingSneakers, setIsFetchingSneakers] = useState(false);
+  const [isFetchingSneakers, setIsFetchingSneakers] = useState(true);
   const [isFetchingOrders, setIsFetchingOrders] = useState(false);
   const [isCartSidebarOpen, setIsCartSidebarOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -215,10 +215,6 @@ const App: React.FC = () => {
     fetchBrands(); fetchCategories(); fetchPaymentMethods(); fetchSlides(); 
     fetchNavItems(); fetchCheckoutFields(); fetchSiteIdentity(); fetchCustomers();
     
-    // Initial Auth Sync
-    const adminSession = localStorage.getItem('sv_admin_session') === 'active';
-    setIsAdminAuthenticated(adminSession);
-
     const storedCustomer = localStorage.getItem('sv_customer_session');
     if (storedCustomer) {
       const parsed = JSON.parse(storedCustomer);
@@ -268,23 +264,28 @@ const App: React.FC = () => {
     const categorySlug = params.get('category');
     const viewParam = params.get('view') as View;
 
-    // SECURITY PROTOCOL: Synchronous check for admin access via URL
-    if (viewParam === 'admin') {
+    // SECURITY PROTOCOL: Strict check for admin view via URL
+    if (viewParam === 'admin' || params.get('view') === 'admin') {
       const isLogged = localStorage.getItem('sv_admin_session') === 'active';
       if (!isLogged) {
         setCurrentView('admin-login');
-        safePushState({ view: 'admin-login' }, '', window.location.pathname + '?view=admin-login');
+        setIsAdminAuthenticated(false);
         return;
       }
     }
 
-    if (productSlug && sneakers.length > 0) {
-      const product = sneakers.find(s => s.slug === productSlug || s.id === productSlug);
-      if (product) {
-        setSelectedProduct(product);
-        setCurrentView('pdp');
-        return;
+    if (productSlug) {
+      // WAIT FOR DATA: Do not redirect to home if sneakers are still loading
+      if (sneakers.length > 0) {
+        const product = sneakers.find(s => s.slug === productSlug || s.id === productSlug);
+        if (product) {
+          setSelectedProduct(product);
+          setCurrentView('pdp');
+        } else {
+          setCurrentView('home');
+        }
       }
+      return; // Stay in current view (loading) until sneakers load
     }
 
     if (categorySlug) {
@@ -322,8 +323,8 @@ const App: React.FC = () => {
   }, [selectedProduct?.id, currentView, footerConfig.fb_pixel_id]);
 
   const handleNavigate = (view: View, params: string = '') => {
-    // SECURITY GUARD: Handle manual navigation calls
-    if (view === 'admin' && !isAdminAuthenticated) {
+    // SECURE NAVIGATION: Manual calls must also pass auth check
+    if (view === 'admin' && !isAdminAuthenticated && localStorage.getItem('sv_admin_session') !== 'active') {
       setCurrentView('admin-login');
       safePushState({ view: 'admin-login' }, '', window.location.pathname + '?view=admin-login');
       return;
@@ -715,7 +716,7 @@ const App: React.FC = () => {
   const handleLogout = () => { localStorage.removeItem('sv_admin_session'); setIsAdminAuthenticated(false); handleNavigate('home'); };
   const handleCustomerLogout = () => { localStorage.removeItem('sv_customer_session'); setCurrentCustomer(null); handleNavigate('home'); };
 
-  const navigateToAdmin = () => { if (isAdminAuthenticated) handleNavigate('admin'); else handleNavigate('admin-login'); };
+  const navigateToAdmin = () => { if (isAdminAuthenticated || localStorage.getItem('sv_admin_session') === 'active') handleNavigate('admin'); else handleNavigate('admin-login'); };
   const navigateToCustomer = () => { if (currentCustomer) handleNavigate('customer-account'); else handleNavigate('customer-login'); };
 
   const handleSearch = (query: string) => { setSearchQuery(query); setIsSearchOpen(false); handleNavigate('shop'); };
@@ -801,10 +802,17 @@ const App: React.FC = () => {
   };
 
   const renderView = () => {
+    // SECURITY GUARD: Check authentication before rendering sensitive views
+    const isAdmin = isAdminAuthenticated || localStorage.getItem('sv_admin_session') === 'active';
+
     switch (currentView) {
       case 'home': return <Home sneakers={sneakers} slides={slides} onSelectProduct={handleSelectProduct} onNavigate={handleNavigate} onSearch={handleSearch} />;
       case 'shop': return <Shop sneakers={sneakers} onSelectProduct={handleSelectProduct} searchQuery={searchQuery} onClearSearch={() => setSearchQuery('')} categoryFilter={selectedCategory} onCategoryChange={handleSelectCategory} />;
-      case 'pdp': return selectedProduct ? <ProductDetail sneaker={selectedProduct} onAddToCart={handleAddToCart} onBack={() => handleNavigate('shop')} onToggleWishlist={toggleWishlist} isInWishlist={wishlist.some(s => s.id === selectedProduct.id)} onSelectProduct={handleSelectProduct} /> : <Home sneakers={sneakers} slides={slides} onSelectProduct={handleSelectProduct} onNavigate={handleNavigate} onSearch={handleSearch} />;
+      case 'pdp': return selectedProduct ? <ProductDetail sneaker={selectedProduct} onAddToCart={handleAddToCart} onBack={() => handleNavigate('shop')} onToggleWishlist={toggleWishlist} isInWishlist={wishlist.some(s => s.id === selectedProduct.id)} onSelectProduct={handleSelectProduct} /> : (
+        <div className="min-h-[60vh] flex items-center justify-center">
+           <i className="fa-solid fa-circle-notch animate-spin text-red-600 text-4xl"></i>
+        </div>
+      );
       case 'admin-login':
       case 'customer-login': return (
         <UnifiedLogin 
@@ -890,8 +898,7 @@ const App: React.FC = () => {
         ) : null;
       }
       case 'admin': {
-        // SECURITY PROTOCOL: Synchronous layer to prevent dashboard rendering without auth
-        if (!isAdminAuthenticated && localStorage.getItem('sv_admin_session') !== 'active') {
+        if (!isAdmin) {
           return (
             <UnifiedLogin 
               supabaseUrl={SUPABASE_URL} 
@@ -1225,7 +1232,14 @@ const App: React.FC = () => {
           siteIdentity={siteIdentity}
         />
       )}
-      <div className="flex-1">{renderView()}</div>
+      <div className="flex-1">
+        {isFetchingSneakers && sneakers.length === 0 && (new URLSearchParams(window.location.search).get('product')) ? (
+           <div className="min-h-screen flex flex-col items-center justify-center bg-white space-y-4">
+              <i className="fa-solid fa-vault text-4xl animate-bounce text-red-600"></i>
+              <p className="text-[10px] font-black uppercase tracking-[0.5em] italic animate-pulse">Decrypting Vault Assets...</p>
+           </div>
+        ) : renderView()}
+      </div>
       <SearchOverlay />
       <CartSidebar />
       {currentView !== 'admin' && currentView !== 'admin-login' && <Footer config={footerConfig} onNavigate={handleNavigate} />}
