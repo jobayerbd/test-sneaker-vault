@@ -303,37 +303,52 @@ const App: React.FC = () => {
       return; 
     }
     setIsPlacingOrder(true);
-    const subtotal = cart.reduce((acc, item) => acc + (item.price * item.quantity), 0);
-    const total = subtotal + (selectedShipping?.rate || 0);
-    const validCustomerId = currentCustomer?.id?.startsWith('demo-') ? null : (currentCustomer?.id || null);
-    const orderId = crypto.randomUUID?.() || `ORD-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-
-    const newOrder = {
-      id: orderId,
-      customer_id: validCustomerId,
-      first_name: String(checkoutForm.first_name || '').trim(), 
-      last_name: String(checkoutForm.last_name || '').trim(), 
-      email: String(checkoutForm.email || '').toLowerCase().trim(), 
-      mobile_number: String(checkoutForm.mobile_number || '').trim(), 
-      street_address: String(checkoutForm.street_address || '').trim(), 
-      city: String(checkoutForm.city || '').trim(), 
-      zip_code: String(checkoutForm.zip_code || '').trim(), 
-      total, 
-      status: OrderStatus.PLACED, 
-      shipping_name: selectedShipping.name || 'Standard', 
-      shipping_rate: selectedShipping.rate || 0, 
-      payment_method: selectedPayment.name || 'COD', 
-      items: cart.map(item => ({ 
-        sneakerId: item.id, 
-        name: item.name, 
-        image: item.image, 
-        size: item.selectedSize, 
-        quantity: item.quantity, 
-        price: item.price 
-      }))
-    };
-
+    
     try {
+      // Step 1: Fetch fresh orders from server to ensure no ID collision
+      const freshOrders = await vaultApi.fetchOrders();
+      setOrders(freshOrders || []); // Update local state while we're at it
+
+      // Sequential Numeric Order ID Logic (Improved for multi-user sync)
+      const lastNumericId = (freshOrders || []).reduce((max: number, order: Order) => {
+        if (/^\d{1,6}$/.test(order.id)) {
+          const num = parseInt(order.id, 10);
+          return isNaN(num) ? max : Math.max(max, num);
+        }
+        return max;
+      }, 0);
+      
+      const orderId = String(lastNumericId + 1).padStart(6, '0');
+
+      const subtotal = cart.reduce((acc, item) => acc + (item.price * item.quantity), 0);
+      const total = subtotal + (selectedShipping?.rate || 0);
+      const validCustomerId = currentCustomer?.id?.startsWith('demo-') ? null : (currentCustomer?.id || null);
+
+      const newOrder = {
+        id: orderId,
+        customer_id: validCustomerId,
+        first_name: String(checkoutForm.first_name || '').trim(), 
+        last_name: String(checkoutForm.last_name || '').trim(), 
+        email: String(checkoutForm.email || '').toLowerCase().trim(), 
+        mobile_number: String(checkoutForm.mobile_number || '').trim(), 
+        street_address: String(checkoutForm.street_address || '').trim(), 
+        city: String(checkoutForm.city || '').trim(), 
+        zip_code: String(checkoutForm.zip_code || '').trim(), 
+        total, 
+        status: OrderStatus.PLACED, 
+        shipping_name: selectedShipping.name || 'Standard', 
+        shipping_rate: selectedShipping.rate || 0, 
+        payment_method: selectedPayment.name || 'COD', 
+        items: cart.map(item => ({ 
+          sneakerId: item.id, 
+          name: item.name, 
+          image: item.image, 
+          size: item.selectedSize, 
+          quantity: item.quantity, 
+          price: item.price 
+        }))
+      };
+
       const saved = await vaultApi.createOrder(newOrder);
       if (saved) {
         if (window.fbq) {
