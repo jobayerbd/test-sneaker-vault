@@ -132,28 +132,45 @@ const AdminOrders: React.FC<AdminOrdersProps> = ({
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
-            {orders.map(order => (
-              <tr 
-                key={order.id} 
-                className="hover:bg-gray-50/50 cursor-pointer group transition-colors" 
-                onClick={() => onSelectOrder(order)}
-              >
-                <td className="px-8 py-6 font-mono text-xs font-black">{order.id}</td>
-                <td className="px-8 py-6 font-bold text-xs uppercase">
-                  <div>{order.first_name} {order.last_name}</div>
-                  <div className="text-[9px] text-gray-400 font-medium">{order.email}</div>
-                </td>
-                <td className="px-8 py-6 text-[10px] font-black text-gray-400 uppercase italic">
-                  {order.created_at ? new Date(order.created_at).toLocaleDateString() : 'N/A'}
-                </td>
-                <td className="px-8 py-6">
-                  <span className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase border ${getStatusBadgeStyles(order.status)}`}>
-                    {order.status}
-                  </span>
-                </td>
-                <td className="px-8 py-6 font-black italic text-right">{order.total.toLocaleString()}৳</td>
-              </tr>
-            ))}
+            {orders.map(order => {
+              // Safety: Identify the absolute latest status from the timeline or fallback to order.status
+              const latestEvent = order.timeline && order.timeline.length > 0 
+                ? order.timeline[order.timeline.length - 1] 
+                : null;
+              
+              const currentStatus = latestEvent ? latestEvent.status : order.status;
+              const updateTime = latestEvent ? new Date(latestEvent.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : null;
+
+              return (
+                <tr 
+                  key={order.id} 
+                  className="hover:bg-gray-50/50 cursor-pointer group transition-colors" 
+                  onClick={() => onSelectOrder(order)}
+                >
+                  <td className="px-8 py-6 font-mono text-xs font-black">{order.id}</td>
+                  <td className="px-8 py-6 font-bold text-xs uppercase">
+                    <div>{order.first_name} {order.last_name}</div>
+                    <div className="text-[9px] text-gray-400 font-medium">{order.email}</div>
+                  </td>
+                  <td className="px-8 py-6 text-[10px] font-black text-gray-400 uppercase italic">
+                    {order.created_at ? new Date(order.created_at).toLocaleDateString() : 'N/A'}
+                  </td>
+                  <td className="px-8 py-6">
+                    <div className="flex flex-col">
+                      <span className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase border w-fit ${getStatusBadgeStyles(currentStatus)}`}>
+                        {currentStatus}
+                      </span>
+                      {updateTime && (
+                        <span className="text-[8px] text-gray-400 font-bold uppercase mt-1 ml-1">
+                          Refreshed @ {updateTime}
+                        </span>
+                      )}
+                    </div>
+                  </td>
+                  <td className="px-8 py-6 font-black italic text-right">{order.total.toLocaleString()}৳</td>
+                </tr>
+              );
+            })}
             {orders.length === 0 && (
               <tr>
                 <td colSpan={5} className="px-8 py-20 text-center">

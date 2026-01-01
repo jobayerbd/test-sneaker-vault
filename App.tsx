@@ -87,35 +87,33 @@ const App: React.FC = () => {
 
   /**
    * ROBUST ORDER FETCHING: 
-   * Fetches orders with an optional join for order_timeline.
-   * If join fails due to DB schema mismatch, it falls back to a simple fetch.
+   * Fetches orders and ensures timeline events are sorted so the UI always has the latest status.
    */
   const fetchOrders = useCallback(async () => {
     setIsFetchingOrders(true);
-    console.log("Vault Retrieval: Starting Order Manifest Pull...");
     try {
-      // Primary Attempt: Relational Join
       const response = await fetch(`${SUPABASE_URL}/rest/v1/orders?select=*,timeline:order_timeline(status,note,timestamp)&order=created_at.desc`, { 
         headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } 
       });
 
       if (response.ok) {
         const data = await response.json();
-        console.log(`Vault Success: ${data.length} orders logged.`);
-        setOrders(data);
+        // Ensure timeline is sorted for each order to easily pick the latest
+        const processed = data.map((o: Order) => ({
+          ...o,
+          timeline: (o.timeline || []).sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
+        }));
+        setOrders(processed);
       } else {
-        // Fallback: Simple Fetch (in case join fails)
-        console.warn("Vault Warning: Relational join failed. Attempting legacy fetch...");
         const fallbackResp = await fetch(`${SUPABASE_URL}/rest/v1/orders?select=*&order=created_at.desc`, { 
           headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } 
         });
         if (fallbackResp.ok) {
-          const fallbackData = await fallbackResp.json();
-          setOrders(fallbackData);
+          setOrders(await fallbackResp.json());
         }
       }
     } catch (err) {
-      console.error("CRITICAL VAULT RETRIEVAL FAILURE:", err);
+      console.error("Vault retrieval error:", err);
     } finally {
       setIsFetchingOrders(false);
     }
@@ -376,7 +374,6 @@ const App: React.FC = () => {
   };
 
   const handleUpdateOrderStatus = async (orderId: string, newStatus: OrderStatus) => {
-    console.log(`Vault Command: Syncing Order [${orderId}] to [${newStatus}]`);
     try {
       const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/advance_order_status`, {
         method: 'POST',
@@ -393,16 +390,12 @@ const App: React.FC = () => {
       });
 
       if (response.ok) {
-        console.log("Vault Success: Relational sync complete.");
         await fetchOrders();
         return true;
       } else {
-        const errorText = await response.text();
-        console.error("Vault SQL Execution Error:", errorText);
         return false;
       }
     } catch (err) {
-      console.error("CRITICAL VAULT SYNC FAILURE:", err);
       return false;
     }
   };
@@ -701,6 +694,17 @@ const App: React.FC = () => {
 
   const handleSearch = (query: string) => { setSearchQuery(query); setIsSearchOpen(false); handleNavigate('shop'); };
 
+  const updateCartQuantity = (idx: number, delta: number) => {
+    const newCart = [...cart];
+    newCart[idx].quantity = Math.max(1, newCart[idx].quantity + delta);
+    setCart(newCart);
+  };
+
+  const removeFromCart = (idx: number) => {
+    if (cart.length <= 1) return; // Prevent empty cart via edit controls
+    setCart(cart.filter((_, i) => i !== idx));
+  };
+
   const SearchOverlay = () => {
     const [localQuery, setLocalQuery] = useState('');
     return (
@@ -735,14 +739,24 @@ const App: React.FC = () => {
                   <div className="flex-1 flex flex-col justify-center">
                     <div className="flex justify-between items-start mb-2">
                       <h4 className="text-[11px] font-black uppercase tracking-tight leading-tight">{item.name}</h4>
-                      <button onClick={() => setCart(cart.filter((_, i) => i !== idx))} className="text-gray-300 hover:text-red-600 transition-colors"><i className="fa-solid fa-trash-can text-sm"></i></button>
+                      <button 
+                        disabled={cart.length <= 1}
+                        onClick={() => removeFromCart(idx)} 
+                        className="text-gray-300 hover:text-red-600 transition-colors disabled:opacity-10 disabled:cursor-not-allowed"
+                      >
+                        <i className="fa-solid fa-trash-can text-sm"></i>
+                      </button>
                     </div>
                     <p className="text-[10px] text-red-600 font-black mb-4 italic">SIZE Index: {item.selectedSize}</p>
                     <div className="flex justify-between items-center mt-auto">
                       <div className="flex items-center border border-gray-100 rounded-lg bg-gray-50 overflow-hidden h-8">
-                        <button onClick={() => { const n = [...cart]; n[idx].quantity = Math.max(1, n[idx].quantity - 1); setCart(n); }} className="px-3 hover:bg-white">-</button>
+                        <button 
+                          disabled={item.quantity <= 1}
+                          onClick={() => updateCartQuantity(idx, -1)} 
+                          className="px-3 hover:bg-white disabled:opacity-30 disabled:cursor-not-allowed"
+                        >-</button>
                         <span className="px-2 font-black text-xs">{item.quantity}</span>
-                        <button onClick={() => { const n = [...cart]; n[idx].quantity += 1; setCart(n); }} className="px-3 hover:bg-white">+</button>
+                        <button onClick={() => updateCartQuantity(idx, 1)} className="px-3 hover:bg-white">+</button>
                       </div>
                       <p className="text-xs font-black italic text-black">{(item.price * item.quantity).toLocaleString()}৳</p>
                     </div>
@@ -751,8 +765,8 @@ const App: React.FC = () => {
               ))}
             </div>
             <div className="p-8 bg-white border-t border-gray-100">
-               <div className="flex justify-between mb-2"><span className="text-[10px] font-black uppercase text-gray-400">Inventory Value</span><span className="text-sm font-black italic">{total.toLocaleString()}৳</span></div>
-               <div className="flex justify-between mb-6 pt-2 border-t border-gray-50"><span className="text-sm font-black uppercase">Final Settlement</span><span className="text-2xl font-black text-red-700">{total.toLocaleString()}৳</span></div>
+               <div className="flex justify-between mb-2"><span className="text-[10px] font-black uppercase text-gray-400">Inventory Value</span><span className="text-sm font-black italic">{cart.reduce((acc, item) => acc + (item.price * item.quantity), 0).toLocaleString()}৳</span></div>
+               <div className="flex justify-between mb-6 pt-2 border-t border-gray-50"><span className="text-sm font-black uppercase">Final Settlement</span><span className="text-2xl font-black text-red-700">{cart.reduce((acc, item) => acc + (item.price * item.quantity), 0).toLocaleString()}৳</span></div>
                <button disabled={cart.length === 0} onClick={() => { handleNavigate('checkout'); setIsCartSidebarOpen(false); }} className="w-full bg-black text-white py-5 rounded-xl font-black uppercase tracking-[0.2em] text-xs shadow-xl hover:bg-red-700 transition-all active:scale-95 disabled:opacity-30">Initialize Checkout</button>
             </div>
            </div>
@@ -888,127 +902,189 @@ const App: React.FC = () => {
           onLogout={handleLogout} 
         />
       );
-      case 'checkout': return (
-        <div className="max-w-6xl mx-auto px-4 py-16 animate-in fade-in duration-500">
-          <div className="flex flex-col items-center mb-12 text-center">
-            <h1 className="text-4xl font-black uppercase font-heading italic mb-4">Checkout Registry</h1>
-            <div className="w-16 h-1 bg-red-600 mb-2"></div>
-            <p className="text-gray-400 text-[10px] font-black uppercase tracking-[0.3em]">Finalizing secured transaction protocols</p>
-          </div>
-          {checkoutError && (
-            <div className="max-w-4xl mx-auto mb-10 bg-red-600 text-white p-6 rounded-2xl flex items-center justify-center gap-4 animate-in slide-in-from-bottom-4 duration-300 shadow-2xl">
-              <i className="fa-solid fa-triangle-exclamation text-2xl animate-pulse"></i>
-              <span className="text-[11px] font-black uppercase tracking-[0.2em] italic">{checkoutError}</span>
+      case 'checkout': {
+        const subtotal = cart.reduce((acc, item) => acc + (item.price * item.quantity), 0);
+        const finalTotal = subtotal + (selectedShipping?.rate || 0);
+        
+        return (
+          <div className="max-w-6xl mx-auto px-4 py-16 animate-in fade-in duration-500">
+            <div className="flex flex-col items-center mb-12 text-center">
+              <h1 className="text-4xl font-black uppercase font-heading italic mb-4">Checkout Registry</h1>
+              <div className="w-16 h-1 bg-red-600 mb-2"></div>
+              <p className="text-gray-400 text-[10px] font-black uppercase tracking-[0.3em]">Finalizing secured transaction protocols</p>
             </div>
-          )}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
-            <div className="lg:col-span-2 space-y-8">
-              <div className="bg-white p-10 border border-gray-100 rounded-3xl shadow-sm">
-                <h3 className="text-xs font-black uppercase italic mb-8 border-b pb-4 tracking-widest">Subject Coordinates</h3>
-                <div className="grid grid-cols-2 gap-6">
-                  {checkoutFields.filter(f => f.enabled).sort((a,b) => a.order - b.order).map((field) => (
-                    <div key={field.id} className={`${field.width === 'half' ? 'col-span-1' : 'col-span-2'} space-y-1`}>
-                      <label className="text-[10px] font-black uppercase text-black px-1 tracking-widest">{field.label} {field.required && '*'}</label>
-                      <input 
-                        type={field.type} 
-                        placeholder={field.placeholder.toUpperCase()} 
-                        value={checkoutForm[field.field_key] || ''} 
-                        onChange={e => {
-                          setCheckoutForm({ ...checkoutForm, [field.field_key]: e.target.value });
-                          setCheckoutError(null);
-                        }} 
-                        className="w-full bg-gray-50 p-4 rounded-xl outline-none font-bold text-xs focus:ring-2 ring-black/5" 
-                      />
-                    </div>
-                  ))}
-                  
-                  {!currentCustomer && (
-                    <div className="col-span-2 mt-4 p-6 bg-gray-50 rounded-2xl border border-gray-100 space-y-4">
-                       <label className="flex items-center gap-3 cursor-pointer group">
-                          <input type="checkbox" checked={createAccount} onChange={e => setCreateAccount(e.target.checked)} className="w-5 h-5 rounded border-gray-200 text-red-600 focus:ring-red-600" />
-                          <span className="text-[10px] font-black uppercase tracking-widest text-black italic">Create Vault Member Account</span>
-                       </label>
-                       {createAccount && (
-                          <div className="space-y-2 animate-in slide-in-from-top-2">
-                             <label className="text-[9px] font-black uppercase text-gray-400 px-1 italic">Security Password (Mandatory for Account)</label>
-                             <input 
-                               type="password" 
-                               value={accountPassword} 
-                               onChange={e => setAccountPassword(e.target.value)} 
-                               placeholder="ENTER SECURE PASSWORD" 
-                               className="w-full bg-white p-4 rounded-xl outline-none font-bold text-xs border-2 border-transparent focus:border-black"
-                             />
-                             <p className="text-[8px] text-gray-400 font-bold uppercase italic mt-1 px-1">Note: Email protocol becomes mandatory if account creation is active.</p>
+            
+            {cart.length === 0 ? (
+              <div className="text-center py-20 bg-white border rounded-3xl shadow-sm">
+                <i className="fa-solid fa-bag-shopping text-4xl text-gray-200 mb-6"></i>
+                <h3 className="text-xl font-black uppercase italic mb-4">Your Vault is Empty</h3>
+                <button onClick={() => handleNavigate('shop')} className="bg-black text-white px-12 py-4 rounded-xl font-black uppercase text-[10px] tracking-widest hover:bg-red-700 transition-all">Return to Archives</button>
+              </div>
+            ) : (
+              <>
+                {checkoutError && (
+                  <div className="max-w-4xl mx-auto mb-10 bg-red-600 text-white p-6 rounded-2xl flex items-center justify-center gap-4 animate-in slide-in-from-bottom-4 duration-300 shadow-2xl">
+                    <i className="fa-solid fa-triangle-exclamation text-2xl animate-pulse"></i>
+                    <span className="text-[11px] font-black uppercase tracking-[0.2em] italic">{checkoutError}</span>
+                  </div>
+                )}
+                
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
+                  <div className="lg:col-span-2 space-y-8">
+                    {/* User Coordinates */}
+                    <div className="bg-white p-10 border border-gray-100 rounded-3xl shadow-sm">
+                      <h3 className="text-xs font-black uppercase italic mb-8 border-b pb-4 tracking-widest flex items-center gap-3">
+                        <i className="fa-solid fa-id-card text-red-600"></i> Subject Coordinates
+                      </h3>
+                      <div className="grid grid-cols-2 gap-6">
+                        {checkoutFields.filter(f => f.enabled).sort((a,b) => a.order - b.order).map((field) => (
+                          <div key={field.id} className={`${field.width === 'half' ? 'col-span-1' : 'col-span-2'} space-y-1`}>
+                            <label className="text-[10px] font-black uppercase text-black px-1 tracking-widest">{field.label} {field.required && '*'}</label>
+                            <input 
+                              type={field.type} 
+                              placeholder={field.placeholder.toUpperCase()} 
+                              value={checkoutForm[field.field_key] || ''} 
+                              onChange={e => {
+                                setCheckoutForm({ ...checkoutForm, [field.field_key]: e.target.value });
+                                setCheckoutError(null);
+                              }} 
+                              className="w-full bg-gray-50 p-4 rounded-xl outline-none font-bold text-xs focus:ring-2 ring-black/5 border border-transparent focus:border-gray-200 transition-all" 
+                            />
                           </div>
-                       )}
-                    </div>
-                  )}
-                </div>
-              </div>
-              <div className="bg-white p-10 border border-gray-100 rounded-3xl shadow-sm">
-                <h3 className="text-xs font-black uppercase italic mb-8 border-b pb-4 tracking-widest">Logistics Hub</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {shippingOptions.map(o => (
-                    <div 
-                      key={o.id} 
-                      onClick={() => { setSelectedShipping(o); setCheckoutError(null); }} 
-                      className={`p-6 border-2 rounded-2xl flex justify-between items-center cursor-pointer transition-all duration-300 ${selectedShipping?.id === o.id ? 'border-black bg-black text-white shadow-xl scale-[1.02]' : 'border-gray-50 bg-gray-50 hover:border-gray-200'}`}
-                    >
-                      <div className="flex flex-col">
-                        <span className="font-black text-[10px] uppercase tracking-widest mb-1">{o.name}</span>
-                        <span className={`text-[9px] font-bold ${selectedShipping?.id === o.id ? 'text-gray-300' : 'text-black'} uppercase`}>Transit Protocol</span>
+                        ))}
+                        
+                        {!currentCustomer && (
+                          <div className="col-span-2 mt-4 p-6 bg-gray-50 rounded-2xl border border-gray-100 space-y-4">
+                             <label className="flex items-center gap-3 cursor-pointer group">
+                                <input type="checkbox" checked={createAccount} onChange={e => setCreateAccount(e.target.checked)} className="w-5 h-5 rounded border-gray-200 text-red-600 focus:ring-red-600" />
+                                <span className="text-[10px] font-black uppercase tracking-widest text-black italic">Create Vault Member Account</span>
+                             </label>
+                             {createAccount && (
+                                <div className="space-y-2 animate-in slide-in-from-top-2">
+                                   <label className="text-[9px] font-black uppercase text-gray-400 px-1 italic">Security Password (Mandatory for Account)</label>
+                                   <input 
+                                     type="password" 
+                                     value={accountPassword} 
+                                     onChange={e => setAccountPassword(e.target.value)} 
+                                     placeholder="ENTER SECURE PASSWORD" 
+                                     className="w-full bg-white p-4 rounded-xl outline-none font-bold text-xs border-2 border-transparent focus:border-black"
+                                   />
+                                </div>
+                             )}
+                          </div>
+                        )}
                       </div>
-                      <span className="font-black italic text-sm">{o.rate}৳</span>
                     </div>
-                  ))}
-                </div>
-              </div>
-              <div className="bg-white p-10 border border-gray-100 rounded-3xl shadow-sm">
-                <h3 className="text-xs font-black uppercase italic mb-8 border-b pb-4 tracking-widest">Payment Gateway Matrix</h3>
-                <div className="space-y-4">
-                  {paymentMethods.map(pm => (
-                    <div 
-                      key={pm.id}
-                      onClick={() => { setSelectedPayment(pm); setCheckoutError(null); }}
-                      className={`p-6 border-2 rounded-2xl cursor-pointer transition-all duration-300 ${selectedPayment?.id === pm.id ? 'border-red-600 bg-red-50 shadow-md' : 'border-gray-50 bg-gray-50 hover:border-gray-200'}`}
-                    >
-                      <div className="flex justify-between items-center mb-2">
-                         <span className="font-black text-xs uppercase tracking-widest">{pm.name}</span>
-                         {selectedPayment?.id === pm.id && <i className="fa-solid fa-circle-check text-red-600"></i>}
+
+                    {/* Logistics Hub */}
+                    <div className="bg-white p-10 border border-gray-100 rounded-3xl shadow-sm">
+                      <h3 className="text-xs font-black uppercase italic mb-8 border-b pb-4 tracking-widest flex items-center gap-3">
+                        <i className="fa-solid fa-truck-fast text-red-600"></i> Logistics Hub
+                      </h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {shippingOptions.map(o => (
+                          <div 
+                            key={o.id} 
+                            onClick={() => { setSelectedShipping(o); setCheckoutError(null); }} 
+                            className={`p-6 border-2 rounded-2xl flex justify-between items-center cursor-pointer transition-all duration-300 ${selectedShipping?.id === o.id ? 'border-black bg-black text-white shadow-xl scale-[1.02]' : 'border-gray-50 bg-gray-50 hover:border-gray-200'}`}
+                          >
+                            <div className="flex flex-col">
+                              <span className="font-black text-[10px] uppercase tracking-widest mb-1">{o.name}</span>
+                              <span className={`text-[9px] font-bold ${selectedShipping?.id === o.id ? 'text-gray-300' : 'text-black'} uppercase`}>Transit Protocol</span>
+                            </div>
+                            <span className="font-black italic text-sm">{o.rate}৳</span>
+                          </div>
+                        ))}
                       </div>
-                      {pm.details && <p className="text-[10px] text-gray-500 font-medium italic leading-relaxed whitespace-pre-line">{pm.details}</p>}
                     </div>
-                  ))}
+
+                    {/* Payment Gateway Matrix */}
+                    <div className="bg-white p-10 border border-gray-100 rounded-3xl shadow-sm">
+                      <h3 className="text-xs font-black uppercase italic mb-8 border-b pb-4 tracking-widest flex items-center gap-3">
+                        <i className="fa-solid fa-credit-card text-red-600"></i> Payment Gateway Matrix
+                      </h3>
+                      <div className="space-y-4">
+                        {paymentMethods.map(pm => (
+                          <div 
+                            key={pm.id}
+                            onClick={() => { setSelectedPayment(pm); setCheckoutError(null); }}
+                            className={`p-6 border-2 rounded-2xl cursor-pointer transition-all duration-300 ${selectedPayment?.id === pm.id ? 'border-red-600 bg-red-50 shadow-md' : 'border-gray-50 bg-gray-50 hover:border-gray-200'}`}
+                          >
+                            <div className="flex justify-between items-center mb-2">
+                               <span className="font-black text-xs uppercase tracking-widest">{pm.name}</span>
+                               {selectedPayment?.id === pm.id && <i className="fa-solid fa-circle-check text-red-600"></i>}
+                            </div>
+                            {pm.details && <p className="text-[10px] text-gray-500 font-medium italic leading-relaxed whitespace-pre-line">{pm.details}</p>}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-black text-white p-10 rounded-3xl h-fit shadow-2xl sticky top-24">
+                    <h3 className="text-xl font-black uppercase italic border-b border-white/10 pb-6 mb-8 tracking-tighter font-heading">Settlement Summary</h3>
+                    
+                    {/* Editable Cart List */}
+                    <div className="space-y-6 mb-8 max-h-[300px] overflow-y-auto pr-2 no-scrollbar border-b border-white/5 pb-8">
+                       {cart.map((item, idx) => (
+                         <div key={`${item.id}-${item.selectedSize}`} className="flex gap-4 items-center animate-in slide-in-from-right-2">
+                            <div className="w-12 h-12 bg-white/10 rounded-lg p-1 shrink-0"><img src={item.image} className="w-full h-full object-contain" /></div>
+                            <div className="flex-1 min-w-0">
+                               <h4 className="text-[9px] font-black uppercase truncate mb-1">{item.name}</h4>
+                               <div className="flex items-center gap-2">
+                                  <div className="flex items-center border border-white/10 rounded-md overflow-hidden bg-white/5">
+                                     <button 
+                                       disabled={item.quantity <= 1}
+                                       onClick={() => updateCartQuantity(idx, -1)} 
+                                       className="px-2 py-0.5 hover:bg-white/10 transition-colors text-[10px] disabled:opacity-20 disabled:cursor-not-allowed"
+                                     >-</button>
+                                     <span className="px-2 font-black text-[9px] border-x border-white/10">{item.quantity}</span>
+                                     <button onClick={() => updateCartQuantity(idx, 1)} className="px-2 py-0.5 hover:bg-white/10 transition-colors text-[10px]">+</button>
+                                  </div>
+                                  <span className="text-[8px] font-bold text-gray-500 uppercase">Size: {item.selectedSize}</span>
+                               </div>
+                            </div>
+                            <div className="text-right">
+                               <p className="text-[10px] font-black italic">{(item.price * item.quantity).toLocaleString()}৳</p>
+                               <button 
+                                 disabled={cart.length <= 1}
+                                 onClick={() => removeFromCart(idx)} 
+                                 className="text-[9px] text-red-600 font-black uppercase hover:text-white transition-colors disabled:opacity-20 disabled:cursor-not-allowed"
+                               >Erase</button>
+                            </div>
+                         </div>
+                       ))}
+                    </div>
+
+                    <div className="space-y-4 mb-8">
+                      <div className="flex justify-between text-[11px] font-black uppercase tracking-widest text-white/60">
+                        <span>Subtotal Value</span>
+                        <span>{subtotal.toLocaleString()}৳</span>
+                      </div>
+                      <div className="flex justify-between text-[11px] font-black uppercase tracking-widest text-white/60">
+                        <span>Logistics Fee</span>
+                        <span>{selectedShipping?.rate || 0}৳</span>
+                      </div>
+                      <div className="flex justify-between items-end pt-6 border-t border-white/10">
+                        <span className="text-xs font-black uppercase tracking-[0.2em] italic">Final Settlement</span>
+                        <span className="text-3xl font-black text-red-600">{finalTotal.toLocaleString()}৳</span>
+                      </div>
+                    </div>
+                    
+                    <button 
+                      onClick={handlePlaceOrder} 
+                      disabled={isPlacingOrder || cart.length === 0} 
+                      className="w-full bg-red-700 py-6 rounded-2xl font-black uppercase tracking-[0.3em] text-[10px] shadow-2xl hover:bg-white hover:text-black transition-all transform active:scale-95 flex items-center justify-center gap-3"
+                    >
+                      {isPlacingOrder ? <i className="fa-solid fa-circle-notch animate-spin"></i> : <><i className="fa-solid fa-lock text-sm"></i> Commit Order Protocol</>}
+                    </button>
+                  </div>
                 </div>
-              </div>
-            </div>
-            <div className="bg-black text-white p-10 rounded-3xl h-fit shadow-2xl sticky top-24">
-              <h3 className="text-xl font-black uppercase italic border-b border-white/10 pb-6 mb-8 tracking-tighter font-heading">Settlement Summary</h3>
-              <div className="space-y-4 mb-8">
-                <div className="flex justify-between text-[11px] font-black uppercase tracking-widest text-white">
-                  <span>Subtotal Value</span>
-                  <span>{cart.reduce((acc, item) => acc + (item.price * item.quantity), 0).toLocaleString()}৳</span>
-                </div>
-                <div className="flex justify-between text-[11px] font-black uppercase tracking-widest text-white">
-                  <span>Logistics Fee</span>
-                  <span>{selectedShipping?.rate || 0}৳</span>
-                </div>
-                <div className="flex justify-between items-end pt-6 border-t border-white/10">
-                  <span className="text-xs font-black uppercase tracking-[0.2em] italic">Final Settlement</span>
-                  <span className="text-3xl font-black text-red-600">{(cart.reduce((acc, item) => acc + (item.price * item.quantity), 0) + (selectedShipping?.rate||0)).toLocaleString()}৳</span>
-                </div>
-              </div>
-              <button 
-                onClick={handlePlaceOrder} 
-                disabled={isPlacingOrder || cart.length === 0} 
-                className="w-full bg-red-700 py-6 rounded-2xl font-black uppercase tracking-[0.3em] text-[10px] shadow-2xl hover:bg-white hover:text-black transition-all transform active:scale-95 flex items-center justify-center gap-3"
-              >
-                {isPlacingOrder ? <i className="fa-solid fa-circle-notch animate-spin"></i> : <><i className="fa-solid fa-lock text-sm"></i> Commit Order Protocol</>}
-              </button>
-            </div>
+              </>
+            )}
           </div>
-        </div>
-      );
+        );
+      }
       case 'order-success': return (
         <div className="max-w-4xl mx-auto py-24 px-4 animate-in fade-in zoom-in-95 duration-700">
           <div className="text-center mb-16">
