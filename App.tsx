@@ -76,13 +76,13 @@ const App: React.FC = () => {
   const [createAccount, setCreateAccount] = useState(false);
   const [accountPassword, setAccountPassword] = useState('');
 
-  // Scroll to top on every view change
   useEffect(() => {
     window.scrollTo(0, 0);
   }, [currentView]);
 
   const safePushState = (state: any, title: string, url: string) => {
     try {
+      if (window.location.protocol === 'blob:') return;
       window.history.pushState(state, title, url);
     } catch (e) {
       console.warn('History state push failed.', e);
@@ -106,18 +106,18 @@ const App: React.FC = () => {
       vaultApi.fetchSiteSettings('identity')
     ]);
 
-    setSneakers(s);
-    setOrders(o);
-    setCustomers(cust);
-    setBrands(b);
-    setCategories(c);
-    setPaymentMethods(pm);
-    if (pm.length > 0) setSelectedPayment(pm[0]);
-    setSlides(sl);
-    setNavItems(ni);
-    setCheckoutFields(cf);
-    setShippingOptions(sh);
-    if (sh.length > 0) setSelectedShipping(sh[0]);
+    setSneakers(s || []);
+    setOrders(o || []);
+    setCustomers(cust || []);
+    setBrands(b || []);
+    setCategories(c || []);
+    setPaymentMethods(pm || []);
+    if (pm && pm.length > 0) setSelectedPayment(pm[0]);
+    setSlides(sl || []);
+    setNavItems(ni || []);
+    setCheckoutFields(cf || []);
+    setShippingOptions(sh || []);
+    if (sh && sh.length > 0) setSelectedShipping(sh[0]);
     if (f) setFooterConfig(f);
     if (id) setSiteIdentity(id);
     setIsFetchingSneakers(false);
@@ -130,9 +130,13 @@ const App: React.FC = () => {
       const parsed = JSON.parse(stored);
       setCurrentCustomer(parsed);
       setCheckoutForm({
-        first_name: parsed.first_name || '', last_name: parsed.last_name || '',
-        email: parsed.email || '', mobile_number: parsed.mobile_number || '',
-        street_address: parsed.street_address || '', city: parsed.city || '', zip_code: parsed.zip_code || ''
+        first_name: parsed.first_name || '', 
+        last_name: parsed.last_name || '',
+        email: parsed.email || '', 
+        mobile_number: parsed.mobile_number || '',
+        street_address: parsed.street_address || '', 
+        city: parsed.city || '', 
+        zip_code: parsed.zip_code || ''
       });
     }
   }, []);
@@ -216,35 +220,82 @@ const App: React.FC = () => {
 
   const handlePlaceOrder = async () => {
     setCheckoutError(null);
-    const enabledFields = checkoutFields.filter(f => f.enabled);
-    for (const field of enabledFields) {
+    
+    // 1. Core Mandatory Infrastructure Validation
+    // We keep first_name as the bare minimum for an order record, 
+    // but everything else will be handled by the dynamic config below.
+    if (!checkoutForm.first_name) {
+      setCheckoutError("ERROR: [FIRST NAME] IS CRITICAL FOR PROTOCOL INITIATION");
+      return;
+    }
+
+    // 2. Dynamic Config Validation (Collects logic from Settings > Checkout Fields)
+    // This allows the admin to decide if 'email', 'mobile_number', etc. are mandatory.
+    const activeFields = checkoutFields.filter(f => f.enabled);
+    for (const field of activeFields) {
       if (field.required && !checkoutForm[field.field_key]) {
-        setCheckoutError(`ERROR: [${field.label.toUpperCase()}] IS REQUIRED`);
+        setCheckoutError(`ERROR: [${field.label.toUpperCase()}] IS REQUIRED PER VAULT SETTINGS`);
         return;
       }
     }
-    if (!selectedShipping || !selectedPayment) { setCheckoutError("ERROR: SHIPPING OR PAYMENT NOT SELECTED"); return; }
+
+    if (!selectedShipping || !selectedPayment) { 
+      setCheckoutError("ERROR: SHIPPING OR PAYMENT NOT SELECTED"); 
+      return; 
+    }
     
     setIsPlacingOrder(true);
-    const orderId = `ORD-${Math.floor(Math.random() * 90000) + 10000}`;
-    const total = cart.reduce((acc, item) => acc + (item.price * item.quantity), 0) + selectedShipping.rate;
     
+    const subtotal = cart.reduce((acc, item) => acc + (item.price * item.quantity), 0);
+    const total = subtotal + (selectedShipping?.rate || 0);
+    
+    const validCustomerId = currentCustomer?.id?.startsWith('demo-') ? null : (currentCustomer?.id || null);
+    const orderId = crypto.randomUUID?.() || `ORD-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+
+    // 3. Payload Construction
+    // Note: We use .trim() and fallback to empty strings. 
+    // This ensures we don't send 'null' to the database, which triggers the 23502 error.
     const newOrder = {
-      id: orderId, customer_id: currentCustomer?.id, first_name: checkoutForm.first_name, last_name: checkoutForm.last_name, 
-      email: checkoutForm.email, mobile_number: checkoutForm.mobile_number, street_address: checkoutForm.street_address, 
-      city: checkoutForm.city, zip_code: checkoutForm.zip_code, total, status: OrderStatus.PLACED, 
-      shipping_name: selectedShipping.name, shipping_rate: selectedShipping.rate, payment_method: selectedPayment.name, 
-      items: cart.map(item => ({ sneakerId: item.id, name: item.name, image: item.image, size: item.selectedSize, quantity: item.quantity, price: item.price }))
+      id: orderId,
+      customer_id: validCustomerId,
+      first_name: String(checkoutForm.first_name || '').trim(), 
+      last_name: String(checkoutForm.last_name || '').trim(), 
+      email: String(checkoutForm.email || '').toLowerCase().trim(), 
+      mobile_number: String(checkoutForm.mobile_number || '').trim(), 
+      street_address: String(checkoutForm.street_address || '').trim(), 
+      city: String(checkoutForm.city || '').trim(), 
+      zip_code: String(checkoutForm.zip_code || '').trim(), 
+      total, 
+      status: OrderStatus.PLACED, 
+      shipping_name: selectedShipping.name || 'Standard', 
+      shipping_rate: selectedShipping.rate || 0, 
+      payment_method: selectedPayment.name || 'COD', 
+      items: cart.map(item => ({ 
+        sneakerId: item.id, 
+        name: item.name, 
+        image: item.image, 
+        size: item.selectedSize, 
+        quantity: item.quantity, 
+        price: item.price 
+      }))
     };
 
-    const saved = await vaultApi.createOrder(newOrder);
-    if (saved) {
-      await vaultApi.createTimelineEvent(orderId, OrderStatus.PLACED, 'Order has been placed successfully.');
-      setLastOrder(saved); setCart([]); handleNavigate('order-success');
-    } else {
-      setCheckoutError("SERVER ERROR: FAILED TO PLACE ORDER");
+    try {
+      const saved = await vaultApi.createOrder(newOrder);
+      if (saved) {
+        await vaultApi.createTimelineEvent(saved.id, OrderStatus.PLACED, 'Order has been placed successfully.');
+        setLastOrder(saved); 
+        setCart([]); 
+        handleNavigate('order-success');
+      } else {
+        setCheckoutError("SERVER ERROR: VAULT REJECTED ORDER. CHECK ADMIN SETTINGS FOR FIELD CONSTRAINTS.");
+      }
+    } catch (err) {
+      console.error("Order Placement Exception:", err);
+      setCheckoutError("NETWORK ERROR: FAILED TO CONNECT TO VAULT.");
+    } finally {
+      setIsPlacingOrder(false);
     }
-    setIsPlacingOrder(false);
   };
 
   const handleLogout = () => { localStorage.removeItem('sv_admin_session'); setIsAdminAuthenticated(false); handleNavigate('home'); };

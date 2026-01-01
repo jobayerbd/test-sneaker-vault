@@ -104,14 +104,27 @@ export const vaultApi = {
       headers: { ...headers, 'Prefer': 'return=representation' },
       body: JSON.stringify(orderData)
     });
-    return resp.ok ? (await resp.json())[0] : null;
+    
+    if (!resp.ok) {
+      const errorMsg = await resp.text();
+      console.error("VAULT API ERROR [createOrder]:", errorMsg);
+      return null;
+    }
+    
+    const data = await resp.json();
+    return data[0];
   },
 
   createTimelineEvent: async (orderId: string, status: OrderStatus, note: string) => {
-    return await fetch(`${SUPABASE_URL}/rest/v1/order_timeline`, {
+    const resp = await fetch(`${SUPABASE_URL}/rest/v1/order_timeline`, {
       method: 'POST',
       headers,
       body: JSON.stringify({ order_id: orderId, status, note })
     });
+    if (!resp.ok) {
+      const errorMsg = await resp.text();
+      console.error("VAULT API ERROR [createTimelineEvent]:", errorMsg);
+    }
+    return resp.ok;
   }
 };

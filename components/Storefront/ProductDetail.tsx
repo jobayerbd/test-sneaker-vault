@@ -65,6 +65,10 @@ const ProductDetail: React.FC<ProductDetailProps> = ({
     // We use the browser history API to trigger the category filter in App.tsx
     const queryString = `?category=${cat.toLowerCase().replace(/\s+/g, '-')}`;
     try {
+      if (window.location.protocol === 'blob:') {
+        console.warn('History state push blocked due to blob: protocol context.');
+        return;
+      }
       window.history.pushState({ view: 'shop', category: cat.toLowerCase() }, '', window.location.pathname + queryString);
       // Force a popstate event to trigger App.tsx routing logic
       window.dispatchEvent(new PopStateEvent('popstate'));
