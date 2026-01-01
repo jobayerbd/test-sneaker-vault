@@ -10,6 +10,7 @@ import UnifiedLogin from './components/Auth/UnifiedLogin.tsx';
 import CustomerPortal from './components/Customer/CustomerPortal.tsx';
 import CheckoutPage from './components/Storefront/CheckoutPage.tsx';
 import OrderSuccess from './components/Storefront/OrderSuccess.tsx';
+import CartOverlay from './components/Storefront/CartOverlay.tsx';
 import { updateBrowserIdentity } from './services/identityService.ts';
 import { vaultApi } from './services/api.ts';
 import { Sneaker, CartItem, Order, OrderStatus, ShippingOption, FooterConfig, BrandEntity, Category, PaymentMethod, HomeSlide, NavItem, CheckoutField, SiteIdentity, Customer } from './types.ts';
@@ -215,22 +216,32 @@ const App: React.FC = () => {
       if (existing) return prev.map(i => (i.id === item.id && i.selectedSize === item.selectedSize) ? { ...i, quantity: i.quantity + item.quantity } : i);
       return [...prev, item];
     });
-    if (shouldCheckout) { handleNavigate('checkout'); setIsCartSidebarOpen(false); } else { setIsCartSidebarOpen(true); }
+    if (shouldCheckout) { 
+      handleNavigate('checkout'); 
+      setIsCartSidebarOpen(false); 
+    } else { 
+      setIsCartSidebarOpen(true); 
+    }
+  };
+
+  const updateCartQuantity = (idx: number, delta: number) => {
+    setCart(prev => {
+      const newCart = [...prev];
+      newCart[idx].quantity = Math.max(1, newCart[idx].quantity + delta);
+      return newCart;
+    });
+  };
+
+  const removeFromCart = (idx: number) => {
+    setCart(prev => prev.filter((_, i) => i !== idx));
   };
 
   const handlePlaceOrder = async () => {
     setCheckoutError(null);
-    
-    // 1. Core Mandatory Infrastructure Validation
-    // We keep first_name as the bare minimum for an order record, 
-    // but everything else will be handled by the dynamic config below.
     if (!checkoutForm.first_name) {
       setCheckoutError("ERROR: [FIRST NAME] IS CRITICAL FOR PROTOCOL INITIATION");
       return;
     }
-
-    // 2. Dynamic Config Validation (Collects logic from Settings > Checkout Fields)
-    // This allows the admin to decide if 'email', 'mobile_number', etc. are mandatory.
     const activeFields = checkoutFields.filter(f => f.enabled);
     for (const field of activeFields) {
       if (field.required && !checkoutForm[field.field_key]) {
@@ -238,23 +249,16 @@ const App: React.FC = () => {
         return;
       }
     }
-
     if (!selectedShipping || !selectedPayment) { 
       setCheckoutError("ERROR: SHIPPING OR PAYMENT NOT SELECTED"); 
       return; 
     }
-    
     setIsPlacingOrder(true);
-    
     const subtotal = cart.reduce((acc, item) => acc + (item.price * item.quantity), 0);
     const total = subtotal + (selectedShipping?.rate || 0);
-    
     const validCustomerId = currentCustomer?.id?.startsWith('demo-') ? null : (currentCustomer?.id || null);
     const orderId = crypto.randomUUID?.() || `ORD-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
 
-    // 3. Payload Construction
-    // Note: We use .trim() and fallback to empty strings. 
-    // This ensures we don't send 'null' to the database, which triggers the 23502 error.
     const newOrder = {
       id: orderId,
       customer_id: validCustomerId,
@@ -357,12 +361,8 @@ const App: React.FC = () => {
           onPaymentChange={setSelectedPayment}
           onToggleCreateAccount={setCreateAccount}
           onPasswordChange={setAccountPassword}
-          onUpdateCartQuantity={(idx, delta) => {
-            const newCart = [...cart];
-            newCart[idx].quantity = Math.max(1, newCart[idx].quantity + delta);
-            setCart(newCart);
-          }}
-          onRemoveFromCart={(idx) => setCart(cart.filter((_, i) => i !== idx))}
+          onUpdateCartQuantity={updateCartQuantity}
+          onRemoveFromCart={removeFromCart}
           onPlaceOrder={handlePlaceOrder}
           onNavigate={handleNavigate}
         />
@@ -377,8 +377,18 @@ const App: React.FC = () => {
   return (
     <div className="min-h-screen flex flex-col bg-white">
       {currentView !== 'admin' && (
-        <Navigation onNavigate={(v) => { if (v === 'admin') handleNavigate('admin'); else if (v === 'customer') handleNavigate('customer-account'); else handleNavigate(v as View); }} cartCount={cart.reduce((a,c) => a + c.quantity, 0)} wishlistCount={wishlist.length} currentView={currentView} onOpenCart={() => setIsCartSidebarOpen(true)} onOpenSearch={() => setIsSearchOpen(true)} navItems={navItems} siteIdentity={siteIdentity} />
+        <Navigation 
+          onNavigate={(v) => { if (v === 'admin') handleNavigate('admin'); else if (v === 'customer') handleNavigate('customer-account'); else handleNavigate(v as View); }} 
+          cartCount={cart.reduce((a,c) => a + c.quantity, 0)} 
+          wishlistCount={wishlist.length} 
+          currentView={currentView} 
+          onOpenCart={() => setIsCartSidebarOpen(true)} 
+          onOpenSearch={() => setIsSearchOpen(true)} 
+          navItems={navItems} 
+          siteIdentity={siteIdentity} 
+        />
       )}
+      
       <div className="flex-1">
         {isFetchingSneakers && isDeepLinking ? (
            <div className="min-h-screen flex flex-col items-center justify-center bg-white space-y-4">
@@ -387,7 +397,17 @@ const App: React.FC = () => {
            </div>
         ) : renderView()}
       </div>
+
       {currentView !== 'admin' && <Footer config={footerConfig} onNavigate={handleNavigate} />}
+
+      <CartOverlay 
+        isOpen={isCartSidebarOpen} 
+        onClose={() => setIsCartSidebarOpen(false)} 
+        cart={cart}
+        onUpdateQuantity={updateCartQuantity}
+        onRemove={removeFromCart}
+        onCheckout={() => handleNavigate('checkout')}
+      />
     </div>
   );
 };
