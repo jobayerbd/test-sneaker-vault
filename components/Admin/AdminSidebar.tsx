@@ -1,14 +1,16 @@
 
 import React from 'react';
-import { AdminSubView } from '../../types.ts';
+import { AdminSubView, SiteIdentity } from '../../types.ts';
 
 interface AdminSidebarProps {
   currentView: AdminSubView;
   onNavigate: (view: AdminSubView) => void;
   onLogout?: () => void;
+  onVisitSite?: () => void;
+  siteIdentity: SiteIdentity;
 }
 
-const AdminSidebar: React.FC<AdminSidebarProps> = ({ currentView, onNavigate, onLogout }) => {
+const AdminSidebar: React.FC<AdminSidebarProps> = ({ currentView, onNavigate, onLogout, onVisitSite, siteIdentity }) => {
   const sections = [
     {
       label: 'COMMAND',
@@ -53,14 +55,30 @@ const AdminSidebar: React.FC<AdminSidebarProps> = ({ currentView, onNavigate, on
 
   return (
     <aside className="w-72 bg-white border-r border-gray-100 p-8 hidden lg:flex flex-col h-screen sticky top-0 shadow-2xl z-30">
-      <div className="mb-10 text-center">
-        <div className="inline-block p-4 bg-black rounded-3xl mb-4 shadow-2xl">
-          <i className="fa-solid fa-vault text-white text-3xl"></i>
-        </div>
-        <div className="text-xl font-black font-heading tracking-tighter italic text-black uppercase">
-          SNEAKER<span className="text-red-600">VAULT</span>
-        </div>
-        <p className="text-[8px] font-black text-gray-300 uppercase tracking-[0.5em] mt-1 italic">Security Core</p>
+      <div className="mb-8 text-center flex flex-col items-center">
+        {siteIdentity.logo_url ? (
+          <div className="mb-4">
+            <img src={siteIdentity.logo_url} alt={siteIdentity.title} className="h-14 w-auto object-contain" />
+          </div>
+        ) : (
+          <div className="inline-block p-4 bg-black rounded-3xl mb-4 shadow-2xl">
+            <i className="fa-solid fa-vault text-white text-3xl"></i>
+          </div>
+        )}
+        
+        <p className="text-[9px] font-black text-gray-400 uppercase tracking-[0.4em] mt-1 italic">
+          {siteIdentity.tagline || 'Security Core'}
+        </p>
+      </div>
+
+      <div className="mb-8 px-2">
+        <button 
+          onClick={onVisitSite}
+          className="w-full bg-red-50 text-red-600 border border-red-100 py-3 rounded-xl text-[9px] font-black uppercase tracking-[0.2em] flex items-center justify-center gap-3 hover:bg-red-600 hover:text-white transition-all shadow-sm"
+        >
+          <i className="fa-solid fa-arrow-up-right-from-square"></i>
+          Visit Storefront
+        </button>
       </div>
       
       <nav className="flex-1 space-y-8 overflow-y-auto no-scrollbar pb-8">

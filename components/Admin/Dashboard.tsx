@@ -54,6 +54,7 @@ interface DashboardProps {
   onDeleteCheckoutField: (id: string) => Promise<boolean>;
   isRefreshing?: boolean;
   onLogout?: () => void;
+  onVisitSite?: () => void;
 }
 
 const Dashboard: React.FC<DashboardProps> = (props) => {
@@ -66,7 +67,7 @@ const Dashboard: React.FC<DashboardProps> = (props) => {
     onSaveSlide, onDeleteSlide,
     onSaveNavItem, onDeleteNavItem,
     onSaveCheckoutField, onDeleteCheckoutField,
-    isRefreshing, onLogout 
+    isRefreshing, onLogout, onVisitSite
   } = props;
 
   const [subView, setSubView] = useState<AdminSubView>('overview');
@@ -194,7 +195,7 @@ const Dashboard: React.FC<DashboardProps> = (props) => {
 
   return (
     <div className="flex bg-[#fafafa] min-h-screen">
-      <AdminSidebar currentView={subView} onNavigate={setSubView} onLogout={onLogout} />
+      <AdminSidebar currentView={subView} onNavigate={setSubView} onLogout={onLogout} onVisitSite={onVisitSite} siteIdentity={siteIdentity} />
       <main className="flex-1 p-14 overflow-y-auto">
         <div className="max-w-6xl mx-auto">
           {renderContent()}

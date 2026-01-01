@@ -905,6 +905,7 @@ const App: React.FC = () => {
           onDeleteCheckoutField={handleDeleteCheckoutField} 
           isRefreshing={isFetchingSneakers || isFetchingOrders} 
           onLogout={handleLogout} 
+          onVisitSite={() => handleNavigate('home')}
         />
       );
       case 'checkout': {
@@ -1139,9 +1140,7 @@ const App: React.FC = () => {
             <div className="p-8 space-y-6">
               {lastOrder?.items?.map((item, idx) => (
                 <div key={idx} className="flex gap-6 items-center border-b border-gray-50 pb-6 last:border-0 last:pb-0">
-                  <div className="w-20 h-20 bg-gray-50 rounded-xl p-2 shrink-0 border border-gray-100">
-                    <img src={item.image} className="w-full h-full object-contain" alt={item.name} />
-                  </div>
+                  <div className="w-20 h-20 bg-gray-50 rounded-xl p-2 shrink-0 border border-gray-100"><img src={item.image} className="w-full h-full object-contain" alt={item.name} /></div>
                   <div className="flex-1">
                     <h4 className="font-black text-[11px] uppercase tracking-tight mb-1">{item.name}</h4>
                     <p className="text-[9px] text-red-600 font-black italic uppercase tracking-widest">Size Index: {item.size} | Qty: {item.quantity}</p>
