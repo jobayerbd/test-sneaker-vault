@@ -43,6 +43,18 @@ const ProductDetail: React.FC<ProductDetailProps> = ({
     setSelectedSize('');
     setQuantity(1);
     setError(null);
+    
+    // Meta Pixel: Track Content View
+    if (window.fbq) {
+      window.fbq('track', 'ViewContent', {
+        content_name: sneaker.name,
+        content_category: sneaker.brand || sneaker.categories?.[0],
+        content_ids: [sneaker.id],
+        content_type: 'product',
+        value: sneaker.price,
+        currency: 'BDT'
+      });
+    }
   }, [sneaker.id]);
 
   const handleAction = (directToCheckout: boolean = false) => {
@@ -58,14 +70,26 @@ const ProductDetail: React.FC<ProductDetailProps> = ({
       quantity 
     };
     
+    if (window.fbq) {
+      window.fbq('track', 'AddToCart', {
+        content_name: sneaker.name,
+        content_ids: [sneaker.id],
+        content_type: 'product',
+        value: sneaker.price * quantity,
+        currency: 'BDT'
+      });
+    }
+    
     onAddToCart(cartItem, directToCheckout);
   };
 
   const relatedProducts = sneakers.filter(s => s.id !== sneaker.id).slice(0, 4);
 
-  // LOGIC: sneaker.price is the OFFER PRICE, sneaker.original_price is REGULAR PRICE
-  const showDiscount = sneaker.original_price && sneaker.original_price > sneaker.price;
-  const discountPercentage = showDiscount
+  // Price Logic: 
+  // sneaker.price = SELLING PRICE (what customer pays)
+  // sneaker.original_price = REGULAR PRICE (list price)
+  const isSale = sneaker.original_price && sneaker.original_price > sneaker.price;
+  const discountPercentage = isSale
     ? Math.round(((sneaker.original_price! - sneaker.price) / sneaker.original_price!) * 100)
     : 0;
 
@@ -143,13 +167,13 @@ const ProductDetail: React.FC<ProductDetailProps> = ({
               </button>
             </div>
 
-            {/* Price Logic Fixed */}
+            {/* Price Display Logic Fixed */}
             <div className="flex items-center space-x-4 mb-8">
-              {/* Main Selling Price (Offer Price) */}
+              {/* Selling Price */}
               <span className="text-3xl font-black text-black italic">{sneaker.price.toLocaleString()}৳</span>
               
-              {/* Crossed Regular Price if Discount exists */}
-              {showDiscount && (
+              {/* Regular Price (Strikethrough) */}
+              {isSale && (
                 <>
                   <span className="text-sm text-gray-300 line-through font-bold">{sneaker.original_price?.toLocaleString()}৳</span>
                   <span className="bg-red-600 text-white text-[9px] font-black px-2 py-1 uppercase tracking-widest rounded shadow-lg shadow-red-600/10">-{discountPercentage}%</span>

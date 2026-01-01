@@ -70,14 +70,19 @@ const AdminProductForm: React.FC<AdminProductFormProps> = ({
     setIsSaving(true);
     setShowSuccess(false);
     
-    // Logic: If Offer Price (price) is empty, default to Regular Price (original_price)
+    // Logic: original_price (Regular Price) is mandatory. 
+    // price (Offer Price) is what the user pays.
+    // If user leaves price empty, we set price = original_price.
     const finalData = { ...editingProduct };
-    if (!finalData.price && finalData.original_price) {
-      finalData.price = finalData.original_price;
-    } else if (!finalData.price && !finalData.original_price) {
-      alert("ERROR: PRICE INFORMATION MISSING");
-      setIsSaving(false);
-      return;
+    
+    if (!finalData.original_price) {
+        alert("CRITICAL ERROR: REGULAR PRICE IS MANDATORY");
+        setIsSaving(false);
+        return;
+    }
+
+    if (!finalData.price) {
+        finalData.price = finalData.original_price;
     }
     
     try {
@@ -166,8 +171,9 @@ const AdminProductForm: React.FC<AdminProductFormProps> = ({
                   type="number" 
                   required
                   value={editingProduct.original_price || ''} 
-                  onChange={e => setEditingProduct({...editingProduct, original_price: Number(e.target.value)})} 
+                  onChange={e => setEditingProduct({...editingProduct, original_price: e.target.value === '' ? undefined : Number(e.target.value)})} 
                   className="w-full bg-gray-50 p-4 rounded-xl font-bold text-xs outline-none border-2 border-transparent focus:border-black" 
+                  placeholder="e.g. 15000"
                 />
               </div>
               <div>
@@ -176,7 +182,7 @@ const AdminProductForm: React.FC<AdminProductFormProps> = ({
                   type="number" 
                   value={editingProduct.price || ''} 
                   onChange={e => setEditingProduct({...editingProduct, price: e.target.value === '' ? undefined : Number(e.target.value)})} 
-                  placeholder="Leave blank for no discount"
+                  placeholder="Leave blank to use Regular Price"
                   className="w-full bg-gray-50 p-4 rounded-xl font-bold text-xs outline-none border-2 border-transparent focus:border-black" 
                 />
               </div>

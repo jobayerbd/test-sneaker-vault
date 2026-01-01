@@ -34,6 +34,13 @@ const DEFAULT_IDENTITY: SiteIdentity = {
 
 type View = 'home' | 'shop' | 'admin' | 'cart' | 'pdp' | 'wishlist' | 'checkout' | 'order-success' | 'admin-login' | 'customer-login' | 'customer-account' | 'order-details-view';
 
+declare global {
+  interface Window {
+    fbq: any;
+    _fbq: any;
+  }
+}
+
 const App: React.FC = () => {
   const getInitialView = (): View => {
     const params = new URLSearchParams(window.location.search);
@@ -76,6 +83,37 @@ const App: React.FC = () => {
   const [checkoutForm, setCheckoutForm] = useState<Record<string, any>>({});
   const [createAccount, setCreateAccount] = useState(false);
   const [accountPassword, setAccountPassword] = useState('');
+
+  // Meta Pixel Initialization
+  useEffect(() => {
+    if (!footerConfig.fb_pixel_id) return;
+
+    // Standard Meta Pixel Script Injection
+    if (!window.fbq) {
+      (function(f: any, b: any, e: any, v: any, n?: any, t?: any, s?: any) {
+        if (f.fbq) return;
+        n = f.fbq = function() {
+          n.callMethod ? n.callMethod.apply(n, arguments) : n.queue.push(arguments);
+        };
+        if (!f._fbq) f._fbq = n;
+        n.push = n;
+        n.loaded = !0;
+        n.version = '2.0';
+        n.queue = [];
+        t = b.createElement(e);
+        t.async = !0;
+        t.src = v;
+        s = b.getElementsByTagName(e)[0];
+        s.parentNode.insertBefore(t, s);
+      })(window, document, 'script', 'https://connect.facebook.net/en_US/fbevents.js');
+      
+      window.fbq('init', footerConfig.fb_pixel_id);
+    }
+    
+    // Track PageView on every view change
+    window.fbq('track', 'PageView');
+    console.log(`SneakerVault: Meta Pixel ${footerConfig.fb_pixel_id} tracked PageView for ${currentView}`);
+  }, [footerConfig.fb_pixel_id, currentView]);
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -146,7 +184,6 @@ const App: React.FC = () => {
     updateBrowserIdentity(siteIdentity);
   }, [siteIdentity]);
 
-  // STABLE ROUTING: syncViewFromUrl should only depend on basic triggers, not the loaded data itself.
   const syncViewFromUrl = useCallback(() => {
     const params = new URLSearchParams(window.location.search);
     const viewParam = params.get('view') as View;
@@ -170,7 +207,6 @@ const App: React.FC = () => {
     }
   }, []);
 
-  // Separate effect to handle PDP deep linking once sneakers are loaded
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const productSlug = params.get('product');
@@ -289,6 +325,9 @@ const App: React.FC = () => {
     try {
       const saved = await vaultApi.createOrder(newOrder);
       if (saved) {
+        if (window.fbq) {
+          window.fbq('track', 'Purchase', { value: total, currency: 'BDT' });
+        }
         await vaultApi.createTimelineEvent(saved.id, OrderStatus.PLACED, 'Order has been placed successfully.');
         setLastOrder(saved); 
         setCart([]); 
@@ -307,11 +346,9 @@ const App: React.FC = () => {
   const handleLogout = () => { localStorage.removeItem('sv_admin_session'); setIsAdminAuthenticated(false); handleNavigate('home'); };
   const handleCustomerLogout = () => { localStorage.removeItem('sv_customer_session'); setCurrentCustomer(null); handleNavigate('home'); };
 
-  // Admin Protocol Handlers
   const handleSaveProduct = async (data: Partial<Sneaker>) => {
     const success = await vaultApi.saveProduct(data);
     if (success) {
-      // Re-fetch data silently without resetting the view
       await fetchData();
     }
     return success;
