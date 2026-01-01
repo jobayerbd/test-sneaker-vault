@@ -47,7 +47,14 @@ const App: React.FC = () => {
     const params = new URLSearchParams(window.location.search);
     if (params.get('product')) return 'pdp';
     if (params.get('category')) return 'shop';
-    return (params.get('view') as View) || 'home';
+    const viewParam = params.get('view') as View;
+    
+    // Safety check for admin view during initialization
+    if (viewParam === 'admin' && localStorage.getItem('sv_admin_session') !== 'active') {
+      return 'admin-login';
+    }
+    
+    return viewParam || 'home';
   };
 
   const [currentView, setCurrentView] = useState<View>(getInitialView);
@@ -190,8 +197,9 @@ const App: React.FC = () => {
     const viewParam = params.get('view') as View;
 
     if (viewParam === 'admin') {
-      if (localStorage.getItem('sv_admin_session') !== 'active') {
+      if (!isAdminAuthenticated && localStorage.getItem('sv_admin_session') !== 'active') {
         setCurrentView('admin-login');
+        safePushState({ view: 'admin-login' }, '', window.location.pathname + '?view=admin-login');
       } else {
         setCurrentView('admin');
       }
@@ -206,7 +214,7 @@ const App: React.FC = () => {
     if (!window.location.search || window.location.search === '?') {
        setCurrentView('home'); 
     }
-  }, []);
+  }, [isAdminAuthenticated]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -224,10 +232,12 @@ const App: React.FC = () => {
   }, [syncViewFromUrl]);
 
   const handleNavigate = (view: View, params: string = '') => {
-    if (view === 'admin' && !isAdminAuthenticated && localStorage.getItem('sv_admin_session') !== 'active') {
-      setCurrentView('admin-login');
-      safePushState({ view: 'admin-login' }, '', window.location.pathname + '?view=admin-login');
-      return;
+    if (view === 'admin') {
+      if (!isAdminAuthenticated && localStorage.getItem('sv_admin_session') !== 'active') {
+        setCurrentView('admin-login');
+        safePushState({ view: 'admin-login' }, '', window.location.pathname + '?view=admin-login');
+        return;
+      }
     }
     setCurrentView(view);
     const queryString = view === 'home' ? '' : `?view=${view}${params ? '&' + params : ''}`;
@@ -467,8 +477,6 @@ const App: React.FC = () => {
   };
 
   const renderView = () => {
-    const isActuallyAdmin = isAdminAuthenticated || localStorage.getItem('sv_admin_session') === 'active';
-
     switch (currentView) {
       case 'home': return <Home sneakers={sneakers} slides={slides} onSelectProduct={handleSelectProduct} onNavigate={handleNavigate} onSearch={(q) => { setSearchQuery(q); handleNavigate('shop'); }} />;
       case 'shop': return <Shop sneakers={sneakers} onSelectProduct={handleSelectProduct} searchQuery={searchQuery} onClearSearch={() => setSearchQuery('')} categoryFilter={selectedCategory} onCategoryChange={handleSelectCategory} />;
@@ -482,7 +490,7 @@ const App: React.FC = () => {
       case 'customer-login': return <UnifiedLogin supabaseUrl={'https://vwbctddmakbnvfxzrjeo.supabase.co'} supabaseKey={'sb_publishable_8WhV41Km5aj8Dhvu6tUbvA_JnyPoVxu'} onAdminLogin={() => { setIsAdminAuthenticated(true); handleNavigate('admin'); }} onCustomerLogin={(c) => { setCurrentCustomer(c); localStorage.setItem('sv_customer_session', JSON.stringify(c)); handleNavigate('customer-account'); }} onBack={() => handleNavigate('home')} />;
       case 'customer-account': return currentCustomer ? <CustomerPortal customer={currentCustomer} orders={orders} onLogout={handleCustomerLogout} onUpdateProfile={async (u) => vaultApi.updateCustomer(currentCustomer.id, u)} onSelectOrder={(o) => { setViewingOrder(o); handleNavigate('order-details-view'); }} /> : <UnifiedLogin supabaseUrl={'https://vwbctddmakbnvfxzrjeo.supabase.co'} supabaseKey={'sb_publishable_8WhV41Km5aj8Dhvu6tUbvA_JnyPoVxu'} onAdminLogin={() => { setIsAdminAuthenticated(true); handleNavigate('admin'); }} onCustomerLogin={(c) => { setCurrentCustomer(c); handleNavigate('customer-account'); }} onBack={() => handleNavigate('home')} />;
       case 'admin': 
-        if (!isActuallyAdmin) return <UnifiedLogin supabaseUrl={'https://vwbctddmakbnvfxzrjeo.supabase.co'} supabaseKey={'sb_publishable_8WhV41Km5aj8Dhvu6tUbvA_JnyPoVxu'} onAdminLogin={() => { setIsAdminAuthenticated(true); handleNavigate('admin'); }} onCustomerLogin={() => {}} onBack={() => handleNavigate('home')} />;
+        if (!isAdminAuthenticated) return <UnifiedLogin supabaseUrl={'https://vwbctddmakbnvfxzrjeo.supabase.co'} supabaseKey={'sb_publishable_8WhV41Km5aj8Dhvu6tUbvA_JnyPoVxu'} onAdminLogin={() => { setIsAdminAuthenticated(true); handleNavigate('admin'); }} onCustomerLogin={() => {}} onBack={() => handleNavigate('home')} />;
         return <Dashboard sneakers={sneakers} orders={orders} customers={customers} brands={brands} categories={categories} paymentMethods={paymentMethods} slides={slides} navItems={navItems} checkoutFields={checkoutFields} shippingOptions={shippingOptions} footerConfig={footerConfig} siteIdentity={siteIdentity} onRefresh={fetchData} onRefreshOrders={fetchData} onUpdateOrderStatus={handleUpdateOrderStatus} onSaveProduct={handleSaveProduct} onDeleteProduct={handleDeleteProduct} onSaveShipping={handleSaveShipping} onDeleteShipping={handleDeleteShipping} onSavePaymentMethod={handleSavePaymentMethod} onDeletePaymentMethod={handleDeletePaymentMethod} onSaveFooterConfig={handleSaveFooterConfig} onSaveIdentity={handleSaveIdentity} onSaveBrand={handleSaveBrand} onDeleteBrand={handleDeleteBrand} onSaveCategory={handleSaveCategory} onDeleteCategory={handleDeleteCategory} onSaveSlide={handleSaveSlide} onDeleteSlide={handleDeleteSlide} onSaveNavItem={handleSaveNavItem} onDeleteNavItem={handleDeleteNavItem} onSaveCheckoutField={handleSaveCheckoutField} onDeleteCheckoutField={handleDeleteCheckoutField} onLogout={handleLogout} onVisitSite={() => window.open(window.location.origin, '_blank')} />;
       case 'checkout': return (
         <CheckoutPage 

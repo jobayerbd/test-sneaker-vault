@@ -96,13 +96,9 @@ const ProductDetail: React.FC<ProductDetailProps> = ({
   return (
     <div className="bg-white min-h-screen animate-in fade-in duration-500">
       <div className="max-w-7xl mx-auto px-4 py-6">
-        {/* Breadcrumbs */}
-        <div className="text-[10px] text-gray-400 font-black uppercase tracking-widest mb-8 flex items-center space-x-2">
-          <button className="cursor-pointer hover:text-black transition-colors" onClick={onBack}>SHOP</button>
-          <span className="text-gray-200">/</span>
-          <span className="text-gray-400">{sneaker.brand || 'BRAND'}</span>
-          <span className="text-gray-200">/</span>
-          <span className="text-black italic">{sneaker.name}</span>
+        {/* Product Name Display Header (Replacing Breadcrumbs) */}
+        <div className="text-[10px] text-black font-black uppercase tracking-[0.3em] mb-8 italic">
+          {sneaker.name}
         </div>
 
         {/* Main Product Section */}
