@@ -85,10 +85,14 @@ const App: React.FC = () => {
     }
   };
 
+  /**
+   * UPDATED FETCH: Uses relational join for timeline
+   */
   const fetchOrders = useCallback(async () => {
     setIsFetchingOrders(true);
     try {
-      const response = await fetch(`${SUPABASE_URL}/rest/v1/orders?select=*&order=created_at.desc`, { 
+      // We alias order_timeline to 'timeline' to keep UI compatibility
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/orders?select=*,timeline:order_timeline(status,note,timestamp)&order=created_at.desc`, { 
         headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } 
       });
       if (response.ok) {
@@ -358,15 +362,14 @@ const App: React.FC = () => {
   };
 
   /**
-   * REWRITTEN ORDER STATUS UPDATE PROTOCOL
-   * Uses SQL RPC function for server-side processing to ensure data integrity.
+   * REWRITTEN ORDER STATUS UPDATE: Relational Approach
+   * Calls the Database Function (RPC) to handle status and history logging.
    */
   const handleUpdateOrderStatus = async (orderId: string, newStatus: OrderStatus) => {
-    console.log(`Command Center: Initializing Database-Side Update for Order [${orderId}]`);
+    console.log(`Vault Command: Syncing Order [${orderId}] to [${newStatus}]`);
     
     try {
-      const rpcUrl = `${SUPABASE_URL}/rest/v1/rpc/update_order_status_secure`;
-      const response = await fetch(rpcUrl, {
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/advance_order_status`, {
         method: 'POST',
         headers: {
           'apikey': SUPABASE_KEY,
@@ -376,13 +379,13 @@ const App: React.FC = () => {
         body: JSON.stringify({
           p_order_id: orderId,
           p_new_status: newStatus,
-          p_note: `Manual Protocol: Status updated to ${newStatus} via Command Center.`
+          p_note: `Administrative Protocol: Order status updated to ${newStatus}.`
         })
       });
 
       if (response.ok) {
-        console.log("Vault Success: DB-side update completed and verified.");
-        await fetchOrders(); // Full global refresh
+        console.log("Vault Success: Relational sync complete.");
+        await fetchOrders(); // Force refresh local state
         return true;
       } else {
         const errorText = await response.text();
@@ -390,7 +393,7 @@ const App: React.FC = () => {
         return false;
       }
     } catch (err) {
-      console.error("CRITICAL VAULT RPC FAILURE:", err);
+      console.error("CRITICAL VAULT SYNC FAILURE:", err);
       return false;
     }
   };
@@ -469,8 +472,9 @@ const App: React.FC = () => {
     const subtotal = cart.reduce((acc, item) => acc + (item.price * item.quantity), 0);
     const total = subtotal + selectedShipping.rate;
     const orderId = `ORD-${Math.floor(Math.random() * 90000) + 10000}`;
-    const initialTimeline: TimelineEvent[] = [{ status: OrderStatus.PLACED, timestamp: new Date().toISOString(), note: 'Order protocol initiated and secured.' }];
     
+    // Note: Relational approach will handle the initial timeline entry via the advance_order_status call
+    // But for a simple POST, we insert into orders and then manually add to timeline table
     const newOrder = {
       id: orderId, 
       customer_id: customerId,
@@ -483,7 +487,6 @@ const App: React.FC = () => {
       zip_code: checkoutForm.zip_code || '', 
       total, 
       status: OrderStatus.PLACED, 
-      timeline: initialTimeline, 
       shipping_name: selectedShipping.name, 
       shipping_rate: selectedShipping.rate, 
       payment_method: selectedPayment.name, 
@@ -494,8 +497,22 @@ const App: React.FC = () => {
       const response = await fetch(`${SUPABASE_URL}/rest/v1/orders`, { method: 'POST', headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', 'Prefer': 'return=representation' }, body: JSON.stringify(newOrder) });
       if (response.ok) {
         const saved = (await response.json())[0];
+        
+        // Relational Step: Initialize timeline
+        await fetch(`${SUPABASE_URL}/rest/v1/order_timeline`, {
+          method: 'POST',
+          headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            order_id: orderId,
+            status: OrderStatus.PLACED,
+            note: 'Order protocol initiated and secured in vault archives.'
+          })
+        });
+
         trackFBPixel('Purchase', { value: total, currency: 'BDT', content_ids: cart.map(item => String(item.id)), content_type: 'product', num_items: cart.length });
-        setOrders(prev => [saved, ...prev]);
+        
+        // Refresh all orders so the state is consistent
+        await fetchOrders();
         setLastOrder(saved);
         setCart([]);
         handleNavigate('order-success');
