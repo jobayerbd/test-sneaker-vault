@@ -352,8 +352,23 @@ const App: React.FC = () => {
     const newEvent: TimelineEvent = { status: newStatus, timestamp: new Date().toISOString(), note: `Status protocol updated to ${newStatus}.` };
     const updatedTimeline = [...(order.timeline || []), newEvent];
     try {
-      const response = await fetch(`${SUPABASE_URL}/rest/v1/orders?id=eq.${orderId}`, { method: 'PATCH', headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', 'Prefer': 'return=representation' }, body: JSON.stringify({ status: newStatus, timeline: updatedTimeline }) });
-      if (response.ok) { setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: newStatus, timeline: updatedTimeline } : o)); return true; }
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/orders?id=eq.${orderId}`, { 
+        method: 'PATCH', 
+        headers: { 
+          'apikey': SUPABASE_KEY, 
+          'Authorization': `Bearer ${SUPABASE_KEY}`, 
+          'Content-Type': 'application/json', 
+          'Prefer': 'return=representation' 
+        }, 
+        body: JSON.stringify({ 
+          status: newStatus, 
+          timeline: updatedTimeline 
+        }) 
+      });
+      if (response.ok) { 
+        setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: newStatus, timeline: updatedTimeline } : o)); 
+        return true; 
+      }
       return false;
     } catch (err) { return false; }
   };
@@ -730,7 +745,6 @@ const App: React.FC = () => {
           onBack={() => handleNavigate('home')}
         />
       );
-      /* FIXED: Replaced non-existent handleUpdateProfile with handleUpdateCustomerProfile */
       case 'customer-account': return currentCustomer ? <CustomerPortal customer={currentCustomer} orders={orders} onLogout={handleCustomerLogout} onUpdateProfile={handleUpdateCustomerProfile} onSelectOrder={(o) => { setViewingOrder(o); handleNavigate('order-details-view'); }} /> : (
         <UnifiedLogin 
           supabaseUrl={SUPABASE_URL} 
@@ -741,7 +755,6 @@ const App: React.FC = () => {
         />
       );
       case 'order-details-view': {
-        // ALWAYS retrieve the LATEST order from the global state based on the ID to ensure updates are reflected
         const latestOrder = viewingOrder ? (orders.find(o => o.id === viewingOrder.id) || viewingOrder) : null;
         
         return latestOrder ? (
@@ -767,10 +780,10 @@ const App: React.FC = () => {
                     </div>
                   ))}
                 </div>
+                {/* Timeline Section for Customer */}
                 <div className="p-8 bg-gray-50 border-t border-gray-100">
-                  <h4 className="text-[10px] font-black uppercase italic tracking-widest mb-6 border-b pb-4">Timeline Protocol</h4>
+                  <h4 className="text-[10px] font-black uppercase italic tracking-widest mb-6 border-b pb-4">Tracking Protocol Timeline</h4>
                   <div className="space-y-6 pl-4 border-l-2 border-red-100 relative">
-                    {/* Fixed: Use spread operator to avoid mutating state before reversing */}
                     {[...(latestOrder.timeline || [])].reverse().map((event, idx) => (
                       <div key={idx} className="relative">
                         <div className={`absolute -left-[21px] top-1 w-2 h-2 rounded-full ${idx === 0 ? 'bg-red-600 animate-pulse' : 'bg-gray-200'}`}></div>
