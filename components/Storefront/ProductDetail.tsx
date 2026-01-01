@@ -94,13 +94,13 @@ const ProductDetail: React.FC<ProductDetailProps> = ({
         {/* Main Product Section */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
           
-          {/* Gallery Thumbnails (Left Column) */}
+          {/* Gallery Thumbnails (Left Column - Desktop) */}
           <div className="lg:col-span-1 hidden lg:flex flex-col space-y-3">
             {[sneaker.image, ...sneaker.gallery].slice(0, 6).map((img, idx) => (
               <button 
                 key={idx} 
                 onClick={() => setMainImage(img)}
-                className={`aspect-square border-2 overflow-hidden transition-all duration-300 ${mainImage === img ? 'border-red-600 scale-105' : 'border-gray-100 opacity-60 hover:opacity-100'}`}
+                className={`aspect-square border-2 overflow-hidden transition-all duration-300 rounded-lg ${mainImage === img ? 'border-red-600 scale-105 shadow-md' : 'border-gray-100 opacity-60 hover:opacity-100'}`}
               >
                 <img src={img} className="w-full h-full object-cover" alt={`variant-${idx}`} />
               </button>
@@ -108,31 +108,33 @@ const ProductDetail: React.FC<ProductDetailProps> = ({
           </div>
 
           {/* Main Image (Center Column) */}
-          <div className="lg:col-span-5 relative">
-            <div className="border border-gray-100 aspect-[4/5] bg-white overflow-hidden group shadow-sm">
+          <div className="lg:col-span-5 relative group/main">
+            <div className="border border-gray-100 aspect-[4/5] bg-white overflow-hidden shadow-sm relative rounded-3xl">
               <img 
                 src={mainImage} 
                 alt={sneaker.name} 
-                className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-1000" 
+                className="w-full h-full object-cover group-hover/main:scale-110 transition-transform duration-1000" 
               />
               {sneaker.is_drop && (
-                <div className="absolute top-6 left-6 bg-red-600 text-[10px] text-white font-black px-4 py-2 uppercase tracking-[0.2em] italic shadow-2xl animate-pulse">
+                <div className="absolute top-6 left-6 bg-red-600 text-[10px] text-white font-black px-4 py-2 uppercase tracking-[0.2em] italic shadow-2xl animate-pulse z-10 rounded-full">
                   FEATURED
                 </div>
               )}
-            </div>
-            
-            {/* Mobile Thumbnails */}
-            <div className="lg:hidden flex space-x-3 mt-4 overflow-x-auto pb-4 no-scrollbar">
-               {[sneaker.image, ...sneaker.gallery].map((img, idx) => (
-                <button 
-                  key={idx} 
-                  onClick={() => setMainImage(img)} 
-                  className={`w-16 h-16 border-2 shrink-0 bg-white p-1 transition-all ${mainImage === img ? 'border-red-600' : 'border-gray-100'}`}
-                >
-                  <img src={img} className="w-full h-full object-cover" alt={`mobile-variant-${idx}`} />
-                </button>
-               ))}
+
+              {/* Mobile Thumbnails Overlay - Minimalist Style, Left-Aligned */}
+              <div className="lg:hidden absolute bottom-4 left-0 right-0 px-4 z-20 animate-in slide-in-from-bottom-4 duration-700 delay-300">
+                <div className="flex space-x-2 overflow-x-auto pb-2 no-scrollbar scroll-smooth justify-start">
+                  {[sneaker.image, ...sneaker.gallery].map((img, idx) => (
+                    <button 
+                      key={idx} 
+                      onClick={() => setMainImage(img)} 
+                      className={`w-10 h-10 border shrink-0 bg-white p-1 rounded-lg transition-all duration-300 shadow-sm transform active:scale-95 ${mainImage === img ? 'border-red-600 ring-2 ring-red-600/20' : 'border-gray-100 opacity-80 hover:opacity-100'}`}
+                    >
+                      <img src={img} className="w-full h-full object-contain rounded-md" alt={`mobile-variant-${idx}`} />
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
 
@@ -154,7 +156,7 @@ const ProductDetail: React.FC<ProductDetailProps> = ({
             <div className="flex items-center space-x-4 mb-8">
               <span className="text-2xl font-black text-black italic">{sneaker.price}৳</span>
               <span className="text-sm text-gray-300 line-through font-bold">{(sneaker.price * 1.5).toFixed(0)}৳</span>
-              <span className="bg-black text-white text-[9px] font-black px-2 py-1 uppercase tracking-widest">33% OFF</span>
+              <span className="bg-black text-white text-[9px] font-black px-2 py-1 uppercase tracking-widest rounded">33% OFF</span>
             </div>
 
             <div className="mb-8">
@@ -175,7 +177,7 @@ const ProductDetail: React.FC<ProductDetailProps> = ({
                       setError(null);
                     }}
                     className={`
-                      py-3 text-[11px] font-black border transition-all duration-300
+                      py-3 text-[11px] font-black border transition-all duration-300 rounded-xl
                       ${selectedSize === v.size ? 'border-black bg-black text-white shadow-xl scale-105' : 'border-gray-100 text-gray-600 hover:border-gray-300'}
                       ${v.stock === 0 ? 'opacity-20 cursor-not-allowed bg-gray-50 border-transparent' : ''}
                     `}
@@ -303,7 +305,7 @@ const ProductDetail: React.FC<ProductDetailProps> = ({
                 onClick={() => onSelectProduct(s)}
                 className="group cursor-pointer"
               >
-                <div className="relative aspect-[4/5] overflow-hidden border border-gray-100 mb-4 bg-white">
+                <div className="relative aspect-[4/5] overflow-hidden border border-gray-100 mb-4 bg-white rounded-2xl">
                   <img src={s.image} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" alt={s.name} />
                 </div>
                 <h4 className="text-[10px] font-black uppercase truncate w-full mb-1 tracking-widest">{s.name}</h4>
