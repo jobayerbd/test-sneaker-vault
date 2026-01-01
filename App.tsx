@@ -730,6 +730,7 @@ const App: React.FC = () => {
           onBack={() => handleNavigate('home')}
         />
       );
+      /* FIXED: Replaced non-existent handleUpdateProfile with handleUpdateCustomerProfile */
       case 'customer-account': return currentCustomer ? <CustomerPortal customer={currentCustomer} orders={orders} onLogout={handleCustomerLogout} onUpdateProfile={handleUpdateCustomerProfile} onSelectOrder={(o) => { setViewingOrder(o); handleNavigate('order-details-view'); }} /> : (
         <UnifiedLogin 
           supabaseUrl={SUPABASE_URL} 
@@ -739,54 +740,60 @@ const App: React.FC = () => {
           onBack={() => handleNavigate('home')}
         />
       );
-      case 'order-details-view': return viewingOrder ? (
-          <div className="max-w-4xl mx-auto py-16 px-4 animate-in fade-in duration-500">
-            <button onClick={() => handleNavigate('customer-account')} className="text-gray-400 font-black uppercase text-[10px] tracking-widest hover:text-black mb-8"><i className="fa-solid fa-arrow-left mr-2"></i> Dashboard</button>
-            <div className="bg-white border border-gray-100 rounded-3xl overflow-hidden shadow-2xl">
-              <div className="bg-black p-8 text-white flex justify-between items-center">
-                <div>
-                  <h3 className="text-sm font-black uppercase italic tracking-widest font-heading">Registry Manifest</h3>
-                  <p className="text-[10px] text-gray-500 mt-1 uppercase font-bold">{viewingOrder.id}</p>
-                </div>
-                <span className="text-[10px] font-black uppercase text-red-600 italic px-4 py-2 bg-white/5 rounded-xl">{viewingOrder.status}</span>
-              </div>
-              <div className="p-8 space-y-6">
-                {viewingOrder.items?.map((item, idx) => (
-                  <div key={idx} className="flex gap-6 items-center border-b border-gray-50 pb-6 last:border-0 last:pb-0">
-                    <div className="w-20 h-20 bg-gray-50 rounded-xl p-2 shrink-0 border border-gray-100"><img src={item.image} className="w-full h-full object-contain" alt={item.name} /></div>
-                    <div className="flex-1">
-                      <h4 className="font-black text-[11px] uppercase tracking-tight mb-1">{item.name}</h4>
-                      <p className="text-[9px] text-red-600 font-black italic uppercase tracking-widest">Size Index: {item.size} | Qty: {item.quantity}</p>
-                    </div>
-                    <div className="text-right"><p className="text-sm font-black italic">{(item.price * item.quantity).toLocaleString()}৳</p></div>
+      case 'order-details-view': {
+        // ALWAYS retrieve the LATEST order from the global state based on the ID to ensure updates are reflected
+        const latestOrder = viewingOrder ? (orders.find(o => o.id === viewingOrder.id) || viewingOrder) : null;
+        
+        return latestOrder ? (
+            <div className="max-w-4xl mx-auto py-16 px-4 animate-in fade-in duration-500">
+              <button onClick={() => handleNavigate('customer-account')} className="text-gray-400 font-black uppercase text-[10px] tracking-widest hover:text-black mb-8"><i className="fa-solid fa-arrow-left mr-2"></i> Dashboard</button>
+              <div className="bg-white border border-gray-100 rounded-3xl overflow-hidden shadow-2xl">
+                <div className="bg-black p-8 text-white flex justify-between items-center">
+                  <div>
+                    <h3 className="text-sm font-black uppercase italic tracking-widest font-heading">Registry Manifest</h3>
+                    <p className="text-[10px] text-gray-500 mt-1 uppercase font-bold">{latestOrder.id}</p>
                   </div>
-                ))}
-              </div>
-              <div className="p-8 bg-gray-50 border-t border-gray-100">
-                <h4 className="text-[10px] font-black uppercase italic tracking-widest mb-6 border-b pb-4">Timeline Protocol</h4>
-                <div className="space-y-6 pl-4 border-l-2 border-red-100 relative">
-                  {(viewingOrder.timeline || []).reverse().map((event, idx) => (
-                    <div key={idx} className="relative">
-                      <div className={`absolute -left-[21px] top-1 w-2 h-2 rounded-full ${idx === 0 ? 'bg-red-600 animate-pulse' : 'bg-gray-200'}`}></div>
-                      <p className={`text-[10px] font-black uppercase tracking-widest ${idx === 0 ? 'text-black' : 'text-gray-400'}`}>
-                        {event.status} <span className="text-gray-300 font-bold ml-2">[{new Date(event.timestamp).toLocaleString()}]</span>
-                      </p>
-                      <p className="text-xs text-gray-500 italic mt-1 leading-relaxed">{event.note}</p>
+                  <span className="text-[10px] font-black uppercase text-red-600 italic px-4 py-2 bg-white/5 rounded-xl">{latestOrder.status}</span>
+                </div>
+                <div className="p-8 space-y-6">
+                  {latestOrder.items?.map((item, idx) => (
+                    <div key={idx} className="flex gap-6 items-center border-b border-gray-50 pb-6 last:border-0 last:pb-0">
+                      <div className="w-20 h-20 bg-gray-50 rounded-xl p-2 shrink-0 border border-gray-100"><img src={item.image} className="w-full h-full object-contain" alt={item.name} /></div>
+                      <div className="flex-1">
+                        <h4 className="font-black text-[11px] uppercase tracking-tight mb-1">{item.name}</h4>
+                        <p className="text-[9px] text-red-600 font-black italic uppercase tracking-widest">Size Index: {item.size} | Qty: {item.quantity}</p>
+                      </div>
+                      <div className="text-right"><p className="text-sm font-black italic">{(item.price * item.quantity).toLocaleString()}৳</p></div>
                     </div>
                   ))}
                 </div>
-              </div>
-              <div className="bg-white p-8 border-t border-gray-100">
-                <div className="space-y-3">
-                  <div className="flex justify-between items-center pt-2">
-                    <span className="text-xs font-black uppercase tracking-widest italic">Final Settlement</span>
-                    <span className="text-3xl font-black text-red-700">{viewingOrder.total.toLocaleString()}৳</span>
+                <div className="p-8 bg-gray-50 border-t border-gray-100">
+                  <h4 className="text-[10px] font-black uppercase italic tracking-widest mb-6 border-b pb-4">Timeline Protocol</h4>
+                  <div className="space-y-6 pl-4 border-l-2 border-red-100 relative">
+                    {/* Fixed: Use spread operator to avoid mutating state before reversing */}
+                    {[...(latestOrder.timeline || [])].reverse().map((event, idx) => (
+                      <div key={idx} className="relative">
+                        <div className={`absolute -left-[21px] top-1 w-2 h-2 rounded-full ${idx === 0 ? 'bg-red-600 animate-pulse' : 'bg-gray-200'}`}></div>
+                        <p className={`text-[10px] font-black uppercase tracking-widest ${idx === 0 ? 'text-black' : 'text-gray-400'}`}>
+                          {event.status} <span className="text-gray-300 font-bold ml-2">[{new Date(event.timestamp).toLocaleString()}]</span>
+                        </p>
+                        <p className="text-xs text-gray-500 italic mt-1 leading-relaxed">{event.note}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div className="bg-white p-8 border-t border-gray-100">
+                  <div className="space-y-3">
+                    <div className="flex justify-between items-center pt-2">
+                      <span className="text-xs font-black uppercase tracking-widest italic">Final Settlement</span>
+                      <span className="text-3xl font-black text-red-700">{latestOrder.total.toLocaleString()}৳</span>
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
-          </div>
-      ) : null;
+        ) : null;
+      }
       case 'admin': return (
         <Dashboard 
           sneakers={sneakers} 
