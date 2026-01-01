@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { Order, OrderStatus, Sneaker, BrandEntity, Category, ShippingOption, FooterConfig, PaymentMethod, HomeSlide, NavItem, CheckoutField, AdminSubView, SiteIdentity } from '../../types.ts';
+import { Order, OrderStatus, Sneaker, BrandEntity, Category, ShippingOption, FooterConfig, PaymentMethod, HomeSlide, NavItem, CheckoutField, AdminSubView, SiteIdentity, Customer } from '../../types.ts';
 
 import AdminSidebar from './AdminSidebar.tsx';
 import AdminOverview from './AdminOverview.tsx';
@@ -16,10 +16,12 @@ import AdminMenuManagement from './AdminMenuManagement.tsx';
 import AdminCheckoutManager from './AdminCheckoutManager.tsx';
 import AdminHomeManagement from './AdminHomeManagement.tsx';
 import AdminIdentity from './AdminIdentity.tsx';
+import AdminCustomers from './AdminCustomers.tsx';
 
 interface DashboardProps {
   orders: Order[];
   sneakers: Sneaker[];
+  customers: Customer[];
   brands: BrandEntity[];
   categories: Category[];
   paymentMethods: PaymentMethod[];
@@ -56,7 +58,7 @@ interface DashboardProps {
 
 const Dashboard: React.FC<DashboardProps> = (props) => {
   const { 
-    orders, sneakers, brands, categories, paymentMethods, slides, navItems, checkoutFields, shippingOptions = [], footerConfig, siteIdentity, onRefresh, onRefreshOrders, onUpdateOrderStatus, 
+    orders, sneakers, customers, brands, categories, paymentMethods, slides, navItems, checkoutFields, shippingOptions = [], footerConfig, siteIdentity, onRefresh, onRefreshOrders, onUpdateOrderStatus, 
     onSaveProduct, onDeleteProduct, onSaveShipping, onDeleteShipping, 
     onSavePaymentMethod, onDeletePaymentMethod,
     onSaveFooterConfig, onSaveIdentity,
@@ -78,7 +80,6 @@ const Dashboard: React.FC<DashboardProps> = (props) => {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
-  // Derive the active order from the current orders list to ensure reactivity
   const activeOrder = useMemo(() => {
     return orders.find(o => o.id === selectedOrderId) || null;
   }, [orders, selectedOrderId]);
@@ -143,6 +144,8 @@ const Dashboard: React.FC<DashboardProps> = (props) => {
         return <AdminOverview orders={orders} sneakers={sneakers} isRefreshing={isRefreshing} onRefresh={onRefresh} />;
       case 'inventory': 
         return <AdminInventory sneakers={sneakers} onEditProduct={handleEditProduct} onAddProduct={handleAddProduct} onDeleteProduct={onDeleteProduct} />;
+      case 'customers':
+        return <AdminCustomers customers={customers} orders={orders} isRefreshing={isRefreshing} />;
       case 'product-form':
         return editingProduct ? <AdminProductForm product={editingProduct} brands={brands} categories={categories} onSave={async (data) => { const s = await onSaveProduct(data); if(s) setSubView('inventory'); return s; }} onCancel={() => setSubView('inventory')} /> : null;
       case 'orders': 

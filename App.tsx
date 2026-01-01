@@ -52,6 +52,7 @@ const App: React.FC = () => {
   const [wishlist, setWishlist] = useState<Sneaker[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [sneakers, setSneakers] = useState<Sneaker[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
   const [brands, setBrands] = useState<BrandEntity[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
@@ -113,6 +114,15 @@ const App: React.FC = () => {
     } finally {
       setIsFetchingOrders(false);
     }
+  }, []);
+
+  const fetchCustomers = useCallback(async () => {
+    try {
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/customers?select=*&order=created_at.desc`, { 
+        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } 
+      });
+      if (response.ok) setCustomers(await response.json());
+    } catch (err) {}
   }, []);
 
   const fetchSneakers = useCallback(async () => {
@@ -203,7 +213,7 @@ const App: React.FC = () => {
   useEffect(() => {
     fetchSneakers(); fetchOrders(); fetchShippingOptions(); fetchFooterConfig(); 
     fetchBrands(); fetchCategories(); fetchPaymentMethods(); fetchSlides(); 
-    fetchNavItems(); fetchCheckoutFields(); fetchSiteIdentity();
+    fetchNavItems(); fetchCheckoutFields(); fetchSiteIdentity(); fetchCustomers();
     if (localStorage.getItem('sv_admin_session') === 'active') setIsAdminAuthenticated(true);
     const storedCustomer = localStorage.getItem('sv_customer_session');
     if (storedCustomer) {
@@ -225,9 +235,11 @@ const App: React.FC = () => {
     if (currentView === 'customer-account' || currentView === 'order-details-view') {
       fetchOrders();
     }
-  }, [currentView, fetchOrders]);
+    if (currentView === 'admin' && isAdminAuthenticated) {
+      fetchCustomers();
+    }
+  }, [currentView, fetchOrders, fetchCustomers, isAdminAuthenticated]);
 
-  // Sync Site Identity using the new service
   useEffect(() => {
     updateBrowserIdentity(siteIdentity);
   }, [siteIdentity]);
@@ -860,6 +872,7 @@ const App: React.FC = () => {
         <Dashboard 
           sneakers={sneakers} 
           orders={orders} 
+          customers={customers}
           brands={brands} 
           categories={categories} 
           paymentMethods={paymentMethods} 
@@ -869,7 +882,7 @@ const App: React.FC = () => {
           shippingOptions={shippingOptions} 
           footerConfig={footerConfig} 
           siteIdentity={siteIdentity} 
-          onRefresh={() => { fetchOrders(); fetchSneakers(); fetchShippingOptions(); fetchFooterConfig(); fetchBrands(); fetchCategories(); fetchPaymentMethods(); fetchSlides(); fetchNavItems(); fetchCheckoutFields(); fetchSiteIdentity(); }}
+          onRefresh={() => { fetchOrders(); fetchSneakers(); fetchShippingOptions(); fetchFooterConfig(); fetchBrands(); fetchCategories(); fetchPaymentMethods(); fetchSlides(); fetchNavItems(); fetchCheckoutFields(); fetchSiteIdentity(); fetchCustomers(); }}
           onRefreshOrders={fetchOrders}
           onUpdateOrderStatus={handleUpdateOrderStatus} 
           onSaveProduct={handleSaveProduct} 

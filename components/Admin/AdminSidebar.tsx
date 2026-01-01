@@ -15,6 +15,7 @@ const AdminSidebar: React.FC<AdminSidebarProps> = ({ currentView, onNavigate, on
       items: [
         { id: 'overview', icon: 'fa-gauge-high', label: 'Intelligence' },
         { id: 'orders', icon: 'fa-folder-tree', label: 'Order Registry' },
+        { id: 'customers', icon: 'fa-users', label: 'Member Directory' },
       ]
     },
     {
