@@ -11,6 +11,7 @@ import CustomerPortal from './components/Customer/CustomerPortal.tsx';
 import CheckoutPage from './components/Storefront/CheckoutPage.tsx';
 import OrderSuccess from './components/Storefront/OrderSuccess.tsx';
 import CartOverlay from './components/Storefront/CartOverlay.tsx';
+import SearchOverlay from './components/Storefront/SearchOverlay.tsx';
 import { updateBrowserIdentity } from './services/identityService.ts';
 import { vaultApi } from './services/api.ts';
 import { Sneaker, CartItem, Order, OrderStatus, ShippingOption, FooterConfig, BrandEntity, Category, PaymentMethod, HomeSlide, NavItem, CheckoutField, SiteIdentity, Customer } from './types.ts';
@@ -548,6 +549,16 @@ const App: React.FC = () => {
         onUpdateQuantity={updateCartQuantity}
         onRemove={removeFromCart}
         onCheckout={() => handleNavigate('checkout')}
+      />
+
+      <SearchOverlay 
+        isOpen={isSearchOpen} 
+        onClose={() => setIsSearchOpen(false)} 
+        onSearch={(q) => {
+          setSearchQuery(q);
+          handleNavigate('shop');
+          setIsSearchOpen(false);
+        }}
       />
     </div>
   );
