@@ -227,7 +227,6 @@ const App: React.FC = () => {
     const categorySlug = params.get('category');
     const viewParam = params.get('view') as View;
 
-    // Priority 1: Product Detail View
     if (productSlug && sneakers.length > 0) {
       const product = sneakers.find(s => s.slug === productSlug || s.id === productSlug);
       if (product) {
@@ -237,20 +236,17 @@ const App: React.FC = () => {
       }
     }
 
-    // Priority 2: Category Filter in Shop
     if (categorySlug) {
       setSelectedCategory(categorySlug);
       setCurrentView('shop');
       return;
     }
 
-    // Priority 3: Specific View from URL
     if (viewParam) {
       setCurrentView(viewParam);
       return;
     }
 
-    // Fallback: Default view (usually 'home')
     if (!productSlug && !categorySlug && !viewParam) {
        setCurrentView('home');
     }
@@ -285,7 +281,6 @@ const App: React.FC = () => {
     setCurrentView('pdp');
     setIsCartSidebarOpen(false);
     const slug = sneaker.slug || sneaker.id;
-    // CRITICAL FIX: Ensure 'view=pdp' is in the URL so syncViewFromUrl doesn't default to home
     safePushState({ view: 'pdp', slug }, '', `${window.location.pathname}?view=pdp&product=${slug}`);
   };
 
@@ -347,11 +342,20 @@ const App: React.FC = () => {
   };
 
   const handleUpdateOrderStatus = async (orderId: string, newStatus: OrderStatus) => {
+    // 1. Find the local order state
     const order = orders.find(o => o.id === orderId);
     if (!order) return false;
-    const newEvent: TimelineEvent = { status: newStatus, timestamp: new Date().toISOString(), note: `Status protocol updated to ${newStatus}.` };
+
+    // 2. Create a new event and update the timeline array
+    const newEvent: TimelineEvent = { 
+      status: newStatus, 
+      timestamp: new Date().toISOString(), 
+      note: `Status protocol updated to ${newStatus} via Command Center.` 
+    };
     const updatedTimeline = [...(order.timeline || []), newEvent];
+
     try {
+      // 3. SECURE DATABASE SYNC (Persist status and full timeline JSON)
       const response = await fetch(`${SUPABASE_URL}/rest/v1/orders?id=eq.${orderId}`, { 
         method: 'PATCH', 
         headers: { 
@@ -365,7 +369,9 @@ const App: React.FC = () => {
           timeline: updatedTimeline 
         }) 
       });
+
       if (response.ok) { 
+        // 4. Update local state to reflect change immediately in UI
         setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: newStatus, timeline: updatedTimeline } : o)); 
         return true; 
       }
@@ -447,7 +453,7 @@ const App: React.FC = () => {
     const subtotal = cart.reduce((acc, item) => acc + (item.price * item.quantity), 0);
     const total = subtotal + selectedShipping.rate;
     const orderId = `ORD-${Math.floor(Math.random() * 90000) + 10000}`;
-    const initialTimeline: TimelineEvent[] = [{ status: OrderStatus.PLACED, timestamp: new Date().toISOString(), note: 'Order protocol initiated and secured.' }];
+    const initialTimeline: TimelineEvent[] = [{ status: OrderStatus.PLACED, timestamp: new Date().toISOString(), note: 'Order protocol initiated and secured in vault.' }];
     
     const newOrder = {
       id: orderId, 
@@ -755,6 +761,7 @@ const App: React.FC = () => {
         />
       );
       case 'order-details-view': {
+        // Find the latest order object from the central orders array to ensure status updates are reflected
         const latestOrder = viewingOrder ? (orders.find(o => o.id === viewingOrder.id) || viewingOrder) : null;
         
         return latestOrder ? (
@@ -780,9 +787,9 @@ const App: React.FC = () => {
                     </div>
                   ))}
                 </div>
-                {/* Timeline Section for Customer */}
+                {/* PERSISTENT TIMELINE VIEW FOR CUSTOMERS */}
                 <div className="p-8 bg-gray-50 border-t border-gray-100">
-                  <h4 className="text-[10px] font-black uppercase italic tracking-widest mb-6 border-b pb-4">Tracking Protocol Timeline</h4>
+                  <h4 className="text-[10px] font-black uppercase italic tracking-widest mb-6 border-b pb-4">Live Tracking Protocol</h4>
                   <div className="space-y-6 pl-4 border-l-2 border-red-100 relative">
                     {[...(latestOrder.timeline || [])].reverse().map((event, idx) => (
                       <div key={idx} className="relative">
@@ -793,6 +800,9 @@ const App: React.FC = () => {
                         <p className="text-xs text-gray-500 italic mt-1 leading-relaxed">{event.note}</p>
                       </div>
                     ))}
+                    {(!latestOrder.timeline || latestOrder.timeline.length === 0) && (
+                       <p className="text-[10px] text-gray-400 font-black uppercase italic">Protocol logs currently initializing...</p>
+                    )}
                   </div>
                 </div>
                 <div className="bg-white p-8 border-t border-gray-100">
