@@ -5,7 +5,7 @@ import { generateHypeDescription } from '../../services/geminiService.ts';
 
 interface ProductDetailProps {
   sneaker: Sneaker;
-  sneakers: Sneaker[]; // Added to provide real related products
+  sneakers: Sneaker[];
   onAddToCart: (item: CartItem, shouldCheckout?: boolean) => void;
   onBack: () => void;
   onToggleWishlist: (sneaker: Sneaker) => void;
@@ -43,7 +43,7 @@ const ProductDetail: React.FC<ProductDetailProps> = ({
     setSelectedSize('');
     setQuantity(1);
     setError(null);
-  }, [sneaker.id]); // Use ID as dependency to handle sneaker updates correctly
+  }, [sneaker.id]);
 
   const handleAction = (directToCheckout: boolean = false) => {
     if (!selectedSize) {
@@ -61,21 +61,12 @@ const ProductDetail: React.FC<ProductDetailProps> = ({
     onAddToCart(cartItem, directToCheckout);
   };
 
-  const navigateToCategory = (cat: string) => {
-    const queryString = `?category=${cat.toLowerCase().replace(/\s+/g, '-')}`;
-    try {
-      if (window.location.protocol === 'blob:') return;
-      window.history.pushState({ view: 'shop', category: cat.toLowerCase() }, '', window.location.pathname + queryString);
-      window.dispatchEvent(new PopStateEvent('popstate'));
-    } catch (e) {
-      console.warn('SneakerVault: Deep-link history blocked.', e);
-    }
-  };
-
   const relatedProducts = sneakers.filter(s => s.id !== sneaker.id).slice(0, 4);
 
-  const discountPercentage = sneaker.original_price && sneaker.original_price > sneaker.price
-    ? Math.round(((sneaker.original_price - sneaker.price) / sneaker.original_price) * 100)
+  // LOGIC: sneaker.price is the OFFER PRICE, sneaker.original_price is REGULAR PRICE
+  const showDiscount = sneaker.original_price && sneaker.original_price > sneaker.price;
+  const discountPercentage = showDiscount
+    ? Math.round(((sneaker.original_price! - sneaker.price) / sneaker.original_price!) * 100)
     : 0;
 
   return (
@@ -93,7 +84,7 @@ const ProductDetail: React.FC<ProductDetailProps> = ({
         {/* Main Product Section */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
           
-          {/* Gallery Thumbnails (Left Column - Desktop) */}
+          {/* Gallery Thumbnails */}
           <div className="lg:col-span-1 hidden lg:flex flex-col space-y-3">
             {[sneaker.image, ...sneaker.gallery].slice(0, 6).map((img, idx) => (
               <button 
@@ -106,7 +97,7 @@ const ProductDetail: React.FC<ProductDetailProps> = ({
             ))}
           </div>
 
-          {/* Main Image (Center Column) */}
+          {/* Main Image */}
           <div className="lg:col-span-5 relative group/main">
             <div className="border border-gray-100 aspect-[4/5] bg-white overflow-hidden shadow-sm relative rounded-3xl">
               <img 
@@ -137,7 +128,7 @@ const ProductDetail: React.FC<ProductDetailProps> = ({
             </div>
           </div>
 
-          {/* Product Info (Right Column) */}
+          {/* Product Info */}
           <div className="lg:col-span-6 flex flex-col">
             <div className="flex justify-between items-start">
               <div>
@@ -152,12 +143,15 @@ const ProductDetail: React.FC<ProductDetailProps> = ({
               </button>
             </div>
 
-            {/* Price Display Logic */}
+            {/* Price Logic Fixed */}
             <div className="flex items-center space-x-4 mb-8">
+              {/* Main Selling Price (Offer Price) */}
               <span className="text-3xl font-black text-black italic">{sneaker.price.toLocaleString()}৳</span>
-              {sneaker.original_price && sneaker.original_price > sneaker.price && (
+              
+              {/* Crossed Regular Price if Discount exists */}
+              {showDiscount && (
                 <>
-                  <span className="text-sm text-gray-300 line-through font-bold">{sneaker.original_price.toLocaleString()}৳</span>
+                  <span className="text-sm text-gray-300 line-through font-bold">{sneaker.original_price?.toLocaleString()}৳</span>
                   <span className="bg-red-600 text-white text-[9px] font-black px-2 py-1 uppercase tracking-widest rounded shadow-lg shadow-red-600/10">-{discountPercentage}%</span>
                 </>
               )}
@@ -200,14 +194,12 @@ const ProductDetail: React.FC<ProductDetailProps> = ({
                 </div>
               )}
 
-              {/* Quantity Selector */}
               <div className="flex items-center border-2 border-gray-100 h-16 rounded-full overflow-hidden bg-gray-50/50">
                 <button onClick={() => setQuantity(Math.max(1, quantity - 1))} className="w-16 h-full hover:bg-white transition-colors font-black text-xl">-</button>
                 <div className="flex-1 text-center font-black text-base tracking-widest">{quantity}</div>
                 <button onClick={() => setQuantity(quantity + 1)} className="w-16 h-full hover:bg-white transition-colors font-black text-xl">+</button>
               </div>
               
-              {/* Action Buttons */}
               <div className="flex flex-row gap-2 sm:gap-4 h-16">
                 <button onClick={() => handleAction(false)} className="flex-1 h-full bg-white border-2 border-black text-black font-black uppercase text-[9px] sm:text-[11px] tracking-widest hover:bg-black hover:text-white transition-all duration-300 rounded-full flex items-center justify-center px-1">ADD TO CART</button>
                 <button onClick={() => handleAction(true)} className="flex-1 h-full bg-red-700 text-white font-black uppercase text-[9px] sm:text-[11px] tracking-widest hover:bg-black transition-all duration-300 rounded-full shadow-lg shadow-red-700/10 active:scale-95 flex items-center justify-center px-1">BUY NOW</button>
