@@ -25,13 +25,13 @@ const AdminOrderDetail: React.FC<AdminOrderDetailProps> = ({ order: initialOrder
   const [isUpdating, setIsUpdating] = useState(false);
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
-  // Sync local state when parent order data changes (e.g. from fetchOrders in App.tsx)
+  // Sync internal state when props change (global orders list refresh)
   useEffect(() => {
     setOrder(initialOrder);
     setPendingStatus(initialOrder.status);
   }, [initialOrder]);
 
-  // Auto-clear notification after 5 seconds
+  // Auto-clear tactical notifications
   useEffect(() => {
     if (notification) {
       const timer = setTimeout(() => setNotification(null), 5000);
@@ -45,7 +45,7 @@ const AdminOrderDetail: React.FC<AdminOrderDetailProps> = ({ order: initialOrder
     setIsUpdating(true);
     setNotification(null);
     
-    // Directly call the parent update function which patches the DB and refreshes state
+    // Execute atomic update protocol
     const success = await onUpdateStatus(order.id, pendingStatus);
     
     if (success) {

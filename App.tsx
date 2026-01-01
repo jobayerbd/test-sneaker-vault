@@ -91,8 +91,15 @@ const App: React.FC = () => {
       const response = await fetch(`${SUPABASE_URL}/rest/v1/orders?select=*&order=created_at.desc`, { 
         headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } 
       });
-      if (response.ok) setOrders(await response.json());
-    } catch (err) {} finally { setIsFetchingOrders(false); }
+      if (response.ok) {
+        const data = await response.json();
+        setOrders(data);
+      }
+    } catch (err) {
+      console.error("Vault Order Retrieval Failure:", err);
+    } finally {
+      setIsFetchingOrders(false);
+    }
   }, []);
 
   const fetchSneakers = useCallback(async () => {
@@ -200,6 +207,13 @@ const App: React.FC = () => {
       });
     }
   }, []);
+
+  // Sync Orders when navigating to customer or details views to ensure real-time data
+  useEffect(() => {
+    if (currentView === 'customer-account' || currentView === 'order-details-view') {
+      fetchOrders();
+    }
+  }, [currentView, fetchOrders]);
 
   useEffect(() => {
     document.title = siteIdentity.title + (siteIdentity.tagline ? ` - ${siteIdentity.tagline}` : '');
@@ -343,28 +357,45 @@ const App: React.FC = () => {
     });
   };
 
+  /**
+   * REWRITTEN CORE: Order Status and Timeline Protocol
+   * This function ensures that status updates are strictly persisted 
+   * to the database and history is never overwritten by stale local data.
+   */
   const handleUpdateOrderStatus = async (orderId: string, newStatus: OrderStatus) => {
+    console.log(`Vault Execution: Syncing Order [${orderId}] to status [${newStatus}]`);
+    
     try {
-      // 1. ATOMIC FETCH: Get current state from database to avoid stale local state issues
+      // 1. GET FRESH DATA FROM VAULT: Direct database query to get latest timeline
+      // Using raw string for orderId to avoid double-encoding issues with hyphens
       const getResponse = await fetch(`${SUPABASE_URL}/rest/v1/orders?id=eq.${orderId}&select=timeline`, {
-        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
+        headers: { 
+          'apikey': SUPABASE_KEY, 
+          'Authorization': `Bearer ${SUPABASE_KEY}` 
+        }
       });
       
-      if (!getResponse.ok) return false;
-      const orderData = await getResponse.json();
-      if (!orderData || orderData.length === 0) return false;
+      if (!getResponse.ok) {
+        console.error("Vault DB Access Error");
+        return false;
+      }
       
-      const currentTimeline = orderData[0].timeline || [];
-      
-      // 2. Prepare updated timeline with new event
+      const remoteData = await getResponse.json();
+      if (!remoteData || remoteData.length === 0) {
+        console.error("Vault Record Not Found:", orderId);
+        return false;
+      }
+
+      // 2. CONSTRUCT UPDATE: Retrieve current timeline and append new status event
+      const currentTimeline = Array.isArray(remoteData[0].timeline) ? remoteData[0].timeline : [];
       const newEvent: TimelineEvent = { 
         status: newStatus, 
         timestamp: new Date().toISOString(), 
-        note: `Status protocol updated to ${newStatus} via Vault Command Center.` 
+        note: `Status updated to ${newStatus} via Administrative Command Center.` 
       };
       const updatedTimeline = [...currentTimeline, newEvent];
 
-      // 3. SECURE DATABASE SYNC: Update both status and cumulative timeline
+      // 3. PERSISTENCE LAYER: Save the new status and updated timeline array
       const patchResponse = await fetch(`${SUPABASE_URL}/rest/v1/orders?id=eq.${orderId}`, { 
         method: 'PATCH', 
         headers: { 
@@ -380,13 +411,17 @@ const App: React.FC = () => {
       });
 
       if (patchResponse.ok) { 
-        // 4. Update global app state
+        console.log("Vault Success: DB state fully synchronized.");
+        // 4. GLOBAL SYNC: Re-fetch orders to update state across the entire application
         await fetchOrders(); 
         return true; 
+      } else {
+        const errorDetail = await patchResponse.text();
+        console.error("Vault Persistence Failure:", errorDetail);
+        return false;
       }
-      return false;
     } catch (err) { 
-      console.error("Vault Persistence Error:", err);
+      console.error("CRITICAL VAULT SYNC FAILURE:", err);
       return false; 
     }
   };
@@ -534,7 +569,8 @@ const App: React.FC = () => {
       const response = await fetch(`${SUPABASE_URL}/rest/v1/home_slides?id=eq.${id}`, { method: 'DELETE', headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } });
       if (response.ok) { fetchSlides(); return true; }
       return false;
-    } catch (err) { return false; }
+    } catch (err) {}
+    return false;
   };
 
   const handleSaveNavItem = async (data: Partial<NavItem>): Promise<boolean> => {
