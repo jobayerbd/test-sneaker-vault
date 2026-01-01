@@ -76,6 +76,11 @@ const App: React.FC = () => {
   const [createAccount, setCreateAccount] = useState(false);
   const [accountPassword, setAccountPassword] = useState('');
 
+  // Scroll to top on every view change
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [currentView]);
+
   const safePushState = (state: any, title: string, url: string) => {
     try {
       window.history.pushState(state, title, url);
@@ -245,6 +250,25 @@ const App: React.FC = () => {
   const handleLogout = () => { localStorage.removeItem('sv_admin_session'); setIsAdminAuthenticated(false); handleNavigate('home'); };
   const handleCustomerLogout = () => { localStorage.removeItem('sv_customer_session'); setCurrentCustomer(null); handleNavigate('home'); };
 
+  const handleSaveCheckoutField = async (field: Partial<CheckoutField>) => {
+    const success = await vaultApi.saveCheckoutField(field);
+    if (success) {
+      const updatedFields = await vaultApi.fetchCheckoutFields();
+      setCheckoutFields(updatedFields);
+      return true;
+    }
+    return false;
+  };
+
+  const handleDeleteCheckoutField = async (id: string) => {
+    const success = await vaultApi.deleteCheckoutField(id);
+    if (success) {
+      setCheckoutFields(prev => prev.filter(f => f.id !== id));
+      return true;
+    }
+    return false;
+  };
+
   const renderView = () => {
     const isActuallyAdmin = isAdminAuthenticated || localStorage.getItem('sv_admin_session') === 'active';
 
@@ -262,7 +286,7 @@ const App: React.FC = () => {
       case 'customer-account': return currentCustomer ? <CustomerPortal customer={currentCustomer} orders={orders} onLogout={handleCustomerLogout} onUpdateProfile={async (u) => vaultApi.updateCustomer(currentCustomer.id, u)} onSelectOrder={(o) => { setViewingOrder(o); handleNavigate('order-details-view'); }} /> : <UnifiedLogin supabaseUrl={'https://vwbctddmakbnvfxzrjeo.supabase.co'} supabaseKey={'sb_publishable_8WhV41Km5aj8Dhvu6tUbvA_JnyPoVxu'} onAdminLogin={() => { setIsAdminAuthenticated(true); handleNavigate('admin'); }} onCustomerLogin={(c) => { setCurrentCustomer(c); handleNavigate('customer-account'); }} onBack={() => handleNavigate('home')} />;
       case 'admin': 
         if (!isActuallyAdmin) return <UnifiedLogin supabaseUrl={'https://vwbctddmakbnvfxzrjeo.supabase.co'} supabaseKey={'sb_publishable_8WhV41Km5aj8Dhvu6tUbvA_JnyPoVxu'} onAdminLogin={() => { setIsAdminAuthenticated(true); handleNavigate('admin'); }} onCustomerLogin={() => {}} onBack={() => handleNavigate('home')} />;
-        return <Dashboard sneakers={sneakers} orders={orders} customers={customers} brands={brands} categories={categories} paymentMethods={paymentMethods} slides={slides} navItems={navItems} checkoutFields={checkoutFields} shippingOptions={shippingOptions} footerConfig={footerConfig} siteIdentity={siteIdentity} onRefresh={fetchData} onRefreshOrders={fetchData} onUpdateOrderStatus={async (id, s) => true} onSaveProduct={async (d) => true} onDeleteProduct={async (i) => true} onSaveShipping={async (o) => true} onDeleteShipping={async (i) => true} onSavePaymentMethod={async (m) => true} onDeletePaymentMethod={async (i) => true} onSaveFooterConfig={async (c) => true} onSaveIdentity={async (i) => true} onSaveBrand={async (b) => true} onDeleteBrand={async (i) => true} onSaveCategory={async (c) => true} onDeleteCategory={async (i) => true} onSaveSlide={async (s) => true} onDeleteSlide={async (i) => true} onSaveNavItem={async (n) => true} onDeleteNavItem={async (i) => true} onSaveCheckoutField={async (f) => true} onDeleteCheckoutField={async (i) => true} onLogout={handleLogout} onVisitSite={() => window.open(window.location.origin, '_blank')} />;
+        return <Dashboard sneakers={sneakers} orders={orders} customers={customers} brands={brands} categories={categories} paymentMethods={paymentMethods} slides={slides} navItems={navItems} checkoutFields={checkoutFields} shippingOptions={shippingOptions} footerConfig={footerConfig} siteIdentity={siteIdentity} onRefresh={fetchData} onRefreshOrders={fetchData} onUpdateOrderStatus={async (id, s) => true} onSaveProduct={async (d) => true} onDeleteProduct={async (i) => true} onSaveShipping={async (o) => true} onDeleteShipping={async (i) => true} onSavePaymentMethod={async (m) => true} onDeletePaymentMethod={async (i) => true} onSaveFooterConfig={async (c) => true} onSaveIdentity={async (i) => true} onSaveBrand={async (b) => true} onDeleteBrand={async (i) => true} onSaveCategory={async (c) => true} onDeleteCategory={async (i) => true} onSaveSlide={async (s) => true} onDeleteSlide={async (i) => true} onSaveNavItem={async (n) => true} onDeleteNavItem={async (i) => true} onSaveCheckoutField={handleSaveCheckoutField} onDeleteCheckoutField={handleDeleteCheckoutField} onLogout={handleLogout} onVisitSite={() => window.open(window.location.origin, '_blank')} />;
       case 'checkout': return (
         <CheckoutPage 
           cart={cart} 

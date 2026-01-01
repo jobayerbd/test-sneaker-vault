@@ -56,6 +56,27 @@ export const vaultApi = {
     return resp.ok ? await resp.json() : [];
   },
 
+  saveCheckoutField: async (field: Partial<CheckoutField>) => {
+    const isNew = !field.id;
+    const url = isNew ? `${SUPABASE_URL}/rest/v1/checkout_fields` : `${SUPABASE_URL}/rest/v1/checkout_fields?id=eq.${field.id}`;
+    const method = isNew ? 'POST' : 'PATCH';
+    
+    const resp = await fetch(url, {
+      method,
+      headers: { ...headers, 'Prefer': 'return=representation' },
+      body: JSON.stringify(field)
+    });
+    return resp.ok;
+  },
+
+  deleteCheckoutField: async (id: string) => {
+    const resp = await fetch(`${SUPABASE_URL}/rest/v1/checkout_fields?id=eq.${id}`, {
+      method: 'DELETE',
+      headers
+    });
+    return resp.ok;
+  },
+
   fetchShippingOptions: async () => {
     const resp = await fetch(`${SUPABASE_URL}/rest/v1/shipping_options?select=*&order=rate.asc`, { headers });
     return resp.ok ? await resp.json() : [];
