@@ -1,5 +1,5 @@
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { SiteIdentity } from '../../types.ts';
 
 interface AdminIdentityProps {
@@ -12,6 +12,11 @@ const AdminIdentity: React.FC<AdminIdentityProps> = ({ identity, onSave }) => {
   const [isSaving, setIsSaving] = useState(false);
   const logoInputRef = useRef<HTMLInputElement>(null);
   const faviconInputRef = useRef<HTMLInputElement>(null);
+
+  // Sync internal form when identity prop changes from vault
+  useEffect(() => {
+    setForm({ ...identity });
+  }, [identity]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, field: 'logo_url' | 'favicon_url') => {
     const file = e.target.files?.[0];
@@ -130,7 +135,7 @@ const AdminIdentity: React.FC<AdminIdentityProps> = ({ identity, onSave }) => {
                       type="file" 
                       ref={faviconInputRef} 
                       className="hidden" 
-                      accept="image/x-icon,image/png,image/svg+xml" 
+                      accept="image/x-icon,image/png,image/svg+xml,image/jpeg" 
                       onChange={(e) => handleFileChange(e, 'favicon_url')} 
                     />
                   </div>

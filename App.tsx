@@ -8,6 +8,7 @@ import Dashboard from './components/Admin/Dashboard.tsx';
 import Footer from './components/Footer.tsx';
 import UnifiedLogin from './components/Auth/UnifiedLogin.tsx';
 import CustomerPortal from './components/Customer/CustomerPortal.tsx';
+import { updateBrowserIdentity } from './services/identityService.ts';
 import { Sneaker, CartItem, Order, OrderStatus, ShippingOption, FooterConfig, TimelineEvent, BrandEntity, Category, PaymentMethod, HomeSlide, NavItem, CheckoutField, SiteIdentity, Customer } from './types.ts';
 
 const SUPABASE_URL = 'https://vwbctddmakbnvfxzrjeo.supabase.co';
@@ -85,10 +86,6 @@ const App: React.FC = () => {
     }
   };
 
-  /**
-   * ROBUST ORDER FETCHING: 
-   * Fetches orders and ensures timeline events are sorted so the UI always has the latest status.
-   */
   const fetchOrders = useCallback(async () => {
     setIsFetchingOrders(true);
     try {
@@ -98,7 +95,6 @@ const App: React.FC = () => {
 
       if (response.ok) {
         const data = await response.json();
-        // Ensure timeline is sorted for each order to easily pick the latest
         const processed = data.map((o: Order) => ({
           ...o,
           timeline: (o.timeline || []).sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
@@ -231,12 +227,9 @@ const App: React.FC = () => {
     }
   }, [currentView, fetchOrders]);
 
+  // Sync Site Identity using the new service
   useEffect(() => {
-    document.title = siteIdentity.title + (siteIdentity.tagline ? ` - ${siteIdentity.tagline}` : '');
-    const link = document.querySelector("link[rel~='icon']") as HTMLLinkElement;
-    if (link && siteIdentity.favicon_url) {
-      link.href = siteIdentity.favicon_url;
-    }
+    updateBrowserIdentity(siteIdentity);
   }, [siteIdentity]);
 
   useEffect(() => {
@@ -701,7 +694,7 @@ const App: React.FC = () => {
   };
 
   const removeFromCart = (idx: number) => {
-    if (cart.length <= 1) return; // Prevent empty cart via edit controls
+    if (cart.length <= 1) return; 
     setCart(cart.filter((_, i) => i !== idx));
   };
 
@@ -722,7 +715,6 @@ const App: React.FC = () => {
   };
 
   const CartSidebar = () => {
-    const total = cart.reduce((acc, item) => acc + (item.price * item.quantity), 0);
     return (
       <>
         <div className={`fixed inset-0 bg-black/60 z-[60] transition-opacity duration-300 ${isCartSidebarOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`} onClick={() => setIsCartSidebarOpen(false)} />
@@ -931,7 +923,6 @@ const App: React.FC = () => {
                 
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
                   <div className="lg:col-span-2 space-y-8">
-                    {/* User Coordinates */}
                     <div className="bg-white p-10 border border-gray-100 rounded-3xl shadow-sm">
                       <h3 className="text-xs font-black uppercase italic mb-8 border-b pb-4 tracking-widest flex items-center gap-3">
                         <i className="fa-solid fa-id-card text-red-600"></i> Subject Coordinates
@@ -976,7 +967,6 @@ const App: React.FC = () => {
                       </div>
                     </div>
 
-                    {/* Logistics Hub */}
                     <div className="bg-white p-10 border border-gray-100 rounded-3xl shadow-sm">
                       <h3 className="text-xs font-black uppercase italic mb-8 border-b pb-4 tracking-widest flex items-center gap-3">
                         <i className="fa-solid fa-truck-fast text-red-600"></i> Logistics Hub
@@ -998,7 +988,6 @@ const App: React.FC = () => {
                       </div>
                     </div>
 
-                    {/* Payment Gateway Matrix */}
                     <div className="bg-white p-10 border border-gray-100 rounded-3xl shadow-sm">
                       <h3 className="text-xs font-black uppercase italic mb-8 border-b pb-4 tracking-widest flex items-center gap-3">
                         <i className="fa-solid fa-credit-card text-red-600"></i> Payment Gateway Matrix
@@ -1024,11 +1013,10 @@ const App: React.FC = () => {
                   <div className="bg-black text-white p-10 rounded-3xl h-fit shadow-2xl sticky top-24">
                     <h3 className="text-xl font-black uppercase italic border-b border-white/10 pb-6 mb-8 tracking-tighter font-heading">Settlement Summary</h3>
                     
-                    {/* Editable Cart List */}
                     <div className="space-y-6 mb-8 max-h-[300px] overflow-y-auto pr-2 no-scrollbar border-b border-white/5 pb-8">
                        {cart.map((item, idx) => (
                          <div key={`${item.id}-${item.selectedSize}`} className="flex gap-4 items-center animate-in slide-in-from-right-2">
-                            <div className="w-12 h-12 bg-white/10 rounded-lg p-1 shrink-0"><img src={item.image} className="w-full h-full object-contain" /></div>
+                            <div className="w-12 h-12 bg-white/10 rounded-lg p-1 shrink-0"><img src={item.image} className="w-full h-full object-contain" alt="" /></div>
                             <div className="flex-1 min-w-0">
                                <h4 className="text-[9px] font-black uppercase truncate mb-1">{item.name}</h4>
                                <div className="flex items-center gap-2">
