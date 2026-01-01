@@ -86,21 +86,36 @@ const App: React.FC = () => {
   };
 
   /**
-   * UPDATED FETCH: Uses relational join for timeline
+   * ROBUST ORDER FETCHING: 
+   * Fetches orders with an optional join for order_timeline.
+   * If join fails due to DB schema mismatch, it falls back to a simple fetch.
    */
   const fetchOrders = useCallback(async () => {
     setIsFetchingOrders(true);
+    console.log("Vault Retrieval: Starting Order Manifest Pull...");
     try {
-      // We alias order_timeline to 'timeline' to keep UI compatibility
+      // Primary Attempt: Relational Join
       const response = await fetch(`${SUPABASE_URL}/rest/v1/orders?select=*,timeline:order_timeline(status,note,timestamp)&order=created_at.desc`, { 
         headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } 
       });
+
       if (response.ok) {
         const data = await response.json();
+        console.log(`Vault Success: ${data.length} orders logged.`);
         setOrders(data);
+      } else {
+        // Fallback: Simple Fetch (in case join fails)
+        console.warn("Vault Warning: Relational join failed. Attempting legacy fetch...");
+        const fallbackResp = await fetch(`${SUPABASE_URL}/rest/v1/orders?select=*&order=created_at.desc`, { 
+          headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } 
+        });
+        if (fallbackResp.ok) {
+          const fallbackData = await fallbackResp.json();
+          setOrders(fallbackData);
+        }
       }
     } catch (err) {
-      console.error("Vault Order Retrieval Failure:", err);
+      console.error("CRITICAL VAULT RETRIEVAL FAILURE:", err);
     } finally {
       setIsFetchingOrders(false);
     }
@@ -212,7 +227,6 @@ const App: React.FC = () => {
     }
   }, []);
 
-  // Sync Orders when navigating to customer or details views to ensure real-time data
   useEffect(() => {
     if (currentView === 'customer-account' || currentView === 'order-details-view') {
       fetchOrders();
@@ -361,13 +375,8 @@ const App: React.FC = () => {
     });
   };
 
-  /**
-   * REWRITTEN ORDER STATUS UPDATE: Relational Approach
-   * Calls the Database Function (RPC) to handle status and history logging.
-   */
   const handleUpdateOrderStatus = async (orderId: string, newStatus: OrderStatus) => {
     console.log(`Vault Command: Syncing Order [${orderId}] to [${newStatus}]`);
-    
     try {
       const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/advance_order_status`, {
         method: 'POST',
@@ -379,13 +388,13 @@ const App: React.FC = () => {
         body: JSON.stringify({
           p_order_id: orderId,
           p_new_status: newStatus,
-          p_note: `Administrative Protocol: Order status updated to ${newStatus}.`
+          p_note: `Administrative Protocol: Order status transitioned to ${newStatus}.`
         })
       });
 
       if (response.ok) {
         console.log("Vault Success: Relational sync complete.");
-        await fetchOrders(); // Force refresh local state
+        await fetchOrders();
         return true;
       } else {
         const errorText = await response.text();
@@ -473,8 +482,6 @@ const App: React.FC = () => {
     const total = subtotal + selectedShipping.rate;
     const orderId = `ORD-${Math.floor(Math.random() * 90000) + 10000}`;
     
-    // Note: Relational approach will handle the initial timeline entry via the advance_order_status call
-    // But for a simple POST, we insert into orders and then manually add to timeline table
     const newOrder = {
       id: orderId, 
       customer_id: customerId,
@@ -498,7 +505,6 @@ const App: React.FC = () => {
       if (response.ok) {
         const saved = (await response.json())[0];
         
-        // Relational Step: Initialize timeline
         await fetch(`${SUPABASE_URL}/rest/v1/order_timeline`, {
           method: 'POST',
           headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' },
@@ -510,8 +516,6 @@ const App: React.FC = () => {
         });
 
         trackFBPixel('Purchase', { value: total, currency: 'BDT', content_ids: cart.map(item => String(item.id)), content_type: 'product', num_items: cart.length });
-        
-        // Refresh all orders so the state is consistent
         await fetchOrders();
         setLastOrder(saved);
         setCart([]);
