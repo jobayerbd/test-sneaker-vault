@@ -43,7 +43,7 @@ type View = 'home' | 'shop' | 'admin' | 'cart' | 'pdp' | 'wishlist' | 'checkout'
 
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<View>('home');
-  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
+  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(localStorage.getItem('sv_admin_session') === 'active');
   const [currentCustomer, setCurrentCustomer] = useState<Customer | null>(null);
   const [selectedProduct, setSelectedProduct] = useState<Sneaker | null>(null);
   const [viewingOrder, setViewingOrder] = useState<Order | null>(null);
@@ -214,7 +214,11 @@ const App: React.FC = () => {
     fetchSneakers(); fetchOrders(); fetchShippingOptions(); fetchFooterConfig(); 
     fetchBrands(); fetchCategories(); fetchPaymentMethods(); fetchSlides(); 
     fetchNavItems(); fetchCheckoutFields(); fetchSiteIdentity(); fetchCustomers();
-    if (localStorage.getItem('sv_admin_session') === 'active') setIsAdminAuthenticated(true);
+    
+    // Initial Auth Sync
+    const adminSession = localStorage.getItem('sv_admin_session') === 'active';
+    setIsAdminAuthenticated(adminSession);
+
     const storedCustomer = localStorage.getItem('sv_customer_session');
     if (storedCustomer) {
       const parsed = JSON.parse(storedCustomer);
@@ -264,6 +268,16 @@ const App: React.FC = () => {
     const categorySlug = params.get('category');
     const viewParam = params.get('view') as View;
 
+    // SECURITY PROTOCOL: Synchronous check for admin access via URL
+    if (viewParam === 'admin') {
+      const isLogged = localStorage.getItem('sv_admin_session') === 'active';
+      if (!isLogged) {
+        setCurrentView('admin-login');
+        safePushState({ view: 'admin-login' }, '', window.location.pathname + '?view=admin-login');
+        return;
+      }
+    }
+
     if (productSlug && sneakers.length > 0) {
       const product = sneakers.find(s => s.slug === productSlug || s.id === productSlug);
       if (product) {
@@ -308,6 +322,13 @@ const App: React.FC = () => {
   }, [selectedProduct?.id, currentView, footerConfig.fb_pixel_id]);
 
   const handleNavigate = (view: View, params: string = '') => {
+    // SECURITY GUARD: Handle manual navigation calls
+    if (view === 'admin' && !isAdminAuthenticated) {
+      setCurrentView('admin-login');
+      safePushState({ view: 'admin-login' }, '', window.location.pathname + '?view=admin-login');
+      return;
+    }
+
     setCurrentView(view);
     const queryString = view === 'home' ? '' : `?view=${view}${params ? '&' + params : ''}`;
     safePushState({ view }, '', window.location.pathname + queryString);
@@ -868,46 +889,65 @@ const App: React.FC = () => {
             </div>
         ) : null;
       }
-      case 'admin': return (
-        <Dashboard 
-          sneakers={sneakers} 
-          orders={orders} 
-          customers={customers}
-          brands={brands} 
-          categories={categories} 
-          paymentMethods={paymentMethods} 
-          slides={slides} 
-          navItems={navItems} 
-          checkoutFields={checkoutFields} 
-          shippingOptions={shippingOptions} 
-          footerConfig={footerConfig} 
-          siteIdentity={siteIdentity} 
-          onRefresh={() => { fetchOrders(); fetchSneakers(); fetchShippingOptions(); fetchFooterConfig(); fetchBrands(); fetchCategories(); fetchPaymentMethods(); fetchSlides(); fetchNavItems(); fetchCheckoutFields(); fetchSiteIdentity(); fetchCustomers(); }}
-          onRefreshOrders={fetchOrders}
-          onUpdateOrderStatus={handleUpdateOrderStatus} 
-          onSaveProduct={handleSaveProduct} 
-          onDeleteProduct={handleDeleteProduct} 
-          onSaveShipping={handleSaveShippingOption} 
-          onDeleteShipping={handleDeleteShippingOption} 
-          onSavePaymentMethod={handleSavePaymentMethod} 
-          onDeletePaymentMethod={handleDeletePaymentMethod} 
-          onSaveFooterConfig={handleSaveFooterConfig} 
-          onSaveIdentity={handleSaveIdentity} 
-          onSaveBrand={handleSaveBrand} 
-          onDeleteBrand={handleDeleteBrand} 
-          onSaveCategory={handleSaveCategoryData} 
-          onDeleteCategory={handleDeleteCategoryData} 
-          onSaveSlide={handleSaveSlide} 
-          onDeleteSlide={handleDeleteSlide} 
-          onSaveNavItem={handleSaveNavItem} 
-          onDeleteNavItem={handleDeleteNavItem} 
-          onSaveCheckoutField={handleSaveCheckoutField} 
-          onDeleteCheckoutField={handleDeleteCheckoutField} 
-          isRefreshing={isFetchingSneakers || isFetchingOrders} 
-          onLogout={handleLogout} 
-          onVisitSite={() => window.open(window.location.origin + window.location.pathname, '_blank')}
-        />
-      );
+      case 'admin': {
+        // SECURITY PROTOCOL: Synchronous layer to prevent dashboard rendering without auth
+        if (!isAdminAuthenticated && localStorage.getItem('sv_admin_session') !== 'active') {
+          return (
+            <UnifiedLogin 
+              supabaseUrl={SUPABASE_URL} 
+              supabaseKey={SUPABASE_KEY} 
+              onAdminLogin={() => { setIsAdminAuthenticated(true); handleNavigate('admin'); }}
+              onCustomerLogin={(c) => { 
+                setCurrentCustomer(c); 
+                localStorage.setItem('sv_customer_session', JSON.stringify(c)); 
+                handleNavigate('customer-account'); 
+              }}
+              onBack={() => handleNavigate('home')}
+            />
+          );
+        }
+        
+        return (
+          <Dashboard 
+            sneakers={sneakers} 
+            orders={orders} 
+            customers={customers}
+            brands={brands} 
+            categories={categories} 
+            paymentMethods={paymentMethods} 
+            slides={slides} 
+            navItems={navItems} 
+            checkoutFields={checkoutFields} 
+            shippingOptions={shippingOptions} 
+            footerConfig={footerConfig} 
+            siteIdentity={siteIdentity} 
+            onRefresh={() => { fetchOrders(); fetchSneakers(); fetchShippingOptions(); fetchFooterConfig(); fetchBrands(); fetchCategories(); fetchPaymentMethods(); fetchSlides(); fetchNavItems(); fetchCheckoutFields(); fetchSiteIdentity(); fetchCustomers(); }}
+            onRefreshOrders={fetchOrders}
+            onUpdateOrderStatus={handleUpdateOrderStatus} 
+            onSaveProduct={handleSaveProduct} 
+            onDeleteProduct={handleDeleteProduct} 
+            onSaveShipping={handleSaveShippingOption} 
+            onDeleteShipping={handleDeleteShippingOption} 
+            onSavePaymentMethod={handleSavePaymentMethod} 
+            onDeletePaymentMethod={handleDeletePaymentMethod} 
+            onSaveFooterConfig={handleSaveFooterConfig} 
+            onSaveIdentity={handleSaveIdentity} 
+            onSaveBrand={handleSaveBrand} 
+            onDeleteBrand={handleDeleteBrand} 
+            onSaveCategory={handleSaveCategoryData} 
+            onDeleteCategory={handleDeleteCategoryData} 
+            onSaveSlide={handleSaveSlide} 
+            onDeleteSlide={handleDeleteSlide} 
+            onSaveNavItem={handleSaveNavItem} 
+            onDeleteNavItem={handleDeleteNavItem} 
+            onSaveCheckoutField={handleSaveCheckoutField} 
+            onDeleteCheckoutField={handleDeleteCheckoutField} 
+            isRefreshing={isFetchingSneakers || isFetchingOrders} 
+            onLogout={handleLogout} 
+            onVisitSite={() => window.open(window.location.origin + window.location.pathname, '_blank')}
+          />
+        );
+      }
       case 'checkout': {
         const subtotal = cart.reduce((acc, item) => acc + (item.price * item.quantity), 0);
         const finalTotal = subtotal + (selectedShipping?.rate || 0);
