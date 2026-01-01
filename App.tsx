@@ -905,7 +905,7 @@ const App: React.FC = () => {
           onDeleteCheckoutField={handleDeleteCheckoutField} 
           isRefreshing={isFetchingSneakers || isFetchingOrders} 
           onLogout={handleLogout} 
-          onVisitSite={() => handleNavigate('home')}
+          onVisitSite={() => window.open(window.location.origin + window.location.pathname, '_blank')}
         />
       );
       case 'checkout': {
