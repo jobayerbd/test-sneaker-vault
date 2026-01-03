@@ -123,14 +123,17 @@ const AdminSettings: React.FC<AdminSettingsProps> = ({
         <div className="space-y-8">
           <div className="flex justify-between items-center">
             <h3 className="text-[10px] font-black uppercase text-red-600 italic tracking-widest">Logistics Hub</h3>
-            <button onClick={() => setEditingShipping({ name: '', rate: 0 })} className="bg-black text-white px-4 py-2 rounded-lg text-[9px] font-black uppercase">Add Method</button>
+            <button onClick={() => setEditingShipping({ name: '', rate: 0, description: '' })} className="bg-black text-white px-4 py-2 rounded-lg text-[9px] font-black uppercase">Add Method</button>
           </div>
           <div className="bg-white rounded-3xl border border-gray-100 shadow-xl overflow-hidden">
             <table className="w-full text-left text-xs">
               <tbody className="divide-y divide-gray-50">
                 {shippingOptions.map(opt => (
                   <tr key={opt.id} className="group">
-                    <td className="px-8 py-4 font-bold uppercase">{opt.name}</td>
+                    <td className="px-8 py-4">
+                      <div className="font-bold uppercase">{opt.name}</div>
+                      {opt.description && <div className="text-[9px] text-gray-400 font-medium italic mt-0.5">{opt.description}</div>}
+                    </td>
                     <td className="px-8 py-4 font-black italic">{opt.rate}৳</td>
                     <td className="px-8 py-4 text-right">
                       <button onClick={() => setEditingShipping(opt)} className="p-2 text-gray-300 hover:text-black transition-colors">
@@ -158,7 +161,8 @@ const AdminSettings: React.FC<AdminSettingsProps> = ({
               <h4 className="text-[10px] font-black uppercase mb-6 italic">Edit Distribution Layer</h4>
               <div className="space-y-4">
                 <input type="text" placeholder="METHOD NAME" value={editingShipping.name} onChange={e => setEditingShipping({...editingShipping, name: e.target.value})} className="w-full bg-white/5 p-4 rounded-xl font-bold uppercase text-xs outline-none focus:ring-1 ring-red-600" />
-                <input type="number" placeholder="RATE (৳)" value={editingShipping.rate} onChange={e => setEditingShipping({...editingShipping, rate: Number(e.target.value)})} className="w-full bg-gray-50 p-4 rounded-xl font-bold text-xs outline-none focus:ring-1 ring-red-600" />
+                <input type="number" placeholder="RATE (৳)" value={editingShipping.rate} onChange={e => setEditingShipping({...editingShipping, rate: Number(e.target.value)})} className="w-full bg-white/5 p-4 rounded-xl font-bold text-xs outline-none focus:ring-1 ring-red-600" />
+                <textarea placeholder="DESCRIPTION (e.g. 2-3 Days Delivery)" value={editingShipping.description || ''} onChange={e => setEditingShipping({...editingShipping, description: e.target.value})} className="w-full bg-white/5 p-4 rounded-xl font-bold text-xs outline-none focus:ring-1 ring-red-600 resize-none h-20" />
                 <div className="flex gap-3">
                   <button onClick={async () => { setIsSavingShipping(true); if(await onSaveShipping(editingShipping)) { setEditingShipping(null); setShowSuccess(true); } setIsSavingShipping(false); }} className="flex-1 bg-red-700 py-3 rounded-xl font-black text-[10px] uppercase">Commit</button>
                   <button onClick={() => setEditingShipping(null)} className="flex-1 bg-white/10 py-3 rounded-xl font-black text-[10px] uppercase">Cancel</button>

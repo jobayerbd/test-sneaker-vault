@@ -95,6 +95,7 @@ export interface ShippingOption {
   id: string;
   name: string;
   rate: number;
+  description?: string;
   created_at?: string;
 }
 
