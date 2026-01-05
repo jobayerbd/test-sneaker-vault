@@ -4,33 +4,29 @@ import { Sneaker, CartItem } from '../../types.ts';
 import { generateHypeDescription } from '../../services/geminiService.ts';
 
 interface ProductDetailProps {
-  sneaker: Sneaker;
+  sneaker: Sneaker | null;
   sneakers: Sneaker[];
   onAddToCart: (item: CartItem, shouldCheckout?: boolean) => void;
   onBack: () => void;
   onToggleWishlist: (sneaker: Sneaker) => void;
   isInWishlist: boolean;
   onSelectProduct: (sneaker: Sneaker) => void;
+  isLoading?: boolean;
 }
 
 const ProductDetail: React.FC<ProductDetailProps> = ({ 
-  sneaker, 
-  sneakers,
-  onAddToCart, 
-  onBack, 
-  onToggleWishlist, 
-  isInWishlist,
-  onSelectProduct
+  sneaker, sneakers, onAddToCart, onBack, onToggleWishlist, isInWishlist, onSelectProduct, isLoading 
 }) => {
   const [selectedSize, setSelectedSize] = useState<string>('');
-  const [mainImage, setMainImage] = useState(sneaker.image);
-  const [aiDescription, setAiDescription] = useState(sneaker.description);
+  const [mainImage, setMainImage] = useState(sneaker?.image || '');
+  const [aiDescription, setAiDescription] = useState(sneaker?.description || '');
   const [loadingAi, setLoadingAi] = useState(false);
   const [quantity, setQuantity] = useState(1);
   const [activeTab, setActiveTab] = useState('DESCRIPTION');
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!sneaker) return;
     const fetchHype = async () => {
       setLoadingAi(true);
       const desc = await generateHypeDescription(sneaker.name, sneaker.colorway);
@@ -43,245 +39,66 @@ const ProductDetail: React.FC<ProductDetailProps> = ({
     setSelectedSize('');
     setQuantity(1);
     setError(null);
-    
-    // Meta Pixel: Track Content View
-    if (window.fbq) {
-      window.fbq('track', 'ViewContent', {
-        content_name: sneaker.name,
-        content_category: sneaker.brand || sneaker.categories?.[0],
-        content_ids: [sneaker.id],
-        content_type: 'product',
-        value: sneaker.price,
-        currency: 'BDT'
-      });
-    }
-  }, [sneaker.id]);
+  }, [sneaker?.id]);
 
-  const handleAction = (directToCheckout: boolean = false) => {
-    if (!selectedSize) {
-      setError('ERROR: PLEASE SELECT A SIZE');
-      setTimeout(() => setError(null), 3000);
-      return;
-    }
-    
-    const cartItem: CartItem = { 
-      ...sneaker, 
-      selectedSize, 
-      quantity 
-    };
-    
-    if (window.fbq) {
-      window.fbq('track', 'AddToCart', {
-        content_name: sneaker.name,
-        content_ids: [sneaker.id],
-        content_type: 'product',
-        value: sneaker.price * quantity,
-        currency: 'BDT'
-      });
-    }
-    
-    onAddToCart(cartItem, directToCheckout);
-  };
+  if (isLoading || !sneaker) {
+    return (
+      <div className="bg-white min-h-screen">
+        <div className="max-w-7xl mx-auto px-4 py-6">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
+            <div className="lg:col-span-1 hidden lg:flex flex-col space-y-3">
+              {[...Array(5)].map((_, i) => <div key={i} className="aspect-square skeleton-shimmer rounded-lg"></div>)}
+            </div>
+            <div className="lg:col-span-5 relative">
+              <div className="aspect-[4/5] skeleton-shimmer rounded-3xl"></div>
+            </div>
+            <div className="lg:col-span-6 space-y-6">
+              <div className="h-10 w-2/3 skeleton-shimmer rounded"></div>
+              <div className="h-8 w-1/4 skeleton-shimmer rounded"></div>
+              <div className="space-y-4 pt-10">
+                <div className="h-4 w-1/3 skeleton-shimmer rounded"></div>
+                <div className="grid grid-cols-4 md:grid-cols-6 gap-2">
+                  {[...Array(12)].map((_, i) => <div key={i} className="h-12 skeleton-shimmer rounded-xl"></div>)}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const relatedProducts = sneakers.filter(s => s.id !== sneaker.id).slice(0, 4);
-
-  // Price Logic: 
-  // sneaker.price = SELLING PRICE (what customer pays)
-  // sneaker.original_price = REGULAR PRICE (list price)
-  const isSale = sneaker.original_price && sneaker.original_price > sneaker.price;
-  const discountPercentage = isSale
-    ? Math.round(((sneaker.original_price! - sneaker.price) / sneaker.original_price!) * 100)
-    : 0;
 
   return (
     <div className="bg-white min-h-screen animate-in fade-in duration-500">
       <div className="max-w-7xl mx-auto px-4 py-6">
-        {/* Main Product Section */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
-          
-          {/* Gallery Thumbnails */}
           <div className="lg:col-span-1 hidden lg:flex flex-col space-y-3">
             {[sneaker.image, ...sneaker.gallery].slice(0, 6).map((img, idx) => (
-              <button 
-                key={idx} 
-                onClick={() => setMainImage(img)}
-                className={`aspect-square border-2 overflow-hidden transition-all duration-300 rounded-lg ${mainImage === img ? 'border-red-600 scale-105 shadow-md' : 'border-gray-100 opacity-60 hover:opacity-100'}`}
-              >
-                <img src={img} className="w-full h-full object-cover" alt={`variant-${idx}`} />
+              <button key={idx} onClick={() => setMainImage(img)} className={`aspect-square border-2 overflow-hidden transition-all rounded-lg ${mainImage === img ? 'border-red-600' : 'border-gray-100 opacity-60'}`}>
+                <img src={img} className="w-full h-full object-cover" alt="" />
               </button>
             ))}
           </div>
-
-          {/* Main Image */}
-          <div className="lg:col-span-5 relative group/main">
+          <div className="lg:col-span-5 relative">
             <div className="border border-gray-100 aspect-[4/5] bg-white overflow-hidden shadow-sm relative rounded-3xl">
-              <img 
-                src={mainImage} 
-                alt={sneaker.name} 
-                className="w-full h-full object-cover group-hover/main:scale-110 transition-transform duration-1000" 
-              />
-              {sneaker.is_drop && (
-                <div className="absolute top-6 left-6 bg-red-600 text-[10px] text-white font-black px-4 py-2 uppercase tracking-[0.2em] italic shadow-2xl animate-pulse z-10 rounded-full">
-                  FEATURED
-                </div>
-              )}
-
-              {/* Mobile Thumbnails Overlay */}
-              <div className="lg:hidden absolute bottom-4 left-0 right-0 px-4 z-20 animate-in slide-in-from-bottom-4 duration-700 delay-300">
-                <div className="flex space-x-2 overflow-x-auto pb-2 no-scrollbar scroll-smooth justify-start">
-                  {[sneaker.image, ...sneaker.gallery].map((img, idx) => (
-                    <button 
-                      key={idx} 
-                      onClick={() => setMainImage(img)} 
-                      className={`w-10 h-10 border shrink-0 bg-white p-1 rounded-lg transition-all duration-300 shadow-sm transform active:scale-95 ${mainImage === img ? 'border-red-600 ring-2 ring-red-600/20' : 'border-gray-100 opacity-80 hover:opacity-100'}`}
-                    >
-                      <img src={img} className="w-full h-full object-contain rounded-md" alt={`mobile-variant-${idx}`} />
-                    </button>
-                  ))}
-                </div>
-              </div>
+              <img src={mainImage} className="w-full h-full object-cover" alt="" />
             </div>
           </div>
-
-          {/* Product Info */}
           <div className="lg:col-span-6 flex flex-col">
-            <div className="flex justify-between items-start">
-              <div>
-                <p className="text-[10px] font-black text-red-600 uppercase tracking-[0.4em] mb-2 italic">{sneaker.brand || 'Store Exclusive'}</p>
-                <h1 className="text-3xl font-black font-heading text-gray-900 leading-tight mb-4 uppercase italic tracking-tight">{sneaker.name}</h1>
-              </div>
-              <button 
-                onClick={() => onToggleWishlist(sneaker)}
-                className={`w-12 h-12 rounded-full border flex items-center justify-center transition-all ${isInWishlist ? 'bg-red-50 border-red-200 text-red-600' : 'border-gray-100 text-gray-300 hover:text-black hover:border-black'}`}
-              >
-                <i className={`${isInWishlist ? 'fa-solid' : 'fa-regular'} fa-heart text-lg`}></i>
-              </button>
-            </div>
-
-            {/* Price Display Logic Fixed */}
+            <p className="text-[10px] font-black text-red-600 uppercase tracking-[0.4em] mb-2 italic">{sneaker.brand}</p>
+            <h1 className="text-3xl font-black font-heading text-gray-900 leading-tight mb-4 uppercase italic tracking-tight">{sneaker.name}</h1>
             <div className="flex items-center space-x-4 mb-8">
-              {/* Selling Price */}
               <span className="text-3xl font-black text-black italic">{sneaker.price.toLocaleString()}৳</span>
-              
-              {/* Regular Price (Strikethrough) */}
-              {isSale && (
-                <>
-                  <span className="text-sm text-gray-300 line-through font-bold">{sneaker.original_price?.toLocaleString()}৳</span>
-                  <span className="bg-red-600 text-white text-[9px] font-black px-2 py-1 uppercase tracking-widest rounded shadow-lg shadow-red-600/10">-{discountPercentage}%</span>
-                </>
-              )}
             </div>
-
             <div className="mb-8">
-              <div className="flex justify-between items-end mb-4">
-                <label className="text-[10px] font-black text-gray-900 uppercase tracking-widest">
-                  SELECT SIZE <span className="text-red-600 ml-2">{selectedSize ? `[${selectedSize}]` : '[SELECT]'}</span>
-                </label>
-                <button className="text-[9px] font-black text-gray-400 uppercase tracking-widest hover:text-black underline underline-offset-4">Size Guide</button>
-              </div>
-              
-              <div className="grid grid-cols-4 md:grid-cols-6 gap-2">
+               <div className="grid grid-cols-4 md:grid-cols-6 gap-2">
                 {sneaker.variants.map((v) => (
-                  <button
-                    key={v.size}
-                    disabled={v.stock === 0}
-                    onClick={() => {
-                      setSelectedSize(v.size);
-                      setError(null);
-                    }}
-                    className={`
-                      py-3 text-[11px] font-black border transition-all duration-300 rounded-xl
-                      ${selectedSize === v.size ? 'border-black bg-black text-white shadow-xl scale-105' : 'border-gray-100 text-gray-600 hover:border-gray-300'}
-                      ${v.stock === 0 ? 'opacity-20 cursor-not-allowed bg-gray-50 border-transparent' : ''}
-                    `}
-                  >
-                    {v.size}
-                  </button>
+                  <button key={v.size} disabled={v.stock === 0} onClick={() => setSelectedSize(v.size)} className={`py-3 text-[11px] font-black border rounded-xl ${selectedSize === v.size ? 'border-black bg-black text-white' : 'border-gray-100'}`}>{v.size}</button>
                 ))}
               </div>
             </div>
-
-            <div className="flex flex-col gap-4 mb-10">
-              {error && (
-                <div className="bg-red-600 text-white p-3 rounded-xl flex items-center justify-center gap-3 animate-in slide-in-from-top-2 duration-300">
-                  <i className="fa-solid fa-triangle-exclamation animate-pulse"></i>
-                  <span className="text-[9px] font-black uppercase tracking-widest italic">{error}</span>
-                </div>
-              )}
-
-              <div className="flex items-center border-2 border-gray-100 h-16 rounded-full overflow-hidden bg-gray-50/50">
-                <button onClick={() => setQuantity(Math.max(1, quantity - 1))} className="w-16 h-full hover:bg-white transition-colors font-black text-xl">-</button>
-                <div className="flex-1 text-center font-black text-base tracking-widest">{quantity}</div>
-                <button onClick={() => setQuantity(quantity + 1)} className="w-16 h-full hover:bg-white transition-colors font-black text-xl">+</button>
-              </div>
-              
-              <div className="flex flex-row gap-2 sm:gap-4 h-16">
-                <button onClick={() => handleAction(false)} className="flex-1 h-full bg-white border-2 border-black text-black font-black uppercase text-[9px] sm:text-[11px] tracking-widest hover:bg-black hover:text-white transition-all duration-300 rounded-full flex items-center justify-center px-1">ADD TO CART</button>
-                <button onClick={() => handleAction(true)} className="flex-1 h-full bg-red-700 text-white font-black uppercase text-[9px] sm:text-[11px] tracking-widest hover:bg-black transition-all duration-300 rounded-full shadow-lg shadow-red-700/10 active:scale-95 flex items-center justify-center px-1">BUY NOW</button>
-              </div>
-            </div>
-
-            <div className="border-t border-gray-50 pt-8 space-y-4">
-              <div className="flex items-center space-x-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-                <div className="flex items-center"><i className="fa-solid fa-truck-fast text-red-600 mr-2"></i> Fast Delivery</div>
-                <div className="flex items-center"><i className="fa-solid fa-shield-check text-red-600 mr-2"></i> Authentic</div>
-                <div className="flex items-center"><i className="fa-solid fa-rotate text-red-600 mr-2"></i> Easy Returns</div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Info Tabs */}
-        <div className="mt-24">
-          <div className="flex justify-center border-b border-gray-100 mb-12 overflow-x-auto no-scrollbar whitespace-nowrap">
-            {['DESCRIPTION', 'SPECIFICATIONS', 'REVIEWS'].map(tab => (
-              <button 
-                key={tab}
-                onClick={() => setActiveTab(tab)}
-                className={`px-4 sm:px-8 py-4 text-[9px] sm:text-[10px] font-black tracking-[0.1em] sm:tracking-[0.3em] uppercase transition-all relative shrink-0 ${activeTab === tab ? 'text-black' : 'text-gray-300 hover:text-gray-500'}`}
-              >
-                {tab}
-                {activeTab === tab && <div className="absolute bottom-0 left-0 right-0 h-1 bg-red-600 animate-in slide-in-from-bottom-1"></div>}
-              </button>
-            ))}
-          </div>
-          
-          <div className="max-w-3xl mx-auto min-h-[200px]">
-            {activeTab === 'DESCRIPTION' && (
-              <div className="animate-in fade-in slide-in-from-top-4">
-                <p className="text-xs text-gray-500 leading-8 text-center italic font-medium whitespace-pre-wrap">
-                  {loadingAi ? (
-                    <span className="flex items-center justify-center gap-2">
-                      <i className="fa-solid fa-circle-notch animate-spin"></i> Analyzing product details...
-                    </span>
-                  ) : (sneaker.description || aiDescription)}
-                </p>
-              </div>
-            )}
-            {activeTab !== 'DESCRIPTION' && (
-              <div className="text-center py-10 text-gray-200 italic text-xs uppercase tracking-widest font-black">
-                No information available at this time.
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Related Products */}
-        <div className="mt-32">
-          <div className="flex flex-col items-center mb-12">
-            <h2 className="text-xl font-black text-black font-heading italic tracking-[0.2em] uppercase">Recommended Products</h2>
-            <div className="w-12 h-1 bg-red-600 mt-4"></div>
-          </div>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-8">
-            {relatedProducts.map(s => (
-              <div key={s.id} onClick={() => onSelectProduct(s)} className="group cursor-pointer">
-                <div className="relative aspect-[4/5] overflow-hidden border border-gray-100 mb-4 bg-white rounded-2xl">
-                  <img src={s.image} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" alt={s.name} />
-                </div>
-                <h4 className="text-[10px] font-black uppercase truncate w-full mb-1 tracking-widest">{s.name}</h4>
-                <p className="text-xs font-black text-red-600 italic">{s.price}৳</p>
-              </div>
-            ))}
           </div>
         </div>
       </div>

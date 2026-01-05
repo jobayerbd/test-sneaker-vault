@@ -17,6 +17,7 @@ import AdminCheckoutManager from './AdminCheckoutManager.tsx';
 import AdminHomeManagement from './AdminHomeManagement.tsx';
 import AdminIdentity from './AdminIdentity.tsx';
 import AdminCustomers from './AdminCustomers.tsx';
+import AdminFooterSettings from './AdminFooterSettings.tsx';
 
 interface DashboardProps {
   orders: Order[];
@@ -200,12 +201,14 @@ const Dashboard: React.FC<DashboardProps> = (props) => {
         return <AdminSlider slides={slides} onSave={onSaveSlide} onDelete={onDeleteSlide} />;
       case 'menu':
         return <AdminMenuManagement navItems={navItems} onSave={onSaveNavItem} onDelete={onDeleteNavItem} />;
+      case 'footer-settings':
+        return <AdminFooterSettings footerConfig={footerConfig} onSaveFooterConfig={onSaveFooterConfig} />;
       case 'checkout-config':
         return <AdminCheckoutManager fields={checkoutFields} onSave={onSaveCheckoutField} onDelete={onDeleteCheckoutField} />;
       case 'identity':
         return <AdminIdentity identity={siteIdentity} onSave={onSaveIdentity} />;
       case 'settings':
-        return <AdminSettings shippingOptions={shippingOptions} paymentMethods={paymentMethods} footerConfig={footerConfig} onSaveShipping={onSaveShipping} onDeleteShipping={onDeleteShipping} onSavePaymentMethod={onSavePaymentMethod} onDeletePaymentMethod={onDeletePaymentMethod} onSaveFooterConfig={onSaveFooterConfig} />;
+        return <AdminSettings shippingOptions={shippingOptions} paymentMethods={paymentMethods} onSaveShipping={onSaveShipping} onDeleteShipping={onDeleteShipping} onSavePaymentMethod={onSavePaymentMethod} onDeletePaymentMethod={onDeletePaymentMethod} />;
       default:
         return null;
     }

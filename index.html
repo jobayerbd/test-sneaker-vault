@@ -6,32 +6,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>SneakerVault - Premium Footwear</title>
     <script>
-      // Essential shim for libraries that expect process.env
       window.process = { env: { NODE_ENV: 'production', API_KEY: '' } };
-      
-      // Global error tracking to help debug blank screens
       window.onerror = function(msg, url, lineNo, columnNo, error) {
-        // Skip noise from specific browser environments or third-party extensions
-        if (msg === "Script error.") {
-          console.warn("SneakerVault: Cross-origin script error caught. Details are masked by browser security.");
-          return false;
-        }
-
+        if (msg === "Script error.") return false;
         var div = document.createElement('div');
-        div.style.position = 'fixed';
-        div.style.top = '0';
-        div.style.left = '0';
-        div.style.width = '100%';
-        div.style.padding = '20px';
-        div.style.backgroundColor = '#ef4444';
-        div.style.color = 'white';
-        div.style.zIndex = '99999';
-        div.style.fontFamily = 'monospace';
-        div.style.maxHeight = '300px';
-        div.style.overflow = 'auto';
-        div.innerHTML = '<strong>SneakerVault Runtime Error:</strong> ' + (msg || 'Unknown Error') + 
-                        '<br><small>' + url + ' @ ' + lineNo + ':' + columnNo + '</small>' +
-                        (error ? '<br><br>Stack Trace:<br>' + error.stack : '');
+        div.style.position = 'fixed'; div.style.top = '0'; div.style.left = '0'; div.style.width = '100%';
+        div.style.padding = '20px'; div.style.backgroundColor = '#ef4444'; div.style.color = 'white';
+        div.style.zIndex = '99999'; div.style.fontFamily = 'monospace'; div.style.maxHeight = '300px'; div.style.overflow = 'auto';
+        div.innerHTML = '<strong>SneakerVault Runtime Error:</strong> ' + (msg || 'Unknown Error');
         document.body.appendChild(div);
         return false;
       };
@@ -42,18 +24,20 @@
     <style>
       body { font-family: 'Inter', sans-serif; margin: 0; padding: 0; background: #f9fafb; overflow-x: hidden; }
       .font-heading { font-family: 'Oswald', sans-serif; }
-      @keyframes pulse-red {
-        0%, 100% { transform: scale(1); opacity: 1; }
-        50% { transform: scale(1.05); opacity: 0.8; }
+      @keyframes shimmer {
+        0% { background-position: -200% 0; }
+        100% { background-position: 200% 0; }
       }
-      .animate-pulse-red { animation: pulse-red 2s infinite; }
+      .skeleton-shimmer {
+        background: linear-gradient(90deg, #f3f4f6 25%, #f9fafb 50%, #f3f4f6 75%);
+        background-size: 200% 100%;
+        animation: shimmer 1.5s infinite linear;
+      }
       #root { min-height: 100vh; display: flex; flex-direction: column; }
       ::-webkit-scrollbar { width: 8px; }
       ::-webkit-scrollbar-track { background: #f1f1f1; }
       ::-webkit-scrollbar-thumb { background: #333; border-radius: 4px; }
-      ::-webkit-scrollbar-thumb:hover { background: #000; }
       .no-scrollbar::-webkit-scrollbar { display: none; }
-      .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
     </style>
     <script type="importmap">
 {

@@ -16,7 +16,7 @@ export enum OrderStatus {
   RETURNED = 'Returned'
 }
 
-export type AdminSubView = 'overview' | 'orders' | 'inventory' | 'settings' | 'customers' | 'order-detail' | 'product-form' | 'brands' | 'categories' | 'slider' | 'menu' | 'checkout-config' | 'home-layout' | 'identity';
+export type AdminSubView = 'overview' | 'orders' | 'inventory' | 'settings' | 'customers' | 'order-detail' | 'product-form' | 'brands' | 'categories' | 'slider' | 'menu' | 'checkout-config' | 'home-layout' | 'identity' | 'footer-settings';
 
 export interface NavItem {
   id: string;

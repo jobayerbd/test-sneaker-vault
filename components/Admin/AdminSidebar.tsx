@@ -34,6 +34,7 @@ const AdminSidebar: React.FC<AdminSidebarProps> = ({ currentView, onNavigate, on
         { id: 'identity', icon: 'fa-fingerprint', label: 'Site Branding' },
         { id: 'slider', icon: 'fa-images', label: 'Slider Settings' },
         { id: 'menu', icon: 'fa-bars', label: 'Navigation Menu' },
+        { id: 'footer-settings', icon: 'fa-rectangle-list', label: 'Footer Config' },
         { id: 'home-layout', icon: 'fa-house-laptop', label: 'Home Page' },
       ]
     },
@@ -41,7 +42,7 @@ const AdminSidebar: React.FC<AdminSidebarProps> = ({ currentView, onNavigate, on
       label: 'SYSTEM',
       items: [
         { id: 'checkout-config', icon: 'fa-list-check', label: 'Checkout Fields' },
-        { id: 'settings', icon: 'fa-gears', label: 'Settings' }
+        { id: 'settings', icon: 'fa-gears', label: 'General Settings' }
       ]
     }
   ];
