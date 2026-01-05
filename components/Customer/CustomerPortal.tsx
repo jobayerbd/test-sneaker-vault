@@ -23,13 +23,15 @@ const CustomerPortal: React.FC<CustomerPortalProps> = ({ customer, orders, onLog
   const [activeTab, setActiveTab] = useState<'orders' | 'address'>('orders');
   const [isSaving, setIsSaving] = useState(false);
   const [addressForm, setAddressForm] = useState({
-    first_name: customer.first_name || '',
-    last_name: customer.last_name || '',
-    mobile_number: customer.mobile_number || '',
-    street_address: customer.street_address || '',
-    city: customer.city || '',
-    zip_code: customer.zip_code || ''
+    first_name: customer?.first_name || '',
+    last_name: customer?.last_name || '',
+    mobile_number: customer?.mobile_number || '',
+    street_address: customer?.street_address || '',
+    city: customer?.city || '',
+    zip_code: customer?.zip_code || ''
   });
+
+  if (!customer) return null;
 
   const myOrders = orders.filter(o => o.customer_id === customer.id || o.email === customer.email);
   const totalSpent = myOrders.reduce((acc, o) => acc + o.total, 0);

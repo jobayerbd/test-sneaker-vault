@@ -56,8 +56,14 @@ const App: React.FC = () => {
     if (params.get('product')) return 'pdp';
     if (params.get('category')) return 'shop';
     const viewParam = params.get('view') as View;
-    if (viewParam === 'admin' && localStorage.getItem('sv_admin_session') !== 'active') return 'admin-login';
-    if (viewParam === 'customer-account' && !localStorage.getItem('sv_customer_session')) return 'admin-login';
+    
+    // Check sessions for protected routes
+    const isAdmin = localStorage.getItem('sv_admin_session') === 'active';
+    const isCustomer = !!localStorage.getItem('sv_customer_session');
+    
+    if (viewParam === 'admin' && !isAdmin) return 'admin-login';
+    if (viewParam === 'customer' && !isCustomer) return 'customer-login';
+    
     return viewParam || 'home';
   };
 
@@ -65,7 +71,6 @@ const App: React.FC = () => {
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(() => localStorage.getItem('sv_admin_session') === 'active');
   const [currentCustomer, setCurrentCustomer] = useState<Customer | null>(null);
   const [selectedProduct, setSelectedProduct] = useState<Sneaker | null>(null);
-  const [viewingOrder, setViewingOrder] = useState<Order | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(new URLSearchParams(window.location.search).get('category'));
   const [cart, setCart] = useState<CartItem[]>([]);
   const [wishlist, setWishlist] = useState<Sneaker[]>([]);
@@ -96,7 +101,7 @@ const App: React.FC = () => {
   const [accountPassword, setAccountPassword] = useState('');
 
   const isNavigatingRef = useRef(false);
-  const isAdminPanel = currentView === 'admin';
+  const isAdminPanel = currentView === 'admin' || currentView === 'admin-login';
 
   useEffect(() => {
     if (!footerConfig.fb_pixel_id) return;
@@ -153,17 +158,22 @@ const App: React.FC = () => {
     fetchData();
     const stored = localStorage.getItem('sv_customer_session');
     if (stored) {
-      const parsed = JSON.parse(stored);
-      setCurrentCustomer(parsed);
-      setCheckoutForm({
-        first_name: parsed.first_name || '', 
-        last_name: parsed.last_name || '',
-        email: parsed.email || '', 
-        mobile_number: parsed.mobile_number || '',
-        street_address: parsed.street_address || '', 
-        city: parsed.city || '', 
-        zip_code: parsed.zip_code || ''
-      });
+      try {
+        const parsed = JSON.parse(stored);
+        setCurrentCustomer(parsed);
+        setCheckoutForm({
+          first_name: parsed.first_name || '', 
+          last_name: parsed.last_name || '',
+          email: parsed.email || '', 
+          mobile_number: parsed.mobile_number || '',
+          street_address: parsed.street_address || '', 
+          city: parsed.city || '', 
+          zip_code: parsed.zip_code || ''
+        });
+      } catch (e) {
+        console.error("Session parse error", e);
+        localStorage.removeItem('sv_customer_session');
+      }
     }
   }, []);
 
@@ -183,11 +193,20 @@ const App: React.FC = () => {
 
   const handleNavigate = (view: View, params?: Record<string, string>) => {
     isNavigatingRef.current = true;
-    setCurrentView(view);
+    
+    // Auth redirect logic for handleNavigate
+    let targetView = view;
+    const isAdmin = localStorage.getItem('sv_admin_session') === 'active';
+    const isCustomer = !!localStorage.getItem('sv_customer_session');
+
+    if (view === 'admin' && !isAdmin) targetView = 'admin-login';
+    if (view === 'customer' && !isCustomer) targetView = 'customer-login';
+
+    setCurrentView(targetView);
     try {
       const url = new URL(window.location.href);
-      url.searchParams.set('view', view);
-      if (view === 'home') { url.searchParams.delete('product'); url.searchParams.delete('category'); }
+      url.searchParams.set('view', targetView);
+      if (targetView === 'home') { url.searchParams.delete('product'); url.searchParams.delete('category'); }
       if (params) Object.entries(params).forEach(([k, v]) => { if (v === null) url.searchParams.delete(k); else url.searchParams.set(k, v); });
       window.history.pushState({}, '', url.toString());
     } catch (err) { console.warn("Navigation Error", err); }
@@ -204,6 +223,143 @@ const App: React.FC = () => {
     handleNavigate('shop', { category: cat || '' });
   };
 
+  // Cart Functions
+  const handleAddToCart = (item: CartItem, shouldCheckout: boolean = false) => {
+    setCart(prev => {
+      const existing = prev.find(i => i.id === item.id && i.selectedSize === item.selectedSize);
+      if (existing) {
+        return prev.map(i => i.id === item.id && i.selectedSize === item.selectedSize 
+          ? { ...i, quantity: i.quantity + item.quantity } 
+          : i
+        );
+      }
+      return [...prev, item];
+    });
+
+    if (shouldCheckout) {
+      handleNavigate('checkout');
+    } else {
+      setIsCartSidebarOpen(true);
+    }
+  };
+
+  const handleUpdateCartQuantity = (index: number, delta: number) => {
+    setCart(prev => prev.map((item, idx) => idx === index 
+      ? { ...item, quantity: Math.max(1, item.quantity + delta) } 
+      : item
+    ));
+  };
+
+  const handleRemoveFromCart = (index: number) => {
+    setCart(prev => prev.filter((_, idx) => idx !== index));
+  };
+
+  const handlePlaceOrder = async () => {
+    const missing = checkoutFields
+      .filter(f => f.enabled && f.required)
+      .find(f => !checkoutForm[f.field_key]);
+
+    if (missing) {
+      setCheckoutError(`PROTOCOL FAILURE: [${missing.label.toUpperCase()}] IS MANDATORY`);
+      return;
+    }
+
+    if (createAccount && !accountPassword) {
+      setCheckoutError("SECURITY FAILURE: ACCOUNT PASSWORD IS REQUIRED");
+      return;
+    }
+
+    setIsPlacingOrder(true);
+    setCheckoutError(null);
+
+    try {
+      let customerId = currentCustomer?.id;
+
+      // Handle Account Creation
+      if (createAccount && !currentCustomer) {
+        const newCustomer = await vaultApi.createCustomer({
+          email: checkoutForm.email,
+          password: accountPassword,
+          first_name: checkoutForm.first_name,
+          last_name: checkoutForm.last_name,
+          mobile_number: checkoutForm.mobile_number,
+          street_address: checkoutForm.street_address,
+          city: checkoutForm.city || '',
+          zip_code: checkoutForm.zip_code || '',
+          created_at: new Date().toISOString()
+        });
+
+        if (newCustomer) {
+          customerId = newCustomer.id;
+          localStorage.setItem('sv_customer_session', JSON.stringify(newCustomer));
+          setCurrentCustomer(newCustomer);
+        } else {
+          setCheckoutError("SECURITY PROTOCOL ERROR: FAILED TO CREATE IDENTITY. EMAIL MAY ALREADY BE REGISTERED.");
+          setIsPlacingOrder(false);
+          return;
+        }
+      }
+
+      const orderId = generateOrderId();
+      const orderData = {
+        id: orderId,
+        customer_id: customerId,
+        first_name: checkoutForm.first_name || '',
+        last_name: checkoutForm.last_name || '',
+        email: checkoutForm.email || '',
+        mobile_number: checkoutForm.mobile_number || '',
+        street_address: checkoutForm.street_address || '',
+        city: checkoutForm.city || '', 
+        zip_code: checkoutForm.zip_code || '', 
+        status: OrderStatus.PLACED,
+        total: cart.reduce((a, b) => a + (b.price * b.quantity), 0) + (selectedShipping?.rate || 0),
+        items: cart.map(i => ({
+          sneakerId: i.id,
+          name: i.name,
+          image: i.image,
+          size: i.selectedSize,
+          quantity: i.quantity,
+          price: i.price
+        })),
+        shipping_name: selectedShipping?.name,
+        shipping_rate: selectedShipping?.rate,
+        payment_method: selectedPayment?.name,
+        created_at: new Date().toISOString()
+      };
+
+      const result = await vaultApi.createOrder(orderData);
+      if (result) {
+        await vaultApi.createTimelineEvent(orderId, OrderStatus.PLACED, 'Order protocol initiated and secured.');
+        setLastOrder(orderData);
+        setCart([]);
+        
+        // Refresh all data so the new customer and order appear in Admin/Customer panels
+        await fetchData();
+        
+        handleNavigate('order-success');
+      } else {
+        setCheckoutError("VAULT OFFLINE: FAILED TO PERSIST ORDER DATA");
+      }
+    } catch (err) {
+      setCheckoutError("SYSTEM ERROR: AN UNEXPECTED EXCEPTION OCCURRED DURING CHECKOUT");
+    } finally {
+      setIsPlacingOrder(false);
+    }
+  };
+
+  const handleUpdateCustomerProfile = async (updates: Partial<Customer>) => {
+    if (!currentCustomer) return false;
+    const success = await vaultApi.updateCustomer(currentCustomer.id, updates);
+    if (success) {
+      const updated = { ...currentCustomer, ...updates };
+      setCurrentCustomer(updated);
+      localStorage.setItem('sv_customer_session', JSON.stringify(updated));
+      await fetchData();
+      return true;
+    }
+    return false;
+  };
+
   return (
     <div className="min-h-screen flex flex-col font-sans selection:bg-red-100 selection:text-red-900">
       {!isAdminPanel && (
@@ -212,15 +368,42 @@ const App: React.FC = () => {
       <main className="flex-1">
         {currentView === 'home' && <Home isLoading={isFetchingSneakers} sneakers={sneakers} slides={slides} onSelectProduct={handleSelectProduct} onNavigate={handleNavigate} onSearch={(q) => { setSearchQuery(q); handleNavigate('shop'); }} />}
         {currentView === 'shop' && <Shop isLoading={isFetchingSneakers} sneakers={sneakers} onSelectProduct={handleSelectProduct} searchQuery={searchQuery} onClearSearch={() => setSearchQuery('')} categoryFilter={selectedCategory} onCategoryChange={handleCategoryChange} />}
-        {currentView === 'pdp' && <ProductDetail isLoading={isFetchingSneakers} sneaker={selectedProduct} sneakers={sneakers} onAddToCart={(i, c) => {}} onBack={() => handleNavigate('shop')} onToggleWishlist={() => {}} isInWishlist={false} onSelectProduct={handleSelectProduct} />}
-        {currentView === 'checkout' && <CheckoutPage cart={cart} checkoutFields={checkoutFields} shippingOptions={shippingOptions} paymentMethods={paymentMethods} selectedShipping={selectedShipping} selectedPayment={selectedPayment} checkoutForm={checkoutForm} checkoutError={checkoutError} isPlacingOrder={isPlacingOrder} createAccount={createAccount} accountPassword={accountPassword} currentCustomer={currentCustomer} onFormChange={(k, v) => setCheckoutForm({...checkoutForm, [k]: v})} onShippingChange={setSelectedShipping} onPaymentChange={setSelectedPayment} onToggleCreateAccount={setCreateAccount} onPasswordChange={setAccountPassword} onUpdateCartQuantity={(idx, d) => {}} onRemoveFromCart={(idx) => {}} onPlaceOrder={() => {}} onNavigate={handleNavigate} />}
+        {currentView === 'pdp' && <ProductDetail isLoading={isFetchingSneakers} sneaker={selectedProduct} sneakers={sneakers} onAddToCart={handleAddToCart} onBack={() => handleNavigate('shop')} onToggleWishlist={() => {}} isInWishlist={false} onSelectProduct={handleSelectProduct} />}
+        {currentView === 'checkout' && <CheckoutPage cart={cart} checkoutFields={checkoutFields} shippingOptions={shippingOptions} paymentMethods={paymentMethods} selectedShipping={selectedShipping} selectedPayment={selectedPayment} checkoutForm={checkoutForm} checkoutError={checkoutError} isPlacingOrder={isPlacingOrder} createAccount={createAccount} accountPassword={accountPassword} currentCustomer={currentCustomer} onFormChange={(k, v) => setCheckoutForm({...checkoutForm, [k]: v})} onShippingChange={setSelectedShipping} onPaymentChange={setSelectedPayment} onToggleCreateAccount={setCreateAccount} onPasswordChange={setAccountPassword} onUpdateCartQuantity={handleUpdateCartQuantity} onRemoveFromCart={handleRemoveFromCart} onPlaceOrder={handlePlaceOrder} onNavigate={handleNavigate} />}
         {currentView === 'order-success' && <OrderSuccess lastOrder={lastOrder} onNavigate={handleNavigate} />}
-        {currentView === 'customer' && <CustomerPortal customer={currentCustomer!} orders={orders} onLogout={() => {}} onUpdateProfile={async () => true} onSelectOrder={() => {}} />}
-        {currentView === 'admin' && isAdminAuthenticated && <Dashboard orders={orders} sneakers={sneakers} customers={customers} brands={brands} categories={categories} paymentMethods={paymentMethods} slides={slides} navItems={navItems} checkoutFields={checkoutFields} shippingOptions={shippingOptions} footerConfig={footerConfig} siteIdentity={siteIdentity} onUpdateOrderStatus={async () => true} onSaveProduct={async () => true} onDeleteProduct={async () => true} onSaveShipping={async () => true} onDeleteShipping={async () => true} onSavePaymentMethod={async () => true} onDeletePaymentMethod={async () => true} onSaveFooterConfig={async () => true} onSaveIdentity={async () => true} onSaveBrand={async () => true} onDeleteBrand={async () => true} onSaveCategory={async () => true} onDeleteCategory={async () => true} onSaveSlide={async () => true} onDeleteSlide={async () => true} onSaveNavItem={async () => true} onDeleteNavItem={async () => true} onSaveCheckoutField={async () => true} onDeleteCheckoutField={async () => true} onLogout={() => {}} onVisitSite={() => handleNavigate('home')} />}
-        {(currentView === 'admin-login' || currentView === 'customer-login') && <UnifiedLogin supabaseUrl={SUPABASE_URL} supabaseKey={SUPABASE_KEY} onAdminLogin={() => {}} onCustomerLogin={() => {}} onBack={() => handleNavigate('home')} />}
+        
+        {/* Customer Route Logic */}
+        {currentView === 'customer' && (
+          currentCustomer ? (
+            <CustomerPortal customer={currentCustomer} orders={orders} onLogout={() => { localStorage.removeItem('sv_customer_session'); setCurrentCustomer(null); handleNavigate('home'); }} onUpdateProfile={handleUpdateCustomerProfile} onSelectOrder={() => {}} />
+          ) : (
+            <UnifiedLogin supabaseUrl={SUPABASE_URL} supabaseKey={SUPABASE_KEY} onAdminLogin={() => { setIsAdminAuthenticated(true); handleNavigate('admin'); }} onCustomerLogin={(cust) => { setCurrentCustomer(cust); handleNavigate('customer'); }} onBack={() => handleNavigate('home')} />
+          )
+        )}
+
+        {/* Admin Route Logic */}
+        {currentView === 'admin' && (
+          isAdminAuthenticated ? (
+            <Dashboard orders={orders} sneakers={sneakers} customers={customers} brands={brands} categories={categories} paymentMethods={paymentMethods} slides={slides} navItems={navItems} checkoutFields={checkoutFields} shippingOptions={shippingOptions} footerConfig={footerConfig} siteIdentity={siteIdentity} onUpdateOrderStatus={async (id, s) => { 
+              const ok = await vaultApi.updateOrderStatus(id, s); 
+              if(ok) {
+                // Securely log the status change in the timeline archive
+                await vaultApi.createTimelineEvent(id, s, `Protocol Status updated to ${s.toUpperCase()} by Administrator.`);
+                await fetchData(); 
+              }
+              return ok; 
+            }} onSaveProduct={async (p) => { const ok = await vaultApi.saveProduct(p); if(ok) await fetchData(); return ok; }} onDeleteProduct={async (id) => { const ok = await vaultApi.deleteProduct(id); if(ok) await fetchData(); return ok; }} onSaveShipping={async (s) => { const ok = await vaultApi.saveShippingOption(s); if(ok) await fetchData(); return ok; }} onDeleteShipping={async (id) => { const ok = await vaultApi.deleteShippingOption(id); if(ok) await fetchData(); return ok; }} onSavePaymentMethod={async (p) => { const ok = await vaultApi.savePaymentMethod(p); if(ok) await fetchData(); return ok; }} onDeletePaymentMethod={async (id) => { const ok = await vaultApi.deletePaymentMethod(id); if(ok) await fetchData(); return ok; }} onSaveFooterConfig={async (f) => { const ok = await vaultApi.saveSiteSettings('footer', f); if(ok) await fetchData(); return ok; }} onSaveIdentity={async (i) => { const ok = await vaultApi.saveSiteSettings('identity', i); if(ok) await fetchData(); return ok; }} onSaveBrand={async (b) => { const ok = await vaultApi.saveBrand(b); if(ok) await fetchData(); return ok; }} onDeleteBrand={async (id) => { const ok = await vaultApi.deleteBrand(id); if(ok) await fetchData(); return ok; }} onSaveCategory={async (c) => { const ok = await vaultApi.saveCategory(c); if(ok) await fetchData(); return ok; }} onDeleteCategory={async (id) => { const ok = await vaultApi.deleteCategory(id); if(ok) await fetchData(); return ok; }} onSaveSlide={async (s) => { const ok = await vaultApi.saveSlide(s); if(ok) await fetchData(); return ok; }} onDeleteSlide={async (id) => { const ok = await vaultApi.deleteSlide(id); if(ok) await fetchData(); return ok; }} onSaveNavItem={async (n) => { const ok = await vaultApi.saveNavItem(n); if(ok) await fetchData(); return ok; }} onDeleteNavItem={async (id) => { const ok = await vaultApi.deleteNavItem(id); if(ok) await fetchData(); return ok; }} onSaveCheckoutField={async (f) => { const ok = await vaultApi.saveCheckoutField(f); if(ok) await fetchData(); return ok; }} onDeleteCheckoutField={async (id) => { const ok = await vaultApi.deleteCheckoutField(id); if(ok) await fetchData(); return ok; }} onLogout={() => { localStorage.removeItem('sv_admin_session'); setIsAdminAuthenticated(false); handleNavigate('home'); }} onVisitSite={() => handleNavigate('home')} />
+          ) : (
+            <UnifiedLogin supabaseUrl={SUPABASE_URL} supabaseKey={SUPABASE_KEY} onAdminLogin={() => { setIsAdminAuthenticated(true); handleNavigate('admin'); }} onCustomerLogin={(cust) => { setCurrentCustomer(cust); handleNavigate('customer'); }} onBack={() => handleNavigate('home')} />
+          )
+        )}
+
+        {(currentView === 'admin-login' || currentView === 'customer-login') && (
+          <UnifiedLogin supabaseUrl={SUPABASE_URL} supabaseKey={SUPABASE_KEY} onAdminLogin={() => { setIsAdminAuthenticated(true); handleNavigate('admin'); }} onCustomerLogin={(cust) => { setCurrentCustomer(cust); handleNavigate('customer'); }} onBack={() => handleNavigate('home')} />
+        )}
       </main>
       {!isAdminPanel && <Footer config={footerConfig} onNavigate={handleNavigate} />}
-      {!isAdminPanel && <CartOverlay isOpen={isCartSidebarOpen} onClose={() => setIsCartSidebarOpen(false)} cart={cart} onUpdateQuantity={() => {}} onRemove={() => {}} onCheckout={() => handleNavigate('checkout')} />}
+      {!isAdminPanel && <CartOverlay isOpen={isCartSidebarOpen} onClose={() => setIsCartSidebarOpen(false)} cart={cart} onUpdateQuantity={handleUpdateCartQuantity} onRemove={handleRemoveFromCart} onCheckout={() => handleNavigate('checkout')} />}
       {!isAdminPanel && <SearchOverlay isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} onSearch={(q) => { setSearchQuery(q); setIsSearchOpen(false); handleNavigate('shop'); }} />}
     </div>
   );

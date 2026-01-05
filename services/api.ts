@@ -12,7 +12,6 @@ const headers = {
 
 export const vaultApi = {
   fetchSneakers: async () => {
-    // Updated order to created_at.desc to show newest products first
     const resp = await fetch(`${SUPABASE_URL}/rest/v1/sneakers?select=*&order=created_at.desc`, { headers });
     return resp.ok ? await resp.json() : [];
   },
@@ -55,6 +54,21 @@ export const vaultApi = {
   fetchCustomers: async () => {
     const resp = await fetch(`${SUPABASE_URL}/rest/v1/customers?select=*&order=created_at.desc`, { headers });
     return resp.ok ? await resp.json() : [];
+  },
+
+  createCustomer: async (customerData: any) => {
+    const resp = await fetch(`${SUPABASE_URL}/rest/v1/customers`, {
+      method: 'POST',
+      headers: { ...headers, 'Prefer': 'return=representation' },
+      body: JSON.stringify(customerData)
+    });
+    if (!resp.ok) {
+      const errorMsg = await resp.text();
+      console.error("VAULT API ERROR [createCustomer]:", errorMsg);
+      return null;
+    }
+    const data = await resp.json();
+    return data[0];
   },
 
   fetchBrands: async () => {
@@ -234,7 +248,6 @@ export const vaultApi = {
     if (!resp.ok) {
       const errorMsg = await resp.text();
       console.error("VAULT API ERROR [createOrder]:", errorMsg);
-      // Improved visibility for debugging in browser/log systems
       console.error("Payload causing error:", JSON.stringify(orderData, null, 2));
       return null;
     }
