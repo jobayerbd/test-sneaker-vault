@@ -131,6 +131,16 @@ const Dashboard: React.FC<DashboardProps> = (props) => {
     setSubView('product-form');
   };
 
+  const handleDuplicateProduct = (sneaker: Sneaker) => {
+    // Remove ID and created_at to ensure saveProduct treats it as a new POST
+    const { id, created_at, ...rest } = sneaker;
+    setEditingProduct({
+      ...rest,
+      name: `${rest.name} (Copy)`
+    });
+    setSubView('product-form');
+  };
+
   const handleAddProduct = () => {
     setEditingProduct({ 
       name: '', brand: '', category: '', categories: [], price: 0, image: '', gallery: [], variants: [], 
@@ -144,7 +154,7 @@ const Dashboard: React.FC<DashboardProps> = (props) => {
       case 'overview': 
         return <AdminOverview orders={orders} sneakers={sneakers} isRefreshing={isRefreshing} onRefresh={onRefresh} />;
       case 'inventory': 
-        return <AdminInventory sneakers={sneakers} onEditProduct={handleEditProduct} onAddProduct={handleAddProduct} onDeleteProduct={onDeleteProduct} />;
+        return <AdminInventory sneakers={sneakers} onEditProduct={handleEditProduct} onDuplicateProduct={handleDuplicateProduct} onAddProduct={handleAddProduct} onDeleteProduct={onDeleteProduct} />;
       case 'customers':
         return <AdminCustomers customers={customers} orders={orders} isRefreshing={isRefreshing} />;
       case 'product-form':

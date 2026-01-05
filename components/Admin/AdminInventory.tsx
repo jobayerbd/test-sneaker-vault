@@ -5,11 +5,12 @@ import { Sneaker } from '../../types.ts';
 interface AdminInventoryProps {
   sneakers: Sneaker[];
   onEditProduct: (sneaker: Sneaker) => void;
+  onDuplicateProduct: (sneaker: Sneaker) => void;
   onAddProduct: () => void;
   onDeleteProduct?: (id: string) => Promise<boolean>;
 }
 
-const AdminInventory: React.FC<AdminInventoryProps> = ({ sneakers, onEditProduct, onAddProduct, onDeleteProduct }) => {
+const AdminInventory: React.FC<AdminInventoryProps> = ({ sneakers, onEditProduct, onDuplicateProduct, onAddProduct, onDeleteProduct }) => {
   return (
     <div className="space-y-8 animate-in fade-in">
       <div className="flex justify-between items-center">
@@ -43,14 +44,23 @@ const AdminInventory: React.FC<AdminInventoryProps> = ({ sneakers, onEditProduct
                 <td className="px-8 py-6 font-black italic">{sneaker.price}৳</td>
                 <td className="px-8 py-6 text-right">
                   <button 
+                    onClick={() => onDuplicateProduct(sneaker)} 
+                    className="p-3 text-gray-300 hover:text-blue-600 transition-colors"
+                    title="Duplicate Asset"
+                  >
+                    <i className="fa-solid fa-copy"></i>
+                  </button>
+                  <button 
                     onClick={() => onEditProduct(sneaker)} 
-                    className="p-3 text-gray-300 hover:text-black"
+                    className="p-3 text-gray-300 hover:text-black transition-colors"
+                    title="Edit Asset"
                   >
                     <i className="fa-solid fa-pen"></i>
                   </button>
                   <button 
                     onClick={() => { if(confirm('Erase asset?')) onDeleteProduct?.(sneaker.id) }} 
-                    className="p-3 text-gray-300 hover:text-red-600"
+                    className="p-3 text-gray-300 hover:text-red-600 transition-colors"
+                    title="Delete Asset"
                   >
                     <i className="fa-solid fa-trash"></i>
                   </button>

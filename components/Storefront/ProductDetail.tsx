@@ -96,11 +96,6 @@ const ProductDetail: React.FC<ProductDetailProps> = ({
   return (
     <div className="bg-white min-h-screen animate-in fade-in duration-500">
       <div className="max-w-7xl mx-auto px-4 py-6">
-        {/* Product Name Display Header (Replacing Breadcrumbs) */}
-        <div className="text-[10px] text-black font-black uppercase tracking-[0.3em] mb-8 italic">
-          {sneaker.name}
-        </div>
-
         {/* Main Product Section */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
           

@@ -12,7 +12,8 @@ const headers = {
 
 export const vaultApi = {
   fetchSneakers: async () => {
-    const resp = await fetch(`${SUPABASE_URL}/rest/v1/sneakers?select=*&order=name.asc`, { headers });
+    // Updated order to created_at.desc to show newest products first
+    const resp = await fetch(`${SUPABASE_URL}/rest/v1/sneakers?select=*&order=created_at.desc`, { headers });
     return resp.ok ? await resp.json() : [];
   },
   
