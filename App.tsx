@@ -155,6 +155,25 @@ const App: React.FC = () => {
     setIsFetchingSneakers(false);
   }, [selectedPayment, selectedShipping]);
 
+  // Effect to re-hydrate product selection from URL parameters after sneakers load
+  useEffect(() => {
+    if (sneakers.length > 0 && currentView === 'pdp') {
+      const params = new URLSearchParams(window.location.search);
+      const productId = params.get('product');
+      if (productId) {
+        const found = sneakers.find(s => s.id === productId || s.slug === productId);
+        if (found) {
+          if (!selectedProduct || selectedProduct.id !== found.id) {
+            setSelectedProduct(found);
+          }
+        } else {
+          // Fallback to shop if product doesn't exist to prevent being stuck on Loading
+          handleNavigate('shop');
+        }
+      }
+    }
+  }, [sneakers, currentView, selectedProduct]);
+
   useEffect(() => {
     fetchData();
     const stored = localStorage.getItem('sv_customer_session');
@@ -195,6 +214,11 @@ const App: React.FC = () => {
       return; 
     }
     
+    if (params.get('product')) {
+      setCurrentView('pdp');
+      return;
+    }
+    
     if (!window.location.search || window.location.search === '?') {
        setCurrentView('home'); 
     }
@@ -214,11 +238,13 @@ const App: React.FC = () => {
     
     setCurrentView(view);
     
-    // Safety wrap for pushState which can fail in sandboxed/blob environments
+    // Safety wrap for pushState which can fail in sandboxed/blob/restricted-origin environments
     try {
-      const queryString = view === 'home' ? '' : `?view=${view}${params ? '&' + params : ''}`;
-      window.history.pushState({ view }, '', window.location.pathname + queryString);
+      const queryString = view === 'home' && !params ? '' : `?view=${view}${params ? '&' + params : ''}`;
+      const newUrl = window.location.pathname + queryString;
+      window.history.pushState({ view }, '', newUrl);
     } catch (err) {
+      // Logic for environments where URL manipulation is forbidden
       console.warn("SneakerVault: Navigation history suppressed due to environment security policy.", err);
     }
   };
@@ -257,7 +283,7 @@ const App: React.FC = () => {
   const handlePlaceOrder = async () => {
     setCheckoutError(null);
     
-    // Safety check for dynamic field validation
+    // Dynamic field validation using current checkoutFields configuration
     const activeFields = checkoutFields.filter(f => f.enabled);
     for (const field of activeFields) {
       const val = String(checkoutForm[field.field_key] || '').trim();
@@ -275,7 +301,7 @@ const App: React.FC = () => {
     setIsPlacingOrder(true);
     
     try {
-      // Robust order ID generation
+      // Robust order ID generation by finding highest existing numeric ID
       const freshOrders = await vaultApi.fetchOrders();
       const lastNumericId = (freshOrders || []).reduce((max: number, order: Order) => {
         const idNum = parseInt(order.id, 10);
@@ -332,7 +358,7 @@ const App: React.FC = () => {
     switch (currentView) {
       case 'home': return <Home sneakers={sneakers} slides={slides} onSelectProduct={handleSelectProduct} onNavigate={handleNavigate} onSearch={(q) => { setSearchQuery(q); handleNavigate('shop'); }} />;
       case 'shop': return <Shop sneakers={sneakers} onSelectProduct={handleSelectProduct} searchQuery={searchQuery} onClearSearch={() => setSearchQuery('')} categoryFilter={selectedCategory} onCategoryChange={setSelectedCategory} />;
-      case 'pdp': return selectedProduct ? <ProductDetail sneaker={selectedProduct} sneakers={sneakers} onAddToCart={handleAddToCart} onBack={() => handleNavigate('shop')} onToggleWishlist={(s) => setWishlist(p => p.find(x => x.id === s.id) ? p.filter(x => x.id !== s.id) : [...p, s])} isInWishlist={wishlist.some(s => s.id === selectedProduct.id)} onSelectProduct={handleSelectProduct} /> : <div className="min-h-screen flex items-center justify-center font-black">LOADING...</div>;
+      case 'pdp': return selectedProduct ? <ProductDetail sneaker={selectedProduct} sneakers={sneakers} onAddToCart={handleAddToCart} onBack={() => handleNavigate('shop')} onToggleWishlist={(s) => setWishlist(p => p.find(x => x.id === s.id) ? p.filter(x => x.id !== s.id) : [...p, s])} isInWishlist={wishlist.some(s => s.id === selectedProduct.id)} onSelectProduct={handleSelectProduct} /> : <div className="min-h-screen flex items-center justify-center font-black text-gray-300 uppercase italic tracking-widest animate-pulse">Initializing Acquisition...</div>;
       case 'checkout': return (
         <CheckoutPage 
           cart={cart} 
