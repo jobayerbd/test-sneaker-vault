@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { CartItem, CheckoutField, ShippingOption, PaymentMethod, Customer } from '../../types.ts';
 
 interface CheckoutPageProps {
@@ -34,6 +34,19 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
 }) => {
   const subtotal = cart.reduce((acc, item) => acc + (item.price * item.quantity), 0);
   const finalTotal = subtotal + (selectedShipping?.rate || 0);
+  
+  // Ref for the error message container
+  const errorRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll to error message when it appears
+  useEffect(() => {
+    if (checkoutError && errorRef.current) {
+      errorRef.current.scrollIntoView({ 
+        behavior: 'smooth', 
+        block: 'center' 
+      });
+    }
+  }, [checkoutError]);
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-16 animate-in fade-in duration-500">
@@ -52,7 +65,10 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
       ) : (
         <>
           {checkoutError && (
-            <div className="max-w-4xl mx-auto mb-10 bg-red-600 text-white p-6 rounded-2xl flex items-center justify-center gap-4 animate-in slide-in-from-bottom-4 duration-300 shadow-2xl">
+            <div 
+              ref={errorRef}
+              className="max-w-4xl mx-auto mb-10 bg-red-600 text-white p-6 rounded-2xl flex items-center justify-center gap-4 animate-in slide-in-from-bottom-4 duration-300 shadow-2xl scroll-mt-20"
+            >
               <i className="fa-solid fa-triangle-exclamation text-2xl animate-pulse"></i>
               <span className="text-[11px] font-black uppercase tracking-[0.2em] italic">{checkoutError}</span>
             </div>
