@@ -114,7 +114,9 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
                     >
                       <div className="flex flex-col">
                         <span className="font-black text-[10px] uppercase tracking-widest mb-1">{o.name}</span>
-                        <span className={`text-[9px] font-bold ${selectedShipping?.id === o.id ? 'text-gray-300' : 'text-black'} uppercase`}>Delivery Option</span>
+                        <span className={`text-[9px] font-bold ${selectedShipping?.id === o.id ? 'text-gray-300/80' : 'text-gray-500'} uppercase italic`}>
+                          {o.description || 'Standard Delivery Protocol'}
+                        </span>
                       </div>
                       <span className="font-black italic text-sm">{o.rate}৳</span>
                     </div>
@@ -189,7 +191,7 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
                 </div>
                 <div className="flex justify-between items-end pt-6 border-t border-white/10">
                   <span className="text-xs font-black uppercase tracking-[0.2em] italic">Total Amount</span>
-                  <span className="text-3xl font-black text-red-600">{finalTotal.toLocaleString()}৳</span>
+                  <span className="text-3xl font-black text-red-700">{finalTotal.toLocaleString()}৳</span>
                 </div>
               </div>
               
