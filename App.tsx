@@ -179,14 +179,20 @@ const App: React.FC = () => {
 
   useEffect(() => { updateBrowserIdentity(siteIdentity); }, [siteIdentity]);
 
+  // Updated to prevent overriding intentional navigation when a product is in the URL
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const productId = params.get('product');
+    const explicitView = params.get('view');
+    
+    // Only force PDP view if we are NOT intentionally on another view (like checkout)
     if (productId && sneakers.length > 0) {
       const prod = sneakers.find(s => s.id === productId);
       if (prod) {
         setSelectedProduct(prod);
-        if (currentView !== 'pdp') setCurrentView('pdp');
+        if (!explicitView || explicitView === 'pdp') {
+           if (currentView !== 'pdp') setCurrentView('pdp');
+        }
       }
     }
   }, [sneakers, window.location.search]);
@@ -194,7 +200,6 @@ const App: React.FC = () => {
   const handleNavigate = (view: View, params?: Record<string, string>) => {
     isNavigatingRef.current = true;
     
-    // Auth redirect logic for handleNavigate
     let targetView = view;
     const isAdmin = localStorage.getItem('sv_admin_session') === 'active';
     const isCustomer = !!localStorage.getItem('sv_customer_session');
@@ -206,10 +211,30 @@ const App: React.FC = () => {
     try {
       const url = new URL(window.location.href);
       url.searchParams.set('view', targetView);
-      if (targetView === 'home') { url.searchParams.delete('product'); url.searchParams.delete('category'); }
-      if (params) Object.entries(params).forEach(([k, v]) => { if (v === null) url.searchParams.delete(k); else url.searchParams.set(k, v); });
+      
+      // Clean up product-specific params for global views to prevent the PDP-forcing useEffect from hijacking navigation
+      if (targetView !== 'pdp' && targetView !== 'shop') {
+        url.searchParams.delete('product');
+        url.searchParams.delete('category');
+      }
+      
+      if (targetView === 'home') {
+        url.searchParams.delete('view');
+        url.searchParams.delete('product');
+        url.searchParams.delete('category');
+      }
+      
+      if (params) {
+        Object.entries(params).forEach(([k, v]) => {
+          if (v === null || v === '') url.searchParams.delete(k);
+          else url.searchParams.set(k, v);
+        });
+      }
+      
       window.history.pushState({}, '', url.toString());
-    } catch (err) { console.warn("Navigation Error", err); }
+    } catch (err) {
+      console.warn("Navigation Error", err);
+    }
     setTimeout(() => { isNavigatingRef.current = false; }, 100);
   };
 
@@ -223,7 +248,6 @@ const App: React.FC = () => {
     handleNavigate('shop', { category: cat || '' });
   };
 
-  // Cart Functions
   const handleAddToCart = (item: CartItem, shouldCheckout: boolean = false) => {
     setCart(prev => {
       const existing = prev.find(i => i.id === item.id && i.selectedSize === item.selectedSize);
@@ -275,7 +299,6 @@ const App: React.FC = () => {
     try {
       let customerId = currentCustomer?.id;
 
-      // Handle Account Creation
       if (createAccount && !currentCustomer) {
         const newCustomer = await vaultApi.createCustomer({
           email: checkoutForm.email,
@@ -332,10 +355,7 @@ const App: React.FC = () => {
         await vaultApi.createTimelineEvent(orderId, OrderStatus.PLACED, 'Order protocol initiated and secured.');
         setLastOrder(orderData);
         setCart([]);
-        
-        // Refresh all data so the new customer and order appear in Admin/Customer panels
         await fetchData();
-        
         handleNavigate('order-success');
       } else {
         setCheckoutError("VAULT OFFLINE: FAILED TO PERSIST ORDER DATA");
@@ -372,7 +392,6 @@ const App: React.FC = () => {
         {currentView === 'checkout' && <CheckoutPage cart={cart} checkoutFields={checkoutFields} shippingOptions={shippingOptions} paymentMethods={paymentMethods} selectedShipping={selectedShipping} selectedPayment={selectedPayment} checkoutForm={checkoutForm} checkoutError={checkoutError} isPlacingOrder={isPlacingOrder} createAccount={createAccount} accountPassword={accountPassword} currentCustomer={currentCustomer} onFormChange={(k, v) => setCheckoutForm({...checkoutForm, [k]: v})} onShippingChange={setSelectedShipping} onPaymentChange={setSelectedPayment} onToggleCreateAccount={setCreateAccount} onPasswordChange={setAccountPassword} onUpdateCartQuantity={handleUpdateCartQuantity} onRemoveFromCart={handleRemoveFromCart} onPlaceOrder={handlePlaceOrder} onNavigate={handleNavigate} />}
         {currentView === 'order-success' && <OrderSuccess lastOrder={lastOrder} onNavigate={handleNavigate} />}
         
-        {/* Customer Route Logic */}
         {currentView === 'customer' && (
           currentCustomer ? (
             <CustomerPortal customer={currentCustomer} orders={orders} onLogout={() => { localStorage.removeItem('sv_customer_session'); setCurrentCustomer(null); handleNavigate('home'); }} onUpdateProfile={handleUpdateCustomerProfile} onSelectOrder={() => {}} />
@@ -381,13 +400,11 @@ const App: React.FC = () => {
           )
         )}
 
-        {/* Admin Route Logic */}
         {currentView === 'admin' && (
           isAdminAuthenticated ? (
             <Dashboard orders={orders} sneakers={sneakers} customers={customers} brands={brands} categories={categories} paymentMethods={paymentMethods} slides={slides} navItems={navItems} checkoutFields={checkoutFields} shippingOptions={shippingOptions} footerConfig={footerConfig} siteIdentity={siteIdentity} onUpdateOrderStatus={async (id, s) => { 
               const ok = await vaultApi.updateOrderStatus(id, s); 
               if(ok) {
-                // Securely log the status change in the timeline archive
                 await vaultApi.createTimelineEvent(id, s, `Protocol Status updated to ${s.toUpperCase()} by Administrator.`);
                 await fetchData(); 
               }

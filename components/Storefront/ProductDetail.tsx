@@ -84,6 +84,7 @@ const ProductDetail: React.FC<ProductDetailProps> = ({
             {[sneaker.image, ...sneaker.gallery].slice(0, 6).map((img, idx) => (
               <button 
                 key={idx} 
+                type="button"
                 onClick={() => setMainImage(img)} 
                 className={`aspect-square border-2 overflow-hidden transition-all rounded-lg ${mainImage === img ? 'border-red-600 shadow-lg' : 'border-gray-100 opacity-60 hover:opacity-100'}`}
               >
@@ -105,7 +106,7 @@ const ProductDetail: React.FC<ProductDetailProps> = ({
             {/* Mobile Thumbnails */}
             <div className="flex lg:hidden overflow-x-auto space-x-3 mt-4 no-scrollbar pb-2">
                {[sneaker.image, ...sneaker.gallery].map((img, idx) => (
-                <button key={idx} onClick={() => setMainImage(img)} className={`w-20 aspect-square border-2 shrink-0 rounded-xl overflow-hidden ${mainImage === img ? 'border-red-600' : 'border-gray-100'}`}>
+                <button key={idx} type="button" onClick={() => setMainImage(img)} className={`w-20 aspect-square border-2 shrink-0 rounded-xl overflow-hidden ${mainImage === img ? 'border-red-600' : 'border-gray-100'}`}>
                   <img src={img} className="w-full h-full object-cover" alt="" />
                 </button>
                ))}
@@ -121,6 +122,7 @@ const ProductDetail: React.FC<ProductDetailProps> = ({
                 <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-6">Colorway: {sneaker.colorway}</p>
               </div>
               <button 
+                type="button"
                 onClick={() => onToggleWishlist(sneaker)}
                 className={`w-12 h-12 rounded-full flex items-center justify-center transition-all ${isInWishlist ? 'bg-red-50 text-red-600' : 'bg-gray-50 text-gray-300 hover:text-red-600'}`}
               >
@@ -139,13 +141,14 @@ const ProductDetail: React.FC<ProductDetailProps> = ({
             <div className="mb-8">
                <div className="flex justify-between items-center mb-4 px-1">
                  <h4 className="text-[11px] font-black uppercase tracking-widest">Select Size Index</h4>
-                 <button className="text-[10px] font-bold text-gray-400 underline underline-offset-4 hover:text-black">Fit Guide</button>
+                 <button type="button" className="text-[10px] font-bold text-gray-400 underline underline-offset-4 hover:text-black">Fit Guide</button>
                </div>
                {error && <p className="text-red-600 text-[9px] font-black uppercase mb-3 animate-pulse"><i className="fa-solid fa-triangle-exclamation mr-2"></i> {error}</p>}
                <div className="grid grid-cols-4 md:grid-cols-6 gap-2">
                 {sneaker.variants.map((v) => (
                   <button 
                     key={v.size} 
+                    type="button"
                     disabled={v.stock === 0} 
                     onClick={() => { setSelectedSize(v.size); setError(null); }}
                     className={`py-3 text-[11px] font-black border-2 transition-all rounded-xl relative ${v.stock === 0 ? 'opacity-20 cursor-not-allowed bg-gray-50' : selectedSize === v.size ? 'border-black bg-black text-white shadow-xl scale-[1.05]' : 'border-gray-100 hover:border-black'}`}
@@ -162,9 +165,9 @@ const ProductDetail: React.FC<ProductDetailProps> = ({
             {/* Quantity */}
             <div className="flex items-center gap-6 mb-10">
               <div className="flex items-center border-2 border-gray-100 rounded-2xl h-14 bg-white overflow-hidden shadow-sm">
-                <button onClick={() => setQuantity(Math.max(1, quantity - 1))} className="px-6 hover:bg-gray-50 transition-colors font-black text-lg">-</button>
+                <button type="button" onClick={() => setQuantity(Math.max(1, quantity - 1))} className="px-6 hover:bg-gray-50 transition-colors font-black text-lg">-</button>
                 <span className="px-4 font-black text-sm min-w-[40px] text-center">{quantity}</span>
-                <button onClick={() => setQuantity(quantity + 1)} className="px-6 hover:bg-gray-50 transition-colors font-black text-lg">+</button>
+                <button type="button" onClick={() => setQuantity(quantity + 1)} className="px-6 hover:bg-gray-50 transition-colors font-black text-lg">+</button>
               </div>
               <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
                 {sneaker.fit_score || 'True to Size'}
@@ -174,14 +177,16 @@ const ProductDetail: React.FC<ProductDetailProps> = ({
             {/* Action Buttons */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <button 
-                onClick={() => handleAddToCart(false)}
+                type="button"
+                onClick={(e) => { e.preventDefault(); handleAddToCart(false); }}
                 className="bg-black text-white py-5 rounded-2xl font-black uppercase tracking-[0.3em] text-[11px] shadow-xl hover:bg-gray-900 transition-all flex items-center justify-center gap-4 group"
               >
                 <i className="fa-solid fa-bag-shopping group-hover:animate-bounce"></i>
                 Add to Bag
               </button>
               <button 
-                onClick={() => handleAddToCart(true)}
+                type="button"
+                onClick={(e) => { e.preventDefault(); handleAddToCart(true); }}
                 className="bg-red-700 text-white py-5 rounded-2xl font-black uppercase tracking-[0.3em] text-[11px] shadow-xl hover:bg-red-600 transition-all flex items-center justify-center gap-4 italic group"
               >
                 <i className="fa-solid fa-bolt group-hover:animate-pulse"></i>
@@ -197,6 +202,7 @@ const ProductDetail: React.FC<ProductDetailProps> = ({
               {['DESCRIPTION', 'SIZE GUIDE'].map((tab) => (
                 <button 
                   key={tab}
+                  type="button"
                   onClick={() => setActiveTab(tab)}
                   className={`px-10 py-6 text-[11px] font-black tracking-[0.4em] uppercase transition-all relative ${activeTab === tab ? 'text-black' : 'text-gray-300 hover:text-gray-500'}`}
                 >
