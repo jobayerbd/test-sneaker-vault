@@ -145,7 +145,7 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
 
               <div className="bg-white p-10 border border-gray-100 rounded-3xl shadow-sm">
                 <h3 className="text-xs font-black uppercase italic mb-8 border-b pb-4 tracking-widest flex items-center gap-3">
-                  <i className="fa-solid fa-credit-card text-red-600"></i> Payment Protocol
+                  <i className="fa-solid fa-credit-card text-red-600"></i> Payment Method
                 </h3>
                 <div className="space-y-4">
                   {paymentMethods.map(pm => (

@@ -76,6 +76,7 @@ const Dashboard: React.FC<DashboardProps> = (props) => {
   const [editingProduct, setEditingProduct] = useState<Partial<Sneaker> | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -133,7 +134,6 @@ const Dashboard: React.FC<DashboardProps> = (props) => {
   };
 
   const handleDuplicateProduct = (sneaker: Sneaker) => {
-    // Remove ID and created_at to ensure saveProduct treats it as a new POST
     const { id, created_at, ...rest } = sneaker;
     setEditingProduct({
       ...rest,
@@ -148,6 +148,11 @@ const Dashboard: React.FC<DashboardProps> = (props) => {
       description: '', colorway: '', is_drop: false, trending: false 
     });
     setSubView('product-form');
+  };
+
+  const handleNavigate = (view: AdminSubView) => {
+    setSubView(view);
+    setIsMobileSidebarOpen(false);
   };
 
   const renderContent = () => {
@@ -215,9 +220,29 @@ const Dashboard: React.FC<DashboardProps> = (props) => {
   };
 
   return (
-    <div className="flex bg-[#fafafa] min-h-screen">
-      <AdminSidebar currentView={subView} onNavigate={setSubView} onLogout={onLogout} onVisitSite={onVisitSite} siteIdentity={siteIdentity} />
-      <main className="flex-1 p-14 overflow-y-auto">
+    <div className="flex bg-[#fafafa] min-h-screen flex-col lg:flex-row relative">
+      {/* Mobile Top Header */}
+      <div className="lg:hidden h-16 bg-white border-b border-gray-100 flex items-center justify-between px-6 sticky top-0 z-40">
+        <button onClick={() => setIsMobileSidebarOpen(true)} className="text-gray-800 p-2">
+          <i className="fa-solid fa-bars-staggered text-xl"></i>
+        </button>
+        <span className="text-lg font-black font-heading italic">ADMIN <span className="text-red-600">VAULT</span></span>
+        <button onClick={onVisitSite} className="text-red-600 p-2">
+          <i className="fa-solid fa-arrow-up-right-from-square"></i>
+        </button>
+      </div>
+
+      <AdminSidebar 
+        currentView={subView} 
+        onNavigate={handleNavigate} 
+        onLogout={onLogout} 
+        onVisitSite={onVisitSite} 
+        siteIdentity={siteIdentity} 
+        isMobileOpen={isMobileSidebarOpen}
+        onCloseMobile={() => setIsMobileSidebarOpen(false)}
+      />
+
+      <main className="flex-1 p-4 md:p-8 lg:p-14 overflow-y-auto w-full">
         <div className="max-w-6xl mx-auto">
           {renderContent()}
         </div>

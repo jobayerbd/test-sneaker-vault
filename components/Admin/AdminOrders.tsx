@@ -51,88 +51,93 @@ const AdminOrders: React.FC<AdminOrdersProps> = ({
   isRefreshing
 }) => {
   
-  // Directly use first_name and last_name columns
   const resolveCustomerName = (order: any) => {
     const first = String(order.first_name || '').trim();
     const last = String(order.last_name || '').trim();
-    
     if (first && last) return `${first} ${last}`;
     if (first) return first;
-    
     return 'GUEST OPERATOR';
   };
 
   return (
-    <div className="space-y-8 animate-in fade-in">
-      <div className="flex justify-between items-end gap-6 flex-wrap">
-        <div>
-          <div className="flex items-center gap-4">
-            <h1 className="text-3xl font-black uppercase italic font-heading">Protocol Registry</h1>
-            <button 
-              type="button"
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                onRefresh?.();
-              }}
-              className={`w-10 h-10 bg-white border border-gray-100 rounded-xl flex items-center justify-center text-gray-400 hover:text-black hover:border-black transition-all shadow-sm ${isRefreshing ? 'opacity-50 pointer-events-none' : ''}`}
-              title="Sync Manifest"
-            >
-              <i className={`fa-solid fa-sync text-xs ${isRefreshing ? 'animate-spin' : ''}`}></i>
-            </button>
+    <div className="space-y-6 md:space-y-8 animate-in fade-in">
+      <div className="flex flex-col gap-6">
+        <div className="flex justify-between items-center">
+          <div>
+            <div className="flex items-center gap-3">
+              <h1 className="text-2xl md:text-3xl font-black uppercase italic font-heading">Protocol Registry</h1>
+              <button 
+                type="button"
+                onClick={(e) => { e.preventDefault(); onRefresh?.(); }}
+                className={`w-10 h-10 bg-white border border-gray-100 rounded-xl flex items-center justify-center text-gray-400 hover:text-black shadow-sm ${isRefreshing ? 'opacity-50 pointer-events-none' : ''}`}
+                title="Sync Manifest"
+              >
+                <i className={`fa-solid fa-sync text-xs ${isRefreshing ? 'animate-spin' : ''}`}></i>
+              </button>
+            </div>
+            <p className="text-gray-400 text-[10px] font-bold uppercase tracking-widest mt-1 italic">Monitoring {totalItems} Transactions</p>
           </div>
-          <p className="text-gray-400 text-xs font-bold uppercase tracking-widest mt-2 italic">Monitoring {totalItems} Transactions</p>
         </div>
         
-        <div className="flex flex-wrap gap-4 items-end">
-          <div className="flex flex-col gap-1">
+        <div className="grid grid-cols-2 md:flex md:flex-wrap gap-4 items-end">
+          <div className="flex flex-col gap-1 col-span-1">
             <label className="text-[9px] font-black uppercase text-gray-400 px-1 italic">Start Date</label>
-            <input 
-              type="date" 
-              value={startDate} 
-              onChange={e => onStartDateChange(e.target.value)} 
-              className="bg-white border p-3 rounded-xl font-black uppercase text-[10px] outline-none hover:border-black transition-all"
-            />
+            <input type="date" value={startDate} onChange={e => onStartDateChange(e.target.value)} className="bg-white border p-3 rounded-xl font-black uppercase text-[10px] outline-none w-full" />
           </div>
-          <div className="flex flex-col gap-1">
+          <div className="flex flex-col gap-1 col-span-1">
             <label className="text-[9px] font-black uppercase text-gray-400 px-1 italic">End Date</label>
-            <input 
-              type="date" 
-              value={endDate} 
-              onChange={e => onEndDateChange(e.target.value)} 
-              className="bg-white border p-3 rounded-xl font-black uppercase text-[10px] outline-none hover:border-black transition-all"
-            />
+            <input type="date" value={endDate} onChange={e => onEndDateChange(e.target.value)} className="bg-white border p-3 rounded-xl font-black uppercase text-[10px] outline-none w-full" />
           </div>
           
-          <div className="flex flex-col gap-1">
+          <div className="flex flex-col gap-1 col-span-1">
             <label className="text-[9px] font-black uppercase text-gray-400 px-1 italic">Status Protocol</label>
-            <select 
-              value={statusFilter} 
-              onChange={e => onStatusFilterChange(e.target.value)} 
-              className="bg-white border p-3 rounded-xl font-black uppercase text-[10px] outline-none hover:border-black transition-all"
-            >
+            <select value={statusFilter} onChange={e => onStatusFilterChange(e.target.value)} className="bg-white border p-3 rounded-xl font-black uppercase text-[10px] outline-none w-full">
               <option value="ALL">ALL STATUS</option>
               {Object.values(OrderStatus).map(s => <option key={s} value={s}>{s.toUpperCase()}</option>)}
             </select>
           </div>
 
-          <div className="flex flex-col gap-1">
+          <div className="flex flex-col gap-1 col-span-1">
              <label className="text-[9px] font-black uppercase text-gray-400 px-1 italic">Search Manifest</label>
-             <div className="relative">
-                <input 
-                  type="text" 
-                  placeholder="SCAN REGISTRY..." 
-                  value={searchQuery} 
-                  onChange={e => onSearchChange(e.target.value)} 
-                  className="bg-white border p-3 rounded-xl font-black uppercase text-[10px] outline-none w-48 hover:border-black transition-all" 
-                />
-                <i className="fa-solid fa-search absolute right-3 top-1/2 -translate-y-1/2 text-gray-300 text-[10px]"></i>
-             </div>
+             <input type="text" placeholder="SCAN..." value={searchQuery} onChange={e => onSearchChange(e.target.value)} className="bg-white border p-3 rounded-xl font-black uppercase text-[10px] outline-none w-full md:w-48" />
           </div>
         </div>
       </div>
 
-      <div className="bg-white rounded-3xl border border-gray-100 shadow-xl overflow-hidden">
+      {/* Mobile Card View */}
+      <div className="lg:hidden space-y-4">
+        {orders.map(order => (
+          <div 
+            key={order.id} 
+            onClick={() => onSelectOrder(order)}
+            className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm space-y-3 active:bg-gray-50 transition-colors"
+          >
+            <div className="flex justify-between items-start">
+              <div>
+                <p className="font-mono text-[10px] font-black text-red-600">{order.id}</p>
+                <h4 className="font-bold text-xs uppercase mt-1">{resolveCustomerName(order)}</h4>
+              </div>
+              <p className="font-black italic text-xs">{order.total.toLocaleString()}৳</p>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className={`px-3 py-1.5 rounded-lg text-[8px] font-black uppercase border ${getStatusBadgeStyles(order.status)}`}>
+                {order.status}
+              </span>
+              <span className="text-[9px] text-gray-400 font-bold uppercase italic">
+                {order.created_at ? new Date(order.created_at).toLocaleDateString() : 'N/A'}
+              </span>
+            </div>
+          </div>
+        ))}
+        {orders.length === 0 && (
+          <div className="py-20 text-center bg-white rounded-2xl border border-dashed border-gray-200">
+            <p className="text-[9px] font-black uppercase text-gray-300 italic tracking-widest">Zero records identified</p>
+          </div>
+        )}
+      </div>
+
+      {/* Desktop Table View */}
+      <div className="hidden lg:block bg-white rounded-3xl border border-gray-100 shadow-xl overflow-hidden">
         <table className="w-full text-left">
           <thead>
             <tr className="bg-gray-50 text-[10px] font-black uppercase tracking-widest text-gray-400">
@@ -144,97 +149,44 @@ const AdminOrders: React.FC<AdminOrdersProps> = ({
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
-            {orders.map(order => {
-              const latestEvent = order.timeline && order.timeline.length > 0 
-                ? order.timeline[order.timeline.length - 1] 
-                : null;
-              
-              const currentStatus = latestEvent ? latestEvent.status : order.status;
-              const updateTime = latestEvent ? new Date(latestEvent.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : null;
-
-              return (
-                <tr 
-                  key={order.id} 
-                  className="hover:bg-gray-50/50 cursor-pointer group transition-colors" 
-                  onClick={() => onSelectOrder(order)}
-                >
-                  <td className="px-8 py-6 font-mono text-xs font-black">{order.id}</td>
-                  <td className="px-8 py-6 font-bold text-xs uppercase">
-                    <div className="text-black font-black">{resolveCustomerName(order)}</div>
-                    <div className="text-[9px] text-gray-400 font-medium lowercase tracking-normal">{order.email === 'EMPTY' ? 'Guest Participant' : order.email}</div>
-                  </td>
-                  <td className="px-8 py-6 text-[10px] font-black text-gray-400 uppercase italic">
-                    {order.created_at ? new Date(order.created_at).toLocaleDateString() : 'N/A'}
-                  </td>
-                  <td className="px-8 py-6">
-                    <div className="flex flex-col">
-                      <span className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase border w-fit ${getStatusBadgeStyles(currentStatus)}`}>
-                        {currentStatus}
-                      </span>
-                      {updateTime && (
-                        <span className="text-[8px] text-gray-400 font-bold uppercase mt-1 ml-1">
-                          Refreshed @ {updateTime}
-                        </span>
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-8 py-6 font-black italic text-right">{order.total.toLocaleString()}৳</td>
-                </tr>
-              );
-            })}
-            {orders.length === 0 && (
-              <tr>
-                <td colSpan={5} className="px-8 py-20 text-center">
-                  <p className="text-[10px] font-black uppercase text-gray-300 italic tracking-[0.5em]">Zero records identified in current archive scope</p>
+            {orders.map(order => (
+              <tr 
+                key={order.id} 
+                className="hover:bg-gray-50/50 cursor-pointer group transition-colors" 
+                onClick={() => onSelectOrder(order)}
+              >
+                <td className="px-8 py-6 font-mono text-xs font-black">{order.id}</td>
+                <td className="px-8 py-6 font-bold text-xs uppercase">
+                  <div className="text-black font-black">{resolveCustomerName(order)}</div>
+                  <div className="text-[9px] text-gray-400 font-medium lowercase truncate max-w-[150px]">{order.email === 'EMPTY' ? 'Guest Participant' : order.email}</div>
                 </td>
+                <td className="px-8 py-6 text-[10px] font-black text-gray-400 uppercase italic">
+                  {order.created_at ? new Date(order.created_at).toLocaleDateString() : 'N/A'}
+                </td>
+                <td className="px-8 py-6">
+                  <span className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase border w-fit ${getStatusBadgeStyles(order.status)}`}>
+                    {order.status}
+                  </span>
+                </td>
+                <td className="px-8 py-6 font-black italic text-right">{order.total.toLocaleString()}৳</td>
               </tr>
-            )}
+            ))}
           </tbody>
         </table>
-        
-        {totalPages > 1 && (
-          <div className="bg-gray-50/50 px-8 py-6 flex justify-between items-center border-t border-gray-50">
-            <span className="text-[10px] font-black uppercase text-gray-400 italic">
-              Page {currentPage} of {totalPages} | Total Registry Hits: {totalItems}
-            </span>
-            <div className="flex items-center gap-2">
-              <button 
-                disabled={currentPage === 1}
-                onClick={() => onPageChange(currentPage - 1)}
-                className="p-3 bg-white border border-gray-100 rounded-xl text-gray-400 hover:text-black hover:border-black transition-all disabled:opacity-20"
-              >
-                <i className="fa-solid fa-chevron-left text-[10px]"></i>
-              </button>
-              
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => {
-                if (p === 1 || p === totalPages || (p >= currentPage - 1 && p <= currentPage + 1)) {
-                  return (
-                    <button
-                      key={p}
-                      onClick={() => onPageChange(p)}
-                      className={`w-10 h-10 rounded-xl text-[10px] font-black transition-all border ${currentPage === p ? 'bg-black text-white border-black' : 'bg-white text-gray-400 border-gray-100 hover:border-black hover:text-black'}`}
-                    >
-                      {p}
-                    </button>
-                  );
-                }
-                if (p === currentPage - 2 || p === currentPage + 2) {
-                   return <span key={p} className="text-gray-300 text-[10px]">...</span>;
-                }
-                return null;
-              })}
-
-              <button 
-                disabled={currentPage === totalPages}
-                onClick={() => onPageChange(currentPage + 1)}
-                className="p-3 bg-white border border-gray-100 rounded-xl text-gray-400 hover:text-black hover:border-black transition-all disabled:opacity-20"
-              >
-                <i className="fa-solid fa-chevron-right text-[10px]"></i>
-              </button>
-            </div>
-          </div>
-        )}
       </div>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex flex-col sm:flex-row justify-between items-center gap-4 bg-white p-6 rounded-2xl border border-gray-100">
+          <span className="text-[9px] font-black uppercase text-gray-400 italic">
+            Page {currentPage} of {totalPages}
+          </span>
+          <div className="flex items-center gap-2">
+            <button disabled={currentPage === 1} onClick={() => onPageChange(currentPage - 1)} className="p-3 bg-gray-50 rounded-xl text-gray-400 disabled:opacity-20"><i className="fa-solid fa-chevron-left text-[10px]"></i></button>
+            <button disabled={currentPage === totalPages} onClick={() => onPageChange(currentPage + 1)} className="p-3 bg-gray-50 rounded-xl text-gray-400 disabled:opacity-20"><i className="fa-solid fa-chevron-right text-[10px]"></i></button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -12,18 +12,42 @@ interface AdminInventoryProps {
 
 const AdminInventory: React.FC<AdminInventoryProps> = ({ sneakers, onEditProduct, onDuplicateProduct, onAddProduct, onDeleteProduct }) => {
   return (
-    <div className="space-y-8 animate-in fade-in">
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-black uppercase italic font-heading">Vault Inventory</h1>
+    <div className="space-y-6 md:space-y-8 animate-in fade-in">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <h1 className="text-2xl md:text-3xl font-black uppercase italic font-heading">Vault Inventory</h1>
         <button 
           onClick={onAddProduct} 
-          className="bg-black text-white px-8 py-4 rounded-xl font-black uppercase text-[10px] tracking-widest shadow-xl"
+          className="w-full sm:w-auto bg-black text-white px-8 py-4 rounded-xl font-black uppercase text-[10px] tracking-widest shadow-xl"
         >
           Initialize Asset
         </button>
       </div>
 
-      <div className="bg-white rounded-3xl border border-gray-100 shadow-xl overflow-hidden">
+      {/* Mobile Card View */}
+      <div className="lg:hidden space-y-4">
+        {sneakers.map((sneaker) => (
+          <div key={sneaker.id} className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex gap-4">
+            <div className="w-20 h-20 border rounded-xl p-1 overflow-hidden shrink-0">
+              <img src={sneaker.image} className="w-full h-full object-contain" alt={sneaker.name} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <h4 className="font-bold text-xs uppercase truncate">{sneaker.name}</h4>
+              <p className="text-[9px] text-gray-400 font-black uppercase mt-1">
+                {sneaker.brand} | {sneaker.colorway}
+              </p>
+              <p className="font-black italic text-xs mt-2">{sneaker.price}৳</p>
+              <div className="flex gap-2 mt-3">
+                <button onClick={() => onEditProduct(sneaker)} className="text-[9px] font-black uppercase text-gray-500 hover:text-black transition-colors">Edit</button>
+                <button onClick={() => onDuplicateProduct(sneaker)} className="text-[9px] font-black uppercase text-gray-500 hover:text-blue-600 transition-colors">Clone</button>
+                <button onClick={() => { if(confirm('Erase asset?')) onDeleteProduct?.(sneaker.id) }} className="text-[9px] font-black uppercase text-red-500 hover:text-red-700 transition-colors">Delete</button>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Desktop Table View */}
+      <div className="hidden lg:block bg-white rounded-3xl border border-gray-100 shadow-xl overflow-hidden">
         <table className="w-full text-left">
           <tbody className="divide-y divide-gray-50">
             {sneakers.map((sneaker) => (
