@@ -30,39 +30,44 @@ const Navigation: React.FC<NavigationProps> = ({
   return (
     <nav className="sticky top-0 z-50 bg-white border-b border-gray-100 shadow-sm">
       <div className="max-w-7xl mx-auto px-4">
-        <div className="flex justify-between items-center h-16">
-          <button 
-            onClick={() => setIsMobileMenuOpen(true)}
-            className="lg:hidden text-gray-600 hover:text-black transition-colors"
-          >
-            <i className="fa-solid fa-bars-staggered text-xl"></i>
-          </button>
+        <div className="flex items-center h-16">
+          {/* Left Group: Menu + Logo */}
+          <div className="flex items-center space-x-4 flex-1">
+            <button 
+              onClick={() => setIsMobileMenuOpen(true)}
+              className="lg:hidden text-gray-600 hover:text-black transition-colors"
+            >
+              <i className="fa-solid fa-bars-staggered text-xl"></i>
+            </button>
 
-          <button 
-            onClick={() => onNavigate('home')}
-            className="flex items-center"
-          >
-            {siteIdentity.logo_url ? (
-              <img src={siteIdentity.logo_url} alt={siteIdentity.title} className="h-8 md:h-10 w-auto object-contain" />
-            ) : (
-              <span className="text-xl md:text-2xl font-black font-heading tracking-tighter italic">
-                {siteIdentity.title.toUpperCase().split('VAULT')[0]}<span className="text-red-600">VAULT</span>
-              </span>
-            )}
-          </button>
+            <button 
+              onClick={() => onNavigate('home')}
+              className="flex items-center"
+            >
+              {siteIdentity.logo_url ? (
+                <img src={siteIdentity.logo_url} alt={siteIdentity.title} className="h-8 md:h-10 w-auto object-contain" />
+              ) : (
+                <span className="text-xl md:text-2xl font-black font-heading tracking-tighter italic">
+                  {siteIdentity.title.toUpperCase().split('VAULT')[0]}<span className="text-red-600">VAULT</span>
+                </span>
+              )}
+            </button>
 
-          <div className="hidden lg:flex items-center space-x-10">
-            {activeNavItems.map((item) => (
-              <button 
-                key={item.id}
-                onClick={() => onNavigate(item.target_view)} 
-                className="text-[11px] font-bold text-gray-800 uppercase tracking-widest hover:text-red-600 transition-colors"
-              >
-                {item.label}
-              </button>
-            ))}
+            {/* Desktop Navigation Items */}
+            <div className="hidden lg:flex items-center space-x-8 ml-8">
+              {activeNavItems.map((item) => (
+                <button 
+                  key={item.id}
+                  onClick={() => onNavigate(item.target_view)} 
+                  className="text-[11px] font-bold text-gray-800 uppercase tracking-widest hover:text-red-600 transition-colors"
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
           </div>
 
+          {/* Right Group: Icons */}
           <div className="flex items-center space-x-3 md:space-x-5">
             <button 
               onClick={onOpenSearch}
