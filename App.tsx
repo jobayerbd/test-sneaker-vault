@@ -230,6 +230,11 @@ const App: React.FC = () => {
         setCurrentView('pdp');
       }
     }
+
+    const categoryParam = params.get('category');
+    if (categoryParam) {
+      setSelectedCategory(categoryParam);
+    }
   }, [sneakers]);
 
   useEffect(() => {
@@ -244,11 +249,18 @@ const App: React.FC = () => {
     try {
       const url = new URL(window.location.href);
       url.searchParams.set('view', view);
-      if (params) {
-        Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
-      } else {
+      
+      // Clean up previous context-specific params if navigating to a top-level view
+      if (view === 'home') {
         url.searchParams.delete('product');
         url.searchParams.delete('category');
+      }
+
+      if (params) {
+        Object.entries(params).forEach(([k, v]) => {
+          if (v === null || v === undefined) url.searchParams.delete(k);
+          else url.searchParams.set(k, v);
+        });
       }
       
       if (!window.location.href.startsWith('blob:')) {
@@ -266,6 +278,16 @@ const App: React.FC = () => {
   const handleSelectProduct = (s: Sneaker) => {
     setSelectedProduct(s);
     handleNavigate('pdp', { product: s.id });
+  };
+
+  const handleCategoryChange = (cat: string | null) => {
+    setSelectedCategory(cat);
+    handleNavigate('shop', { category: cat || '' });
+    if (!cat) {
+      const url = new URL(window.location.href);
+      url.searchParams.delete('category');
+      window.history.pushState({}, '', url.toString());
+    }
   };
 
   const handleAddToCart = (item: CartItem, shouldCheckout?: boolean) => {
@@ -363,7 +385,7 @@ const App: React.FC = () => {
 
       <main className="flex-1">
         {currentView === 'home' && <Home sneakers={sneakers} slides={slides} onSelectProduct={handleSelectProduct} onNavigate={handleNavigate} onSearch={(q) => { setSearchQuery(q); handleNavigate('shop'); }} />}
-        {currentView === 'shop' && <Shop sneakers={sneakers} onSelectProduct={handleSelectProduct} searchQuery={searchQuery} onClearSearch={() => setSearchQuery('')} categoryFilter={selectedCategory} onCategoryChange={setSelectedCategory} />}
+        {currentView === 'shop' && <Shop sneakers={sneakers} onSelectProduct={handleSelectProduct} searchQuery={searchQuery} onClearSearch={() => setSearchQuery('')} categoryFilter={selectedCategory} onCategoryChange={handleCategoryChange} />}
         {currentView === 'pdp' && (selectedProduct ? <ProductDetail sneaker={selectedProduct} sneakers={sneakers} onAddToCart={handleAddToCart} onBack={() => handleNavigate('shop')} onToggleWishlist={(s) => {}} isInWishlist={false} onSelectProduct={handleSelectProduct} /> : <div className="flex items-center justify-center min-h-[60vh]"><i className="fa-solid fa-circle-notch animate-spin text-red-600 text-3xl"></i></div>)}
         {currentView === 'checkout' && <CheckoutPage cart={cart} checkoutFields={checkoutFields} shippingOptions={shippingOptions} paymentMethods={paymentMethods} selectedShipping={selectedShipping} selectedPayment={selectedPayment} checkoutForm={checkoutForm} checkoutError={checkoutError} isPlacingOrder={isPlacingOrder} createAccount={createAccount} accountPassword={accountPassword} currentCustomer={currentCustomer} onFormChange={(k, v) => setCheckoutForm({...checkoutForm, [k]: v})} onShippingChange={setSelectedShipping} onPaymentChange={setSelectedPayment} onToggleCreateAccount={setCreateAccount} onPasswordChange={setAccountPassword} onUpdateCartQuantity={(idx, d) => {
           const updated = [...cart];

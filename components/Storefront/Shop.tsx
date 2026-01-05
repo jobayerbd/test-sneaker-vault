@@ -89,18 +89,6 @@ const Shop: React.FC<ShopProps> = ({
              </button>
            ))}
         </div>
-        
-        {(searchQuery || categoryFilter) && (
-          <button 
-            onClick={() => {
-              onClearSearch?.();
-              onCategoryChange?.(null);
-            }}
-            className="mt-6 text-[10px] font-black uppercase tracking-widest text-red-600 border border-red-600 px-4 py-2 hover:bg-red-600 hover:text-white transition-all italic"
-          >
-            Reset All Filters
-          </button>
-        )}
       </div>
       
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8">
