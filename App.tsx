@@ -198,6 +198,20 @@ const App: React.FC = () => {
     updateBrowserIdentity(siteIdentity);
   }, [siteIdentity]);
 
+  // Handle initialization of selected product when sneakers array is loaded or URL changes
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const productId = params.get('product');
+    
+    if (productId && sneakers.length > 0) {
+      const prod = sneakers.find(s => s.id === productId);
+      if (prod) {
+        setSelectedProduct(prod);
+        if (currentView !== 'pdp') setCurrentView('pdp');
+      }
+    }
+  }, [sneakers, window.location.search]);
+
   const syncViewFromUrl = useCallback(() => {
     if (isNavigatingRef.current) return;
     
@@ -209,7 +223,7 @@ const App: React.FC = () => {
     }
 
     const productParam = params.get('product');
-    if (productParam) {
+    if (productParam && sneakers.length > 0) {
       const prod = sneakers.find(s => s.id === productParam);
       if (prod) {
         setSelectedProduct(prod);
@@ -350,7 +364,7 @@ const App: React.FC = () => {
       <main className="flex-1">
         {currentView === 'home' && <Home sneakers={sneakers} slides={slides} onSelectProduct={handleSelectProduct} onNavigate={handleNavigate} onSearch={(q) => { setSearchQuery(q); handleNavigate('shop'); }} />}
         {currentView === 'shop' && <Shop sneakers={sneakers} onSelectProduct={handleSelectProduct} searchQuery={searchQuery} onClearSearch={() => setSearchQuery('')} categoryFilter={selectedCategory} onCategoryChange={setSelectedCategory} />}
-        {currentView === 'pdp' && selectedProduct && <ProductDetail sneaker={selectedProduct} sneakers={sneakers} onAddToCart={handleAddToCart} onBack={() => handleNavigate('shop')} onToggleWishlist={(s) => {}} isInWishlist={false} onSelectProduct={handleSelectProduct} />}
+        {currentView === 'pdp' && (selectedProduct ? <ProductDetail sneaker={selectedProduct} sneakers={sneakers} onAddToCart={handleAddToCart} onBack={() => handleNavigate('shop')} onToggleWishlist={(s) => {}} isInWishlist={false} onSelectProduct={handleSelectProduct} /> : <div className="flex items-center justify-center min-h-[60vh]"><i className="fa-solid fa-circle-notch animate-spin text-red-600 text-3xl"></i></div>)}
         {currentView === 'checkout' && <CheckoutPage cart={cart} checkoutFields={checkoutFields} shippingOptions={shippingOptions} paymentMethods={paymentMethods} selectedShipping={selectedShipping} selectedPayment={selectedPayment} checkoutForm={checkoutForm} checkoutError={checkoutError} isPlacingOrder={isPlacingOrder} createAccount={createAccount} accountPassword={accountPassword} currentCustomer={currentCustomer} onFormChange={(k, v) => setCheckoutForm({...checkoutForm, [k]: v})} onShippingChange={setSelectedShipping} onPaymentChange={setSelectedPayment} onToggleCreateAccount={setCreateAccount} onPasswordChange={setAccountPassword} onUpdateCartQuantity={(idx, d) => {
           const updated = [...cart];
           updated[idx].quantity = Math.max(1, updated[idx].quantity + d);
