@@ -11,9 +11,13 @@ interface NavigationProps {
   onOpenSearch: () => void;
   navItems: NavItem[];
   siteIdentity: SiteIdentity;
+  isLoggedIn?: boolean;
 }
 
-const Navigation: React.FC<NavigationProps> = ({ onNavigate, cartCount, wishlistCount, currentView, onOpenCart, onOpenSearch, navItems, siteIdentity }) => {
+const Navigation: React.FC<NavigationProps> = ({ 
+  onNavigate, cartCount, wishlistCount, currentView, 
+  onOpenCart, onOpenSearch, navItems, siteIdentity, isLoggedIn 
+}) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const activeNavItems = navItems.filter(i => i.active).sort((a, b) => a.order - b.order);
@@ -67,8 +71,12 @@ const Navigation: React.FC<NavigationProps> = ({ onNavigate, cartCount, wishlist
             >
               <i className="fa-solid fa-magnifying-glass text-lg"></i>
             </button>
-            <button onClick={() => onNavigate('customer')} className="text-gray-600 hover:text-black" title="My Account">
-              <i className="fa-regular fa-user text-xl"></i>
+            <button 
+              onClick={() => onNavigate('customer')} 
+              className={`${isLoggedIn ? 'text-red-600' : 'text-gray-600'} hover:text-black transition-colors`} 
+              title={isLoggedIn ? "My Account" : "Sign In"}
+            >
+              <i className={`${isLoggedIn ? 'fa-solid' : 'fa-regular'} fa-user text-xl`}></i>
             </button>
             <button 
               onClick={onOpenCart}
@@ -118,8 +126,8 @@ const Navigation: React.FC<NavigationProps> = ({ onNavigate, cartCount, wishlist
                  onClick={() => handleMobileNav('customer')}
                  className="w-full text-left text-xs font-black uppercase tracking-widest flex items-center gap-3"
                >
-                 <i className="fa-solid fa-circle-user text-red-600"></i>
-                 My Account
+                 <i className={`${isLoggedIn ? 'fa-solid text-red-600' : 'fa-regular text-gray-400'} fa-circle-user`}></i>
+                 {isLoggedIn ? "My Account" : "Sign In"}
                </button>
                <button 
                  onClick={() => handleMobileNav('admin')}
@@ -129,7 +137,7 @@ const Navigation: React.FC<NavigationProps> = ({ onNavigate, cartCount, wishlist
                  Admin Dashboard
                </button>
                <button 
-                 onClick={onOpenSearch}
+                 onClick={() => { onOpenSearch(); setIsMobileMenuOpen(false); }}
                  className="w-full text-left text-xs font-black uppercase tracking-widest flex items-center gap-3"
                >
                  <i className="fa-solid fa-magnifying-glass text-red-600"></i>

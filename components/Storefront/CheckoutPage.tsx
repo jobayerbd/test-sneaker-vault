@@ -35,10 +35,8 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
   const subtotal = cart.reduce((acc, item) => acc + (item.price * item.quantity), 0);
   const finalTotal = subtotal + (selectedShipping?.rate || 0);
   
-  // Ref for the error message container
   const errorRef = useRef<HTMLDivElement>(null);
 
-  // Auto-scroll to error message when it appears
   useEffect(() => {
     if (checkoutError && errorRef.current) {
       errorRef.current.scrollIntoView({ 
@@ -53,7 +51,7 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
       <div className="flex flex-col items-center mb-12 text-center">
         <h1 className="text-4xl font-black uppercase font-heading italic mb-4">Checkout</h1>
         <div className="w-16 h-1 bg-red-600 mb-2"></div>
-        <p className="text-gray-400 text-[10px] font-black uppercase tracking-[0.3em]">Fill in your details to complete the order</p>
+        <p className="text-gray-400 text-[10px] font-black uppercase tracking-[0.3em]">Complete your acquisition protocol</p>
       </div>
       
       {cart.length === 0 ? (
@@ -80,16 +78,21 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
                 <h3 className="text-xs font-black uppercase italic mb-8 border-b pb-4 tracking-widest flex items-center gap-3">
                   <i className="fa-solid fa-id-card text-red-600"></i> Shipping Details
                 </h3>
-                <div className="grid grid-cols-2 gap-6">
-                  {checkoutFields.filter(f => f.enabled).sort((a,b) => a.order - b.order).map((field) => (
-                    <div key={field.id} className={`${field.width === 'half' ? 'col-span-1' : 'col-span-2'} space-y-1`}>
-                      <label className="text-[10px] font-black uppercase text-black px-1 tracking-widest">{field.label} {field.required && '*'}</label>
+                <div className="grid grid-cols-2 gap-y-6 gap-x-6">
+                  {checkoutFields
+                    .filter(f => f.enabled)
+                    .sort((a,b) => a.order - b.order)
+                    .map((field) => (
+                    <div key={field.id} className={`${field.width === 'half' ? 'col-span-1' : 'col-span-2'} space-y-1.5`}>
+                      <label className="text-[10px] font-black uppercase text-black px-1 tracking-widest">
+                        {field.label} {field.required && <span className="text-red-600">*</span>}
+                      </label>
                       <input 
                         type={field.type} 
                         placeholder={field.placeholder.toUpperCase()} 
                         value={checkoutForm[field.field_key] || ''} 
                         onChange={e => onFormChange(field.field_key, e.target.value)} 
-                        className="w-full bg-gray-50 p-4 rounded-xl outline-none font-bold text-xs focus:ring-2 ring-black/5 border border-transparent focus:border-gray-200 transition-all" 
+                        className="w-full bg-gray-50 p-4 rounded-xl outline-none font-bold text-xs focus:ring-2 ring-black/5 border border-transparent focus:border-gray-200 transition-all placeholder:text-gray-300" 
                       />
                     </div>
                   ))}
@@ -131,7 +134,7 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
                       <div className="flex flex-col">
                         <span className="font-black text-[10px] uppercase tracking-widest mb-1">{o.name}</span>
                         <span className={`text-[9px] font-bold ${selectedShipping?.id === o.id ? 'text-gray-300/80' : 'text-gray-500'} uppercase italic`}>
-                          {o.description || 'Standard Delivery Protocol'}
+                          {o.description || 'Logistics Directive'}
                         </span>
                       </div>
                       <span className="font-black italic text-sm">{o.rate}৳</span>
@@ -142,7 +145,7 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
 
               <div className="bg-white p-10 border border-gray-100 rounded-3xl shadow-sm">
                 <h3 className="text-xs font-black uppercase italic mb-8 border-b pb-4 tracking-widest flex items-center gap-3">
-                  <i className="fa-solid fa-credit-card text-red-600"></i> Payment Methods
+                  <i className="fa-solid fa-credit-card text-red-600"></i> Payment Protocol
                 </h3>
                 <div className="space-y-4">
                   {paymentMethods.map(pm => (
@@ -163,7 +166,7 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
             </div>
 
             <div className="bg-black text-white p-10 rounded-3xl h-fit shadow-2xl sticky top-24">
-              <h3 className="text-xl font-black uppercase italic border-b border-white/10 pb-6 mb-8 tracking-tighter font-heading">Order Summary</h3>
+              <h3 className="text-xl font-black uppercase italic border-b border-white/10 pb-6 mb-8 tracking-tighter font-heading">Manifest</h3>
               
               <div className="space-y-6 mb-8 max-h-[300px] overflow-y-auto pr-2 no-scrollbar border-b border-white/5 pb-8">
                  {cart.map((item, idx) => (
@@ -176,21 +179,16 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
                                <button 
                                  disabled={item.quantity <= 1}
                                  onClick={() => onUpdateCartQuantity(idx, -1)} 
-                                 className="px-2 py-0.5 hover:bg-white/10 transition-colors text-[10px] disabled:opacity-20 disabled:cursor-not-allowed"
+                                 className="px-2 py-0.5 hover:bg-white/10 transition-colors text-[10px] disabled:opacity-20"
                                >-</button>
                                <span className="px-2 font-black text-[9px] border-x border-white/10">{item.quantity}</span>
                                <button onClick={() => onUpdateCartQuantity(idx, 1)} className="px-2 py-0.5 hover:bg-white/10 transition-colors text-[10px]">+</button>
                             </div>
-                            <span className="text-[8px] font-bold text-gray-500 uppercase">Size: {item.selectedSize}</span>
+                            <span className="text-[8px] font-bold text-gray-500 uppercase">SZ: {item.selectedSize}</span>
                          </div>
                       </div>
                       <div className="text-right">
                          <p className="text-[10px] font-black italic">{(item.price * item.quantity).toLocaleString()}৳</p>
-                         <button 
-                           disabled={cart.length <= 1}
-                           onClick={() => onRemoveFromCart(idx)} 
-                           className="text-[9px] text-red-600 font-black uppercase hover:text-white transition-colors disabled:opacity-20 disabled:cursor-not-allowed"
-                         >Remove</button>
                       </div>
                    </div>
                  ))}
@@ -198,15 +196,15 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
 
               <div className="space-y-4 mb-8">
                 <div className="flex justify-between text-[11px] font-black uppercase tracking-widest text-white/60">
-                  <span>Subtotal</span>
+                  <span>Acquisition</span>
                   <span>{subtotal.toLocaleString()}৳</span>
                 </div>
                 <div className="flex justify-between text-[11px] font-black uppercase tracking-widest text-white/60">
-                  <span>Shipping Fee</span>
+                  <span>Logistics</span>
                   <span>{selectedShipping?.rate || 0}৳</span>
                 </div>
                 <div className="flex justify-between items-end pt-6 border-t border-white/10">
-                  <span className="text-xs font-black uppercase tracking-[0.2em] italic">Total Amount</span>
+                  <span className="text-xs font-black uppercase tracking-[0.2em] italic">Total</span>
                   <span className="text-3xl font-black text-red-700">{finalTotal.toLocaleString()}৳</span>
                 </div>
               </div>
@@ -214,9 +212,9 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
               <button 
                 onClick={onPlaceOrder} 
                 disabled={isPlacingOrder || cart.length === 0} 
-                className="w-full bg-red-700 py-6 rounded-2xl font-black uppercase tracking-[0.3em] text-[10px] shadow-2xl hover:bg-white hover:text-black transition-all transform active:scale-95 flex items-center justify-center gap-3"
+                className="w-full bg-red-700 py-6 rounded-2xl font-black uppercase tracking-[0.3em] text-[10px] shadow-2xl hover:bg-white hover:text-black transition-all transform active:scale-95 flex items-center justify-center gap-3 disabled:opacity-50"
               >
-                {isPlacingOrder ? <i className="fa-solid fa-circle-notch animate-spin"></i> : <><i className="fa-solid fa-lock text-sm"></i> Place Order</>}
+                {isPlacingOrder ? <i className="fa-solid fa-circle-notch animate-spin"></i> : <><i className="fa-solid fa-shield-check text-sm"></i> Commit Order</>}
               </button>
             </div>
           </div>

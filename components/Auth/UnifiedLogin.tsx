@@ -22,7 +22,7 @@ const UnifiedLogin: React.FC<UnifiedLoginProps> = ({ supabaseUrl, supabaseKey, o
     setError('');
 
     try {
-      // Step 1: Admin Check (Tries email first, falls back to username if needed)
+      // Step 1: Admin Check
       const adminResp = await fetch(
         `${supabaseUrl}/rest/v1/admins?or=(email.eq.${email},username.eq.${email})&password=eq.${password}&select=*`,
         { headers: { 'apikey': supabaseKey, 'Authorization': `Bearer ${supabaseKey}` } }
@@ -46,7 +46,9 @@ const UnifiedLogin: React.FC<UnifiedLoginProps> = ({ supabaseUrl, supabaseKey, o
       if (customerResp.ok) {
         const customerData = await customerResp.json();
         if (Array.isArray(customerData) && customerData.length > 0) {
-          onCustomerLogin(customerData[0]);
+          const customer = customerData[0];
+          localStorage.setItem('sv_customer_session', JSON.stringify(customer));
+          onCustomerLogin(customer);
           return;
         }
       }
@@ -78,6 +80,7 @@ const UnifiedLogin: React.FC<UnifiedLoginProps> = ({ supabaseUrl, supabaseKey, o
           city: 'Dhaka',
           zip_code: '1212'
         };
+        localStorage.setItem('sv_customer_session', JSON.stringify(demoMember));
         onCustomerLogin(demoMember);
       }
       setIsLoading(false);

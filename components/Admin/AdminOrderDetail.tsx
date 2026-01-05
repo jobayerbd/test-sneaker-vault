@@ -25,13 +25,12 @@ const AdminOrderDetail: React.FC<AdminOrderDetailProps> = ({ order: initialOrder
   const [isUpdating, setIsUpdating] = useState(false);
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
-  // Sync internal state when props change (global orders list refresh)
+  // Sync internal state when props change
   useEffect(() => {
     setOrder(initialOrder);
     setPendingStatus(initialOrder.status);
   }, [initialOrder]);
 
-  // Auto-clear tactical notifications
   useEffect(() => {
     if (notification) {
       const timer = setTimeout(() => setNotification(null), 5000);
@@ -45,7 +44,6 @@ const AdminOrderDetail: React.FC<AdminOrderDetailProps> = ({ order: initialOrder
     setIsUpdating(true);
     setNotification(null);
     
-    // Execute atomic update protocol
     const success = await onUpdateStatus(order.id, pendingStatus);
     
     if (success) {
@@ -60,6 +58,17 @@ const AdminOrderDetail: React.FC<AdminOrderDetailProps> = ({ order: initialOrder
       });
     }
     setIsUpdating(false);
+  };
+
+  // Directly use first_name and last_name columns
+  const resolveCustomerName = (orderData: any) => {
+    const first = String(orderData.first_name || '').trim();
+    const last = String(orderData.last_name || '').trim();
+    
+    if (first && last) return `${first} ${last}`;
+    if (first) return first;
+    
+    return 'GUEST OPERATOR';
   };
 
   return (
@@ -207,12 +216,12 @@ const AdminOrderDetail: React.FC<AdminOrderDetailProps> = ({ order: initialOrder
               <div className="space-y-4 text-xs font-bold uppercase">
                 <div className="border-l-2 border-red-600 pl-4">
                   <p className="text-gray-400 text-[9px] mb-1">Identity</p>
-                  <p className="text-white">{order.first_name} {order.last_name}</p>
+                  <p className="text-white font-black">{resolveCustomerName(order)}</p>
                 </div>
                 <div className="border-l-2 border-red-600 pl-4">
                   <p className="text-gray-400 text-[9px] mb-1">Contact Sequence</p>
-                  <p className="text-white">{order.mobile_number}</p>
-                  <p className="text-[10px] font-medium lowercase text-gray-500 mt-1">{order.email}</p>
+                  <p className="text-white">{order.mobile_number || 'NOT PROVIDED'}</p>
+                  <p className="text-[10px] font-medium lowercase text-gray-500 mt-1">{order.email === 'EMPTY' ? 'Guest Participation' : order.email}</p>
                 </div>
                 <div className="border-l-2 border-red-600 pl-4">
                   <p className="text-gray-400 text-[9px] mb-1">Destination Parameters</p>

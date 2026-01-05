@@ -50,6 +50,18 @@ const AdminOrders: React.FC<AdminOrdersProps> = ({
   onRefresh,
   isRefreshing
 }) => {
+  
+  // Directly use first_name and last_name columns
+  const resolveCustomerName = (order: any) => {
+    const first = String(order.first_name || '').trim();
+    const last = String(order.last_name || '').trim();
+    
+    if (first && last) return `${first} ${last}`;
+    if (first) return first;
+    
+    return 'GUEST OPERATOR';
+  };
+
   return (
     <div className="space-y-8 animate-in fade-in">
       <div className="flex justify-between items-end gap-6 flex-wrap">
@@ -133,7 +145,6 @@ const AdminOrders: React.FC<AdminOrdersProps> = ({
           </thead>
           <tbody className="divide-y divide-gray-50">
             {orders.map(order => {
-              // Safety: Identify the absolute latest status from the timeline or fallback to order.status
               const latestEvent = order.timeline && order.timeline.length > 0 
                 ? order.timeline[order.timeline.length - 1] 
                 : null;
@@ -149,8 +160,8 @@ const AdminOrders: React.FC<AdminOrdersProps> = ({
                 >
                   <td className="px-8 py-6 font-mono text-xs font-black">{order.id}</td>
                   <td className="px-8 py-6 font-bold text-xs uppercase">
-                    <div>{order.first_name} {order.last_name}</div>
-                    <div className="text-[9px] text-gray-400 font-medium">{order.email}</div>
+                    <div className="text-black font-black">{resolveCustomerName(order)}</div>
+                    <div className="text-[9px] text-gray-400 font-medium lowercase tracking-normal">{order.email === 'EMPTY' ? 'Guest Participant' : order.email}</div>
                   </td>
                   <td className="px-8 py-6 text-[10px] font-black text-gray-400 uppercase italic">
                     {order.created_at ? new Date(order.created_at).toLocaleDateString() : 'N/A'}

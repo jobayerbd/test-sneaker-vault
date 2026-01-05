@@ -8,6 +8,11 @@ interface OrderSuccessProps {
 }
 
 const OrderSuccess: React.FC<OrderSuccessProps> = ({ lastOrder, onNavigate }) => {
+  // Directly use first_name and last_name columns
+  const customerName = lastOrder 
+    ? `${lastOrder.first_name || ''} ${lastOrder.last_name || ''}`.trim() || 'GUEST'
+    : 'GUEST';
+
   return (
     <div className="max-w-4xl mx-auto py-24 px-4 animate-in fade-in zoom-in-95 duration-700">
       <div className="text-center mb-16">
@@ -26,7 +31,7 @@ const OrderSuccess: React.FC<OrderSuccessProps> = ({ lastOrder, onNavigate }) =>
            <div className="space-y-4">
               <div className="flex flex-col">
                 <span className="text-[9px] font-black uppercase text-gray-400 mb-1">Full Name</span>
-                <span className="text-xs font-bold uppercase">{lastOrder?.first_name} {lastOrder?.last_name}</span>
+                <span className="text-xs font-bold uppercase">{customerName}</span>
               </div>
               <div className="flex flex-col">
                 <span className="text-[9px] font-black uppercase text-gray-400 mb-1">Contact Info</span>

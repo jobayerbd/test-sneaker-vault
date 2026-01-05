@@ -233,6 +233,8 @@ export const vaultApi = {
     if (!resp.ok) {
       const errorMsg = await resp.text();
       console.error("VAULT API ERROR [createOrder]:", errorMsg);
+      // Improved visibility for debugging in browser/log systems
+      console.error("Payload causing error:", JSON.stringify(orderData, null, 2));
       return null;
     }
     
