@@ -48,12 +48,13 @@ export const vaultApi = {
   },
 
   fetchOrders: async () => {
-    // STRATEGY 1: Standard Sorted Fetch
-    // Attempts to get orders sorted by created_at. This is preferred.
+    // STRATEGY 1: Standard Sorted Fetch with Relations
+    // Attempts to get orders sorted by created_at AND include the timeline history.
     try {
-      console.log("VAULT: Attempting Strategy 1 (Sorted Fetch)...");
-      const path = `orders?select=*&order=created_at.desc`;
-      // Use cache: 'no-store' to bypass browser caching instead of query param
+      console.log("VAULT: Attempting Strategy 1 (Sorted Fetch + Timeline)...");
+      // We explicitly select *, and join order_timeline.
+      const path = `orders?select=*,order_timeline(*)&order=created_at.desc`;
+      
       const resp = await fetch(getUrl(path), { 
         headers,
         cache: 'no-store' 
@@ -62,7 +63,17 @@ export const vaultApi = {
       if (resp.ok) {
         const data = await resp.json();
         console.log(`VAULT: Strategy 1 Success. Found ${data.length} records.`);
-        return Array.isArray(data) ? data : [];
+        
+        // Map the relation data to the structure the UI expects
+        const mappedData = data.map((order: any) => ({
+          ...order,
+          timeline: (order.order_timeline || []).map((event: any) => ({
+            ...event,
+            timestamp: event.created_at || event.timestamp // Map Supabase created_at to timestamp
+          }))
+        }));
+
+        return Array.isArray(mappedData) ? mappedData : [];
       } else {
         console.warn("VAULT: Strategy 1 Failed (API Error). Trying fallback...");
       }
@@ -71,7 +82,7 @@ export const vaultApi = {
     }
 
     // STRATEGY 2: Raw Fallback Fetch
-    // If Strategy 1 failed (e.g. created_at column missing), try getting raw data without sorting.
+    // If Strategy 1 failed (e.g. relation issue), try getting raw orders without timeline.
     try {
       console.log("VAULT: Attempting Strategy 2 (Raw Fallback)...");
       const rawPath = `orders?select=*`;
@@ -83,7 +94,8 @@ export const vaultApi = {
       if (resp.ok) {
         const data = await resp.json();
         console.log(`VAULT: Strategy 2 Success. Found ${data.length} records.`);
-        return Array.isArray(data) ? data : [];
+        // Return with empty timeline to prevent UI crash
+        return Array.isArray(data) ? data.map((o: any) => ({...o, timeline: o.timeline || []})) : [];
       } else {
         const errText = await resp.text();
         console.error(`VAULT: Strategy 2 Failed. Status: ${resp.status}`, errText);
@@ -98,13 +110,20 @@ export const vaultApi = {
   fetchOrderById: async (orderId: string) => {
     try {
       const safeId = encodeURIComponent(orderId);
-      const path = `orders?id=eq.${safeId}&select=*`;
+      // Fetch with order_timeline relation included
+      const path = `orders?id=eq.${safeId}&select=*,order_timeline(*)`;
       const resp = await fetch(getUrl(path), { headers });
       if (!resp.ok) return null;
       const data = await resp.json();
       
       if (data && data.length > 0) {
-        return data[0];
+        const order = data[0];
+        // Map relation data to timeline property
+        order.timeline = (order.order_timeline || []).map((event: any) => ({
+            ...event,
+            timestamp: event.created_at || event.timestamp
+        }));
+        return order;
       }
       return null;
     } catch (err) {
