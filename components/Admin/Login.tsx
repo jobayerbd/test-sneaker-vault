@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 
 interface LoginProps {
@@ -41,14 +42,6 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess, supabaseUrl, supabaseKey 
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const handleDemoAccess = () => {
-    setIsLoading(true);
-    setTimeout(() => {
-      localStorage.setItem('sv_admin_session', 'active');
-      onLoginSuccess();
-    }, 1500);
   };
 
   return (
@@ -113,20 +106,7 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess, supabaseUrl, supabaseKey 
               )}
             </button>
           </form>
-/*
-          <div className="mt-10 pt-10 border-t border-gray-50 flex flex-col items-center">
-             <p className="text-[9px] font-black text-gray-300 uppercase tracking-widest mb-6 italic">Quick Dev Bypass</p>
-             <button 
-               onClick={handleDemoAccess}
-               disabled={isLoading}
-               className="group flex items-center space-x-3 px-8 py-3 bg-gray-50 hover:bg-black rounded-xl transition-all duration-300"
-             >
-               <i className="fa-solid fa-bolt text-amber-500 group-hover:text-yellow-400"></i>
-               <span className="text-[10px] font-black uppercase tracking-widest text-gray-500 group-hover:text-white">Quick Demo Access</span>
-             </button>
-          </div>
         </div>
-*/
         <p className="text-center mt-12 text-[10px] text-gray-300 font-bold uppercase tracking-[0.3em] leading-relaxed italic px-8">
           Authorized personnel only. All access sequences are monitored by the Vault Security Core.
         </p>
