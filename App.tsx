@@ -103,8 +103,17 @@ const App: React.FC = () => {
   const isNavigatingRef = useRef(false);
   const isAdminPanel = currentView === 'admin' || currentView === 'admin-login';
 
+  // Helper for tracking Pixel events
+  const trackPixelEvent = useCallback((event: string, data?: any) => {
+    if (window.fbq && footerConfig.fb_pixel_id) {
+      window.fbq('track', event, data);
+    }
+  }, [footerConfig.fb_pixel_id]);
+
+  // Meta Pixel Initialization
   useEffect(() => {
     if (!footerConfig.fb_pixel_id) return;
+
     if (!window.fbq) {
       (function(f: any, b: any, e: any, v: any, n?: any, t?: any, s?: any) {
         if (f.fbq) return;
@@ -114,10 +123,17 @@ const App: React.FC = () => {
         t = b.createElement(e); t.async = !0; t.src = v;
         s = b.getElementsByTagName(e)[0]; s.parentNode.insertBefore(t, s);
       })(window, document, 'script', 'https://connect.facebook.net/en_US/fbevents.js');
-      window.fbq('init', footerConfig.fb_pixel_id);
     }
+
+    // Always re-init with the current ID in case it changed
+    window.fbq('init', footerConfig.fb_pixel_id);
     window.fbq('track', 'PageView');
-  }, [footerConfig.fb_pixel_id, currentView]);
+  }, [footerConfig.fb_pixel_id]);
+
+  // Track PageView on view change
+  useEffect(() => {
+    trackPixelEvent('PageView');
+  }, [currentView, trackPixelEvent]);
 
   useEffect(() => { window.scrollTo(0, 0); }, [currentView]);
 
@@ -179,13 +195,11 @@ const App: React.FC = () => {
 
   useEffect(() => { updateBrowserIdentity(siteIdentity); }, [siteIdentity]);
 
-  // Updated to prevent overriding intentional navigation when a product is in the URL
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const productId = params.get('product');
     const explicitView = params.get('view');
     
-    // Only force PDP view if we are NOT intentionally on another view (like checkout)
     if (productId && sneakers.length > 0) {
       const prod = sneakers.find(s => s.id === productId);
       if (prod) {
@@ -207,12 +221,15 @@ const App: React.FC = () => {
     if (view === 'admin' && !isAdmin) targetView = 'admin-login';
     if (view === 'customer' && !isCustomer) targetView = 'customer-login';
 
+    if (targetView === 'checkout') {
+      trackPixelEvent('InitiateCheckout');
+    }
+
     setCurrentView(targetView);
     try {
       const url = new URL(window.location.href);
       url.searchParams.set('view', targetView);
       
-      // Clean up product-specific params for global views to prevent the PDP-forcing useEffect from hijacking navigation
       if (targetView !== 'pdp' && targetView !== 'shop') {
         url.searchParams.delete('product');
         url.searchParams.delete('category');
@@ -240,6 +257,14 @@ const App: React.FC = () => {
 
   const handleSelectProduct = (s: Sneaker) => {
     setSelectedProduct(s);
+    trackPixelEvent('ViewContent', {
+      content_name: s.name,
+      content_category: s.category || s.brand,
+      content_ids: [s.id],
+      content_type: 'product',
+      value: s.price,
+      currency: 'BDT'
+    });
     handleNavigate('pdp', { product: s.id });
   };
 
@@ -249,6 +274,16 @@ const App: React.FC = () => {
   };
 
   const handleAddToCart = (item: CartItem, shouldCheckout: boolean = false) => {
+    trackPixelEvent('AddToCart', {
+      content_name: item.name,
+      content_category: item.category || item.brand,
+      content_ids: [item.id],
+      content_type: 'product',
+      value: item.price,
+      currency: 'BDT',
+      num_items: item.quantity
+    });
+
     setCart(prev => {
       const existing = prev.find(i => i.id === item.id && i.selectedSize === item.selectedSize);
       if (existing) {
@@ -324,6 +359,9 @@ const App: React.FC = () => {
       }
 
       const orderId = generateOrderId();
+      const subtotalValue = cart.reduce((a, b) => a + (b.price * b.quantity), 0);
+      const totalValue = subtotalValue + (selectedShipping?.rate || 0);
+
       const orderData = {
         id: orderId,
         customer_id: customerId,
@@ -335,7 +373,7 @@ const App: React.FC = () => {
         city: checkoutForm.city || '', 
         zip_code: checkoutForm.zip_code || '', 
         status: OrderStatus.PLACED,
-        total: cart.reduce((a, b) => a + (b.price * b.quantity), 0) + (selectedShipping?.rate || 0),
+        total: totalValue,
         items: cart.map(i => ({
           sneakerId: i.id,
           name: i.name,
@@ -352,6 +390,15 @@ const App: React.FC = () => {
 
       const result = await vaultApi.createOrder(orderData);
       if (result) {
+        // Track Purchase event
+        trackPixelEvent('Purchase', {
+          value: totalValue,
+          currency: 'BDT',
+          content_ids: cart.map(i => i.id),
+          content_type: 'product',
+          num_items: cart.reduce((a, b) => a + b.quantity, 0)
+        });
+
         await vaultApi.createTimelineEvent(orderId, OrderStatus.PLACED, 'Order protocol initiated and secured.');
         setLastOrder(orderData);
         setCart([]);
