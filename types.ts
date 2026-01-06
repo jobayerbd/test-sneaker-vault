@@ -82,6 +82,7 @@ export interface Sneaker {
   image: string;
   gallery: string[];
   description: string;
+  size_guide?: string;
   release_date: string;
   is_drop: boolean;
   colorway: string;

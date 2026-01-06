@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Sneaker, CartItem } from '../../types.ts';
 
 interface ProductDetailProps {
@@ -21,6 +21,7 @@ const ProductDetail: React.FC<ProductDetailProps> = ({
   const [quantity, setQuantity] = useState(1);
   const [activeTab, setActiveTab] = useState('DESCRIPTION');
   const [error, setError] = useState<string | null>(null);
+  const tabsRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!sneaker) return;
@@ -71,6 +72,13 @@ const ProductDetail: React.FC<ProductDetailProps> = ({
     }, buyNow);
   };
 
+  const scrollToSizeGuide = () => {
+    setActiveTab('SIZE GUIDE');
+    setTimeout(() => {
+      tabsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 100);
+  };
+
   const relatedProducts = sneakers
     .filter(s => s.id !== sneaker.id && (s.brand === sneaker.brand || s.category === sneaker.category))
     .slice(0, 4);
@@ -79,11 +87,9 @@ const ProductDetail: React.FC<ProductDetailProps> = ({
 
   return (
     <div className="bg-white min-h-screen animate-in fade-in duration-500">
-      {/* Container spacing reduced for mobile: py-4 instead of py-12 */}
       <div className="max-w-7xl mx-auto px-4 py-4 md:py-12">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-12">
           
-          {/* Main Image Container */}
           <div className="lg:col-span-6 relative group">
             <div className="border border-gray-100 aspect-[4/5] bg-white overflow-hidden shadow-sm relative rounded-2xl md:rounded-3xl">
               <img src={mainImage} className="w-full h-full object-cover" alt="" />
@@ -94,7 +100,6 @@ const ProductDetail: React.FC<ProductDetailProps> = ({
                 </div>
               )}
 
-              {/* Gallery thumbnails integrated into the image body at the bottom-left */}
               <div className="absolute bottom-4 left-4 flex space-x-2 z-10 max-w-[80%] overflow-x-auto no-scrollbar py-1">
                 {galleryImages.map((img, idx) => (
                   <button 
@@ -110,7 +115,6 @@ const ProductDetail: React.FC<ProductDetailProps> = ({
             </div>
           </div>
 
-          {/* Product Info - spacing tightened for mobile */}
           <div className="lg:col-span-6 flex flex-col pt-2 md:pt-0">
             <div className="flex justify-between items-start mb-2 md:mb-4">
               <div>
@@ -134,11 +138,16 @@ const ProductDetail: React.FC<ProductDetailProps> = ({
               )}
             </div>
 
-            {/* Size Selection - margin reduced for mobile */}
             <div className="mb-4 md:mb-8">
                <div className="flex justify-between items-center mb-2 md:mb-4 px-1">
                  <h4 className="text-[10px] md:text-[11px] font-black uppercase tracking-widest">Select Size Index</h4>
-                 <button type="button" className="text-[9px] md:text-[10px] font-bold text-gray-400 underline underline-offset-4 hover:text-black">Fit Guide</button>
+                 <button 
+                   type="button" 
+                   onClick={scrollToSizeGuide} 
+                   className="text-[9px] md:text-[10px] font-black text-red-600 uppercase tracking-widest hover:text-black transition-colors flex items-center gap-2"
+                 >
+                   <i className="fa-solid fa-ruler"></i> Fit Guide
+                 </button>
                </div>
                {error && <p className="text-red-600 text-[9px] font-black uppercase mb-3 animate-pulse"><i className="fa-solid fa-triangle-exclamation mr-2"></i> {error}</p>}
                <div className="grid grid-cols-4 md:grid-cols-6 gap-2">
@@ -159,7 +168,6 @@ const ProductDetail: React.FC<ProductDetailProps> = ({
               </div>
             </div>
 
-            {/* Quantity and Actions - more compact on mobile */}
             <div className="flex items-center gap-4 md:gap-6 mb-6 md:mb-10">
               <div className="flex items-center border-2 border-gray-100 rounded-xl md:rounded-2xl h-10 md:h-14 bg-white overflow-hidden shadow-sm">
                 <button type="button" onClick={() => setQuantity(Math.max(1, quantity - 1))} className="px-4 md:px-6 hover:bg-gray-50 transition-colors font-black text-sm md:text-lg">-</button>
@@ -192,8 +200,7 @@ const ProductDetail: React.FC<ProductDetailProps> = ({
           </div>
         </div>
 
-        {/* Detailed Tabs - spacing adjusted */}
-        <div className="mt-12 md:mt-24 border-t border-gray-100">
+        <div className="mt-12 md:mt-24 border-t border-gray-100" ref={tabsRef}>
            <div className="flex border-b border-gray-100 overflow-x-auto no-scrollbar">
               {['DESCRIPTION', 'SIZE GUIDE'].map((tab) => (
                 <button 
@@ -213,45 +220,31 @@ const ProductDetail: React.FC<ProductDetailProps> = ({
                   <p className="text-gray-600 leading-relaxed text-xs md:text-sm whitespace-pre-line mb-6 md:mb-8">
                     {sneaker.description}
                   </p>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12">
-                     <div className="space-y-4">
-                        <h4 className="text-[10px] md:text-xs font-black uppercase italic tracking-widest">Specifications</h4>
-                        <div className="space-y-3">
-                           <div className="flex justify-between border-b border-gray-50 pb-2">
-                              <span className="text-[9px] md:text-[10px] font-black uppercase text-gray-400">Colorway</span>
-                              <span className="text-[9px] md:text-[10px] font-bold text-black uppercase">{sneaker.colorway}</span>
-                           </div>
-                           <div className="flex justify-between border-b border-gray-50 pb-2">
-                              <span className="text-[9px] md:text-[10px] font-black uppercase text-gray-400">Release Date</span>
-                              <span className="text-[9px] md:text-[10px] font-bold text-black uppercase">{sneaker.release_date}</span>
-                           </div>
-                        </div>
-                     </div>
-                     <div className="bg-gray-50 p-4 md:p-6 rounded-2xl md:rounded-3xl">
-                        <h4 className="text-[9px] md:text-[10px] font-black uppercase tracking-widest mb-3 md:mb-4 italic"><i className="fa-solid fa-shield-halved mr-2"></i> Vault Guarantee</h4>
-                        <p className="text-[10px] md:text-[11px] text-gray-500 leading-relaxed">
-                          Every asset in our vault undergoes a rigorous multi-point verification protocol by our expert authentication unit. 100% Genuine guaranteed.
-                        </p>
-                     </div>
-                  </div>
                 </div>
               )}
               {activeTab === 'SIZE GUIDE' && (
                  <div className="animate-in fade-in slide-in-from-bottom-2">
-                    <p className="text-xs md:text-sm text-gray-600 mb-6">Standard US Men's sizing protocol applied. For conversion to UK or EU standards, refer to our global matrix.</p>
-                    <div className="bg-gray-50 rounded-xl md:rounded-2xl p-6 md:p-8 border border-gray-100 flex items-center gap-4 md:gap-6">
-                       <i className="fa-solid fa-ruler-combined text-2xl md:text-3xl text-gray-200"></i>
-                       <div>
-                          <p className="text-[9px] md:text-[10px] font-black uppercase tracking-widest">Fit Intelligence</p>
-                          <p className="text-base md:text-lg font-black italic uppercase text-red-600">{sneaker.fit_score || 'True to size'}</p>
-                       </div>
-                    </div>
+                    {sneaker.size_guide ? (
+                      <p className="text-gray-600 leading-relaxed text-xs md:text-sm whitespace-pre-line">
+                        {sneaker.size_guide}
+                      </p>
+                    ) : (
+                      <>
+                        <p className="text-xs md:text-sm text-gray-600 mb-6">Standard US Men's sizing protocol applied. For conversion to UK or EU standards, refer to our global matrix.</p>
+                        <div className="bg-gray-50 rounded-xl md:rounded-2xl p-6 md:p-8 border border-gray-100 flex items-center gap-4 md:gap-6">
+                          <i className="fa-solid fa-ruler-combined text-2xl md:text-3xl text-gray-200"></i>
+                          <div>
+                              <p className="text-[9px] md:text-[10px] font-black uppercase tracking-widest">Fit Intelligence</p>
+                              <p className="text-base md:text-lg font-black italic uppercase text-red-600">{sneaker.fit_score || 'True to size'}</p>
+                          </div>
+                        </div>
+                      </>
+                    )}
                  </div>
               )}
            </div>
         </div>
 
-        {/* Related Products */}
         {relatedProducts.length > 0 && (
           <div className="mt-16 md:mt-32">
             <h3 className="text-xl md:text-2xl font-black font-heading italic uppercase tracking-widest mb-8 md:mb-12">Related Assets</h3>

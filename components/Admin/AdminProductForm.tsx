@@ -70,9 +70,6 @@ const AdminProductForm: React.FC<AdminProductFormProps> = ({
     setIsSaving(true);
     setShowSuccess(false);
     
-    // Logic: original_price (Regular Price) is mandatory. 
-    // price (Offer Price) is what the user pays.
-    // If user leaves price empty, we set price = original_price.
     const finalData = { ...editingProduct };
     
     if (!finalData.original_price) {
@@ -202,10 +199,21 @@ const AdminProductForm: React.FC<AdminProductFormProps> = ({
             <div className="col-span-2">
               <label className="text-[10px] font-black uppercase text-gray-400 block mb-2 px-1">Asset Description</label>
               <textarea 
-                rows={6} 
+                rows={4} 
                 value={editingProduct.description || ''} 
                 onChange={e => setEditingProduct({...editingProduct, description: e.target.value})} 
                 placeholder="ENTER PRODUCT STORY..."
+                className="w-full bg-gray-50 p-4 rounded-xl font-medium text-xs outline-none border-2 border-transparent focus:border-black transition-all resize-none leading-relaxed" 
+              />
+            </div>
+
+            <div className="col-span-2">
+              <label className="text-[10px] font-black uppercase text-gray-400 block mb-2 px-1 italic">Size Guide Protocol</label>
+              <textarea 
+                rows={4} 
+                value={editingProduct.size_guide || ''} 
+                onChange={e => setEditingProduct({...editingProduct, size_guide: e.target.value})} 
+                placeholder="ENTER SIZING INSTRUCTIONS (e.g. converting to UK/EU, measurement tips...)"
                 className="w-full bg-gray-50 p-4 rounded-xl font-medium text-xs outline-none border-2 border-transparent focus:border-black transition-all resize-none leading-relaxed" 
               />
             </div>
