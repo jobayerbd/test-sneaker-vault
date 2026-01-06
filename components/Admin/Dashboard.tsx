@@ -8,6 +8,7 @@ import AdminInventory from './AdminInventory.tsx';
 import AdminOrders from './AdminOrders.tsx';
 import AdminOrderDetail from './AdminOrderDetail.tsx';
 import AdminProductForm from './AdminProductForm.tsx';
+import AdminOrderForm from './AdminOrderForm.tsx';
 import AdminSettings from './AdminSettings.tsx';
 import AdminBrands from './AdminBrands.tsx';
 import AdminCategories from './AdminCategories.tsx';
@@ -18,6 +19,7 @@ import AdminHomeManagement from './AdminHomeManagement.tsx';
 import AdminIdentity from './AdminIdentity.tsx';
 import AdminCustomers from './AdminCustomers.tsx';
 import AdminFooterSettings from './AdminFooterSettings.tsx';
+import { vaultApi } from '../../services/api.ts';
 
 interface DashboardProps {
   orders: Order[];
@@ -83,17 +85,30 @@ const Dashboard: React.FC<DashboardProps> = (props) => {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
+  // Robust frontend filtering & safe sorting
+  const visibleOrders = useMemo(() => {
+    const validOrders = Array.isArray(orders) ? orders : [];
+    return validOrders
+      .filter(o => o.is_hidden !== true)
+      .sort((a, b) => {
+        const tA = a.created_at ? new Date(a.created_at).getTime() : 0;
+        const tB = b.created_at ? new Date(b.created_at).getTime() : 0;
+        return tB - tA;
+      });
+  }, [orders]);
+
   const activeOrder = useMemo(() => {
-    return orders.find(o => o.id === selectedOrderId) || null;
-  }, [orders, selectedOrderId]);
+    return visibleOrders.find(o => o.id === selectedOrderId) || null;
+  }, [visibleOrders, selectedOrderId]);
 
   useEffect(() => {
     setCurrentPage(1);
   }, [statusFilter, searchQuery, startDate, endDate]);
 
   const filteredOrders = useMemo(() => {
-    let result = orders.filter(o => {
-      const matchesStatus = statusFilter === 'ALL' || o.status === statusFilter;
+    let result = visibleOrders.filter(o => {
+      if (!o) return false;
+      const matchesStatus = statusFilter === 'ALL' || (o.status || '').toLowerCase() === statusFilter.toLowerCase();
       const orderDate = o.created_at ? new Date(o.created_at) : null;
       let matchesDate = true;
       if (orderDate) {
@@ -108,17 +123,25 @@ const Dashboard: React.FC<DashboardProps> = (props) => {
           matchesDate = matchesDate && orderDate <= end;
         }
       }
-      const fullName = `${o.first_name} ${o.last_name}`.toLowerCase();
-      const matchesSearch = o.id.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                           fullName.includes(searchQuery.toLowerCase()) || 
-                           o.email.toLowerCase().includes(searchQuery.toLowerCase());
+      
+      const safeId = (o.id || '').toLowerCase();
+      const safeFirst = (o.first_name || '').toLowerCase();
+      const safeLast = (o.last_name || '').toLowerCase();
+      const safeEmail = (o.email || '').toLowerCase();
+      const query = searchQuery.toLowerCase();
+
+      const matchesSearch = safeId.includes(query) || 
+                           safeFirst.includes(query) || 
+                           safeLast.includes(query) || 
+                           safeEmail.includes(query);
                            
       return matchesStatus && matchesDate && matchesSearch;
     });
-    return result.sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
-  }, [orders, statusFilter, searchQuery, startDate, endDate]);
+    return result;
+  }, [visibleOrders, statusFilter, searchQuery, startDate, endDate]);
 
-  const totalPages = Math.ceil(filteredOrders.length / itemsPerPage);
+  const totalPages = Math.ceil(filteredOrders.length / itemsPerPage) || 1;
+  
   const paginatedOrders = useMemo(() => {
     return filteredOrders.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
   }, [filteredOrders, currentPage]);
@@ -126,6 +149,21 @@ const Dashboard: React.FC<DashboardProps> = (props) => {
   const handleSelectOrder = (order: Order) => {
     setSelectedOrderId(order.id);
     setSubView('order-detail');
+  };
+
+  const handleAddOrder = () => {
+    setSubView('order-form');
+  };
+
+  const handleDeleteOrder = async (id: string) => {
+    const success = await vaultApi.deleteOrder(id);
+    if (success) {
+      if (onRefreshOrders) {
+        await onRefreshOrders();
+      }
+      setCurrentPage(1);
+    }
+    return success;
   };
 
   const handleEditProduct = (sneaker: Sneaker) => {
@@ -158,11 +196,11 @@ const Dashboard: React.FC<DashboardProps> = (props) => {
   const renderContent = () => {
     switch(subView) {
       case 'overview': 
-        return <AdminOverview orders={orders} sneakers={sneakers} isRefreshing={isRefreshing} onRefresh={onRefresh} />;
+        return <AdminOverview orders={visibleOrders} sneakers={sneakers} isRefreshing={isRefreshing} onRefresh={onRefresh} />;
       case 'inventory': 
         return <AdminInventory sneakers={sneakers} onEditProduct={handleEditProduct} onDuplicateProduct={handleDuplicateProduct} onAddProduct={handleAddProduct} onDeleteProduct={onDeleteProduct} />;
       case 'customers':
-        return <AdminCustomers customers={customers} orders={orders} isRefreshing={isRefreshing} />;
+        return <AdminCustomers customers={customers} orders={visibleOrders} isRefreshing={isRefreshing} />;
       case 'product-form':
         return editingProduct ? (
           <AdminProductForm 
@@ -173,6 +211,23 @@ const Dashboard: React.FC<DashboardProps> = (props) => {
             onCancel={() => setSubView('inventory')} 
           />
         ) : null;
+      case 'order-form':
+        return (
+          <AdminOrderForm 
+            sneakers={sneakers} 
+            shippingOptions={shippingOptions} 
+            paymentMethods={paymentMethods} 
+            onSave={async (order) => { 
+              const ok = await vaultApi.createOrder(order); 
+              if(ok) {
+                await vaultApi.createTimelineEvent(order.id, OrderStatus.PLACED, 'Manual protocol entry initiated by administrator.');
+                onRefreshOrders?.(); 
+              }
+              return !!ok; 
+            }} 
+            onCancel={() => setSubView('orders')} 
+          />
+        );
       case 'orders': 
         return (
           <AdminOrders 
@@ -182,6 +237,8 @@ const Dashboard: React.FC<DashboardProps> = (props) => {
             searchQuery={searchQuery} 
             onSearchChange={setSearchQuery} 
             onSelectOrder={handleSelectOrder}
+            onAddOrder={handleAddOrder}
+            onDeleteOrder={handleDeleteOrder}
             startDate={startDate}
             onStartDateChange={setStartDate}
             endDate={endDate}
@@ -195,7 +252,18 @@ const Dashboard: React.FC<DashboardProps> = (props) => {
           />
         );
       case 'order-detail':
-        return activeOrder ? <AdminOrderDetail order={activeOrder} onBack={() => setSubView('orders')} onUpdateStatus={onUpdateOrderStatus} /> : null;
+        return activeOrder ? (
+          <AdminOrderDetail 
+            order={activeOrder} 
+            onBack={() => setSubView('orders')} 
+            onUpdateStatus={onUpdateOrderStatus} 
+            onDeleteOrder={async (id) => {
+              const ok = await handleDeleteOrder(id);
+              if (ok) setSubView('orders');
+              return ok;
+            }}
+          />
+        ) : null;
       case 'home-layout':
         return <AdminHomeManagement sneakers={sneakers} onUpdateProduct={onSaveProduct} />;
       case 'brands':
@@ -221,7 +289,6 @@ const Dashboard: React.FC<DashboardProps> = (props) => {
 
   return (
     <div className="flex bg-[#fafafa] min-h-screen flex-col lg:flex-row relative">
-      {/* Mobile Top Header */}
       <div className="lg:hidden h-16 bg-white border-b border-gray-100 flex items-center justify-between px-6 sticky top-0 z-40">
         <button onClick={() => setIsMobileSidebarOpen(true)} className="text-gray-800 p-2">
           <i className="fa-solid fa-bars-staggered text-xl"></i>

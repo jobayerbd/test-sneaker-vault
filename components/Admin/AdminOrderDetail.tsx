@@ -5,6 +5,7 @@ import { Order, OrderStatus, TimelineEvent } from '../../types.ts';
 interface AdminOrderDetailProps {
   order: Order;
   onUpdateStatus: (orderId: string, newStatus: OrderStatus) => Promise<boolean>;
+  onDeleteOrder: (id: string) => Promise<boolean>;
   onBack: () => void;
 }
 
@@ -19,16 +20,26 @@ const getStatusIcon = (status: OrderStatus) => {
   }
 };
 
-const AdminOrderDetail: React.FC<AdminOrderDetailProps> = ({ order: initialOrder, onUpdateStatus, onBack }) => {
+const AdminOrderDetail: React.FC<AdminOrderDetailProps> = ({ order: initialOrder, onUpdateStatus, onDeleteOrder, onBack }) => {
   const [order, setOrder] = useState<Order>(initialOrder);
   const [pendingStatus, setPendingStatus] = useState<OrderStatus>(initialOrder.status);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
-  // Sync internal state when props change
+  // Derive latest status from timeline
+  const currentStatus = (order.timeline && order.timeline.length > 0) 
+    ? [...order.timeline].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())[0].status
+    : order.status;
+
   useEffect(() => {
     setOrder(initialOrder);
-    setPendingStatus(initialOrder.status);
+    // Sync pending status with the derived current status
+    const derivedStatus = (initialOrder.timeline && initialOrder.timeline.length > 0)
+      ? [...initialOrder.timeline].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())[0].status
+      : initialOrder.status;
+    setPendingStatus(derivedStatus);
   }, [initialOrder]);
 
   useEffect(() => {
@@ -60,19 +71,60 @@ const AdminOrderDetail: React.FC<AdminOrderDetailProps> = ({ order: initialOrder
     setIsUpdating(false);
   };
 
-  // Directly use first_name and last_name columns
+  const confirmPurge = async () => {
+    setIsDeleting(true);
+    const success = await onDeleteOrder(order.id);
+    if (success) {
+      onBack();
+    } else {
+      alert("ARCHIVE FAILURE: Protocol could not be hidden in the archives.");
+      setIsDeleting(false);
+      setShowDeleteConfirm(false);
+    }
+  };
+
   const resolveCustomerName = (orderData: any) => {
     const first = String(orderData.first_name || '').trim();
     const last = String(orderData.last_name || '').trim();
-    
     if (first && last) return `${first} ${last}`;
     if (first) return first;
-    
     return 'GUEST OPERATOR';
   };
 
   return (
     <div className="space-y-8 animate-in fade-in relative">
+      {/* On-Page Archive Confirmation Modal */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md animate-in fade-in duration-300">
+          <div className="bg-white rounded-[2.5rem] p-10 md:p-14 max-w-md w-full shadow-2xl border border-gray-100 animate-in zoom-in-95 duration-300 text-center">
+            <div className="w-24 h-24 bg-amber-50 text-amber-600 rounded-[2rem] flex items-center justify-center mx-auto mb-10">
+              <i className="fa-solid fa-box-archive text-4xl"></i>
+            </div>
+            <h3 className="text-3xl font-black uppercase italic mb-4 tracking-tighter font-heading">Confirm Archive</h3>
+            <p className="text-xs text-gray-500 font-bold uppercase tracking-widest mb-12 leading-relaxed">
+              Archive manifest <span className="text-black font-black">[{order.id}]</span>? It will no longer appear in the active registry list.
+            </p>
+            <div className="space-y-4">
+              <button 
+                onClick={confirmPurge}
+                disabled={isDeleting}
+                className="w-full bg-black text-white py-5 rounded-2xl font-black uppercase text-[11px] tracking-[0.3em] shadow-xl hover:bg-red-700 transition-all flex items-center justify-center gap-3 active:scale-95 disabled:opacity-50"
+              >
+                {isDeleting ? <i className="fa-solid fa-circle-notch animate-spin"></i> : <i className="fa-solid fa-eye-slash"></i>}
+                Proceed with Archive
+              </button>
+              <button 
+                onClick={() => setShowDeleteConfirm(false)}
+                disabled={isDeleting}
+                className="w-full bg-gray-50 text-gray-400 py-5 rounded-2xl font-black uppercase text-[11px] tracking-[0.3em] hover:bg-gray-100 transition-all active:scale-95"
+              >
+                Cancel Protocol
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Tactical UI Notification System */}
       {notification && (
         <div className={`fixed top-8 right-8 z-[100] max-w-sm w-full p-6 rounded-2xl border-l-4 shadow-2xl animate-in slide-in-from-right-4 duration-300 ${
@@ -93,16 +145,25 @@ const AdminOrderDetail: React.FC<AdminOrderDetailProps> = ({ order: initialOrder
         </div>
       )}
 
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <button 
           onClick={onBack} 
           className="text-gray-400 font-black uppercase text-[10px] tracking-widest hover:text-black transition-all"
         >
           <i className="fa-solid fa-arrow-left mr-2"></i> Registry Hub
         </button>
-        <button onClick={() => window.print()} className="bg-white border p-4 rounded-xl font-black uppercase text-[10px] tracking-widest">
-          <i className="fa-solid fa-print mr-2"></i> Print Manifest
-        </button>
+        <div className="flex gap-3 w-full sm:w-auto">
+          <button onClick={() => window.print()} className="bg-white border p-4 rounded-xl font-black uppercase text-[10px] tracking-widest hover:bg-gray-50 transition-colors flex-1 sm:flex-none">
+            <i className="fa-solid fa-print mr-2"></i> Print Manifest
+          </button>
+          <button 
+            onClick={() => setShowDeleteConfirm(true)}
+            disabled={isDeleting}
+            className="bg-amber-50 text-amber-600 border border-amber-100 p-4 rounded-xl font-black uppercase text-[10px] tracking-widest hover:bg-amber-600 hover:text-white transition-all flex-1 sm:flex-none"
+          >
+            {isDeleting ? <i className="fa-solid fa-circle-notch animate-spin"></i> : <><i className="fa-solid fa-box-archive mr-2"></i> Archive Manifest</>}
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -154,7 +215,7 @@ const AdminOrderDetail: React.FC<AdminOrderDetailProps> = ({ order: initialOrder
             <h3 className="text-sm font-black italic uppercase font-heading mb-8 border-b pb-4">Order Protocol Timeline</h3>
             <div className="relative pl-8 space-y-8 border-l-2 border-gray-100 ml-4">
               {(order.timeline || []).length > 0 ? (
-                [...(order.timeline || [])].reverse().map((event, idx) => (
+                [...(order.timeline || [])].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()).map((event, idx) => (
                   <div key={idx} className="relative">
                     <div className={`absolute -left-[41px] top-0 w-8 h-8 rounded-full border-4 border-white flex items-center justify-center shadow-sm ${idx === 0 ? 'bg-black text-white' : 'bg-gray-100 text-gray-400'}`}>
                       <i className={`fa-solid ${getStatusIcon(event.status)} text-[10px]`}></i>
@@ -190,8 +251,8 @@ const AdminOrderDetail: React.FC<AdminOrderDetailProps> = ({ order: initialOrder
             <h3 className="text-[10px] font-black uppercase text-red-600 mb-6 italic tracking-widest">Protocol Intelligence</h3>
             <div className="space-y-4">
               <div className="bg-gray-50 p-4 rounded-xl border border-gray-100">
-                <p className="text-[9px] font-black uppercase text-gray-400 mb-1">Current Status</p>
-                <p className="text-xs font-black uppercase italic text-black">{order.status}</p>
+                <p className="text-[9px] font-black uppercase text-gray-400 mb-1">Live Status Protocol</p>
+                <p className="text-xs font-black uppercase italic text-black">{currentStatus}</p>
               </div>
               <select 
                 value={pendingStatus} 
@@ -201,7 +262,7 @@ const AdminOrderDetail: React.FC<AdminOrderDetailProps> = ({ order: initialOrder
                 {Object.values(OrderStatus).map(s => <option key={s} value={s}>{s.toUpperCase()}</option>)}
               </select>
               <button 
-                disabled={isUpdating || pendingStatus === order.status} 
+                disabled={isUpdating || pendingStatus === currentStatus} 
                 onClick={handleUpdate} 
                 className="w-full bg-black text-white py-4 rounded-xl font-black uppercase text-[10px] tracking-widest disabled:opacity-30 hover:bg-red-700 transition-all flex items-center justify-center gap-2"
               >

@@ -42,6 +42,13 @@ const OrderTracking: React.FC = () => {
     }
   };
 
+  // Derive latest status from timeline events
+  const currentStatus = order 
+    ? (order.timeline && order.timeline.length > 0)
+      ? [...order.timeline].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())[0].status
+      : order.status
+    : null;
+
   return (
     <div className="max-w-4xl mx-auto py-16 px-4 animate-in fade-in duration-700">
       <div className="text-center mb-12">
@@ -97,7 +104,7 @@ const OrderTracking: React.FC = () => {
               </div>
               <div className="text-right">
                 <span className={`px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border border-red-600 text-red-600 bg-red-600/5`}>
-                  STATUS: {order.status}
+                  STATUS: {currentStatus}
                 </span>
               </div>
             </div>
@@ -134,7 +141,7 @@ const OrderTracking: React.FC = () => {
                 <h3 className="text-xs font-black uppercase tracking-widest text-gray-500 italic mb-6">Protocol Timeline</h3>
                 <div className="relative pl-8 space-y-8 border-l-2 border-white/10 ml-4">
                   {(order.timeline || []).length > 0 ? (
-                    [...(order.timeline || [])].reverse().map((event, idx) => (
+                    [...(order.timeline || [])].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()).map((event, idx) => (
                       <div key={idx} className="relative">
                         <div className={`absolute -left-[41px] top-0 w-8 h-8 rounded-full border-4 border-black flex items-center justify-center shadow-sm ${idx === 0 ? 'bg-red-600 text-white animate-pulse' : 'bg-white/10 text-gray-500'}`}>
                           <i className={`fa-solid ${getStatusIcon(event.status)} text-[10px]`}></i>

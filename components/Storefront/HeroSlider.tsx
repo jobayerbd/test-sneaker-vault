@@ -7,7 +7,7 @@ interface HeroSliderProps {
   onNavigate: (view: any) => void;
 }
 
-const HeroSlider: React.FC<HeroSliderProps> = ({ slides, onNavigate }) => {
+const HeroSlider: React.FC<HeroSliderProps> = ({ slides = [], onNavigate }) => {
   const activeSlides = slides.filter(s => s.active).sort((a, b) => a.order - b.order);
   const [current, setCurrent] = useState(0);
 
@@ -37,9 +37,9 @@ const HeroSlider: React.FC<HeroSliderProps> = ({ slides, onNavigate }) => {
           {/* Ken Burns Effect on Image */}
           <div className={`absolute inset-0 transition-transform duration-[6000ms] ease-linear ${idx === current ? 'scale-110' : 'scale-100'}`}>
             <img 
-              src={slide.image} 
+              src={slide.image || 'https://via.placeholder.com/1920x1080?text=Vault+Visual'} 
               className="w-full h-full object-cover" 
-              alt={slide.headline} 
+              alt={slide.headline || 'Vault Slide'} 
             />
           </div>
           
@@ -52,18 +52,18 @@ const HeroSlider: React.FC<HeroSliderProps> = ({ slides, onNavigate }) => {
               Vault Directive: {idx + 1}/{activeSlides.length}
             </p>
             <h2 className={`text-white text-2xl md:text-7xl lg:text-8xl font-black font-heading leading-[1.1] md:leading-none drop-shadow-2xl italic uppercase transition-all duration-700 delay-500 ${idx === current ? 'translate-y-0 opacity-100' : 'translate-y-8 opacity-0'}`}>
-              {slide.headline.replace(/\\n/g, '\n').split('\n').map((line, i) => (
+              {(slide.headline || 'PREMIUM FOOTWEAR').replace(/\\n/g, '\n').split('\n').map((line, i) => (
                 <React.Fragment key={i}>{line}<br/></React.Fragment>
               ))}
             </h2>
             <p className={`text-gray-300 text-[10px] md:text-lg max-w-xs md:max-w-xl mt-4 md:mt-6 font-medium uppercase tracking-widest leading-relaxed transition-all duration-700 delay-700 ${idx === current ? 'translate-y-0 opacity-100' : 'translate-y-8 opacity-0'}`}>
-              {slide.subtext}
+              {slide.subtext || 'SECURE THE ULTIMATE ACQUISITION.'}
             </p>
             <button 
               onClick={() => onNavigate(slide.button_link || 'shop')}
               className={`mt-8 md:mt-10 px-6 md:px-12 py-3 md:py-4 bg-red-700 text-white text-[9px] md:text-xs font-black uppercase tracking-[0.25em] md:tracking-[0.3em] hover:bg-white hover:text-black transition-all duration-300 italic shadow-2xl flex items-center gap-3 md:gap-4 group active:scale-95 ${idx === current ? 'translate-y-0 opacity-100' : 'translate-y-8 opacity-0'}`}
             >
-              {slide.button_text}
+              {slide.button_text || 'EXPLORE NOW'}
               <i className="fa-solid fa-arrow-right-long group-hover:translate-x-2 transition-transform"></i>
             </button>
           </div>

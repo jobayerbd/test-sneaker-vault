@@ -12,7 +12,7 @@ interface HomeProps {
   isLoading?: boolean;
 }
 
-const Home: React.FC<HomeProps> = ({ sneakers, slides, onSelectProduct, onNavigate, isLoading }) => {
+const Home: React.FC<HomeProps> = ({ sneakers = [], slides = [], onSelectProduct, onNavigate, isLoading }) => {
   const newArrivals = [...sneakers].sort((a, b) => {
     return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
   }).slice(0, 8);
@@ -138,12 +138,6 @@ const Home: React.FC<HomeProps> = ({ sneakers, slides, onSelectProduct, onNaviga
                 <h2 className="text-xl md:text-3xl font-black text-red-700 font-heading italic tracking-[0.15em] md:tracking-[0.2em] uppercase">{section.title}</h2>
                 <div className="w-10 md:w-12 h-[2px] md:h-[3px] bg-red-700 mt-2 md:mt-3 mb-2 md:mb-3"></div>
               </div>
-              {section.data.length > 2 && (
-                <div className="flex gap-2 mb-4 md:hidden">
-                  <div className="w-1.5 h-1.5 bg-red-600 rounded-full"></div>
-                  <div className="w-1.5 h-1.5 bg-gray-200 rounded-full"></div>
-                </div>
-              )}
             </div>
             {section.data.length > 0 ? (
               <Carousel data={section.data} />

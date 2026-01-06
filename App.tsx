@@ -58,7 +58,6 @@ const App: React.FC = () => {
     if (params.get('category')) return 'shop';
     const viewParam = params.get('view') as View;
     
-    // Check sessions for protected routes
     const isAdmin = localStorage.getItem('sv_admin_session') === 'active';
     const isCustomer = !!localStorage.getItem('sv_customer_session');
     
@@ -104,17 +103,14 @@ const App: React.FC = () => {
   const isNavigatingRef = useRef(false);
   const isAdminPanel = currentView === 'admin' || currentView === 'admin-login';
 
-  // Helper for tracking Pixel events
   const trackPixelEvent = useCallback((event: string, data?: any) => {
     if (window.fbq && footerConfig.fb_pixel_id) {
       window.fbq('track', event, data);
     }
   }, [footerConfig.fb_pixel_id]);
 
-  // Meta Pixel Initialization
   useEffect(() => {
     if (!footerConfig.fb_pixel_id) return;
-
     if (!window.fbq) {
       (function(f: any, b: any, e: any, v: any, n?: any, t?: any, s?: any) {
         if (f.fbq) return;
@@ -125,50 +121,65 @@ const App: React.FC = () => {
         s = b.getElementsByTagName(e)[0]; s.parentNode.insertBefore(t, s);
       })(window, document, 'script', 'https://connect.facebook.net/en_US/fbevents.js');
     }
-
-    // Always re-init with the current ID in case it changed
     window.fbq('init', footerConfig.fb_pixel_id);
     window.fbq('track', 'PageView');
   }, [footerConfig.fb_pixel_id]);
 
-  // Track PageView on view change
-  useEffect(() => {
-    trackPixelEvent('PageView');
-  }, [currentView, trackPixelEvent]);
-
+  useEffect(() => { trackPixelEvent('PageView'); }, [currentView, trackPixelEvent]);
   useEffect(() => { window.scrollTo(0, 0); }, [currentView]);
 
   const fetchData = useCallback(async () => {
     setIsFetchingSneakers(true);
-    const [s, o, cust, b, c, pm, sl, ni, cf, sh, f, id] = await Promise.all([
-      vaultApi.fetchSneakers(),
-      vaultApi.fetchOrders(),
-      vaultApi.fetchCustomers(),
-      vaultApi.fetchBrands(),
-      vaultApi.fetchCategories(),
-      vaultApi.fetchPaymentMethods(),
-      vaultApi.fetchSlides(),
-      vaultApi.fetchNavItems(),
-      vaultApi.fetchCheckoutFields(),
-      vaultApi.fetchShippingOptions(),
-      vaultApi.fetchSiteSettings('footer'),
-      vaultApi.fetchSiteSettings('identity')
-    ]);
-    setSneakers(s || []);
-    setOrders(o || []);
-    setCustomers(cust || []);
-    setBrands(b || []);
-    setCategories(c || []);
-    setPaymentMethods(pm || []);
-    if (pm && pm.length > 0 && !selectedPayment) setSelectedPayment(pm[0]);
-    setSlides(sl || []);
-    setNavItems(ni || []);
-    setCheckoutFields(cf || []);
-    setShippingOptions(sh || []);
-    if (sh && sh.length > 0 && !selectedShipping) setSelectedShipping(sh[0]);
-    if (f) setFooterConfig(f);
-    if (id) setSiteIdentity(id);
-    setIsFetchingSneakers(false);
+    try {
+      const results = await Promise.allSettled([
+        vaultApi.fetchSneakers(),
+        vaultApi.fetchOrders(),
+        vaultApi.fetchCustomers(),
+        vaultApi.fetchBrands(),
+        vaultApi.fetchCategories(),
+        vaultApi.fetchPaymentMethods(),
+        vaultApi.fetchSlides(),
+        vaultApi.fetchNavItems(),
+        vaultApi.fetchCheckoutFields(),
+        vaultApi.fetchShippingOptions(),
+        vaultApi.fetchSiteSettings('footer'),
+        vaultApi.fetchSiteSettings('identity')
+      ]);
+
+      const data = results.map(r => r.status === 'fulfilled' ? r.value : null);
+      
+      // Safety Assignment & Logging
+      const fetchedSneakers = Array.isArray(data[0]) ? data[0] : [];
+      const fetchedOrders = Array.isArray(data[1]) ? data[1] : [];
+      
+      console.log(`VAULT BOOT: Loaded ${fetchedSneakers.length} products, ${fetchedOrders.length} orders.`);
+      
+      setSneakers(fetchedSneakers);
+      setOrders(fetchedOrders);
+      setCustomers(Array.isArray(data[2]) ? data[2] : []);
+      setBrands(Array.isArray(data[3]) ? data[3] : []);
+      setCategories(Array.isArray(data[4]) ? data[4] : []);
+      
+      const pm = Array.isArray(data[5]) ? data[5] : [];
+      setPaymentMethods(pm);
+      if (pm.length > 0 && !selectedPayment) setSelectedPayment(pm[0]);
+      
+      setSlides(Array.isArray(data[6]) ? data[6] : []);
+      setNavItems(Array.isArray(data[7]) ? data[7] : []);
+      setCheckoutFields(Array.isArray(data[8]) ? data[8] : []);
+      
+      const sh = Array.isArray(data[9]) ? data[9] : [];
+      setShippingOptions(sh);
+      if (sh.length > 0 && !selectedShipping) setSelectedShipping(sh[0]);
+      
+      if (data[10]) setFooterConfig(data[10]);
+      if (data[11]) setSiteIdentity(data[11]);
+
+    } catch (error) {
+      console.error("BOOTLOAD FATAL:", error);
+    } finally {
+      setIsFetchingSneakers(false);
+    }
   }, [selectedPayment, selectedShipping]);
 
   useEffect(() => {
@@ -188,7 +199,6 @@ const App: React.FC = () => {
           zip_code: parsed.zip_code || ''
         });
       } catch (e) {
-        console.error("Session parse error", e);
         localStorage.removeItem('sv_customer_session');
       }
     }
@@ -214,35 +224,28 @@ const App: React.FC = () => {
 
   const handleNavigate = (view: View, params?: Record<string, string>) => {
     isNavigatingRef.current = true;
-    
     let targetView = view;
     const isAdmin = localStorage.getItem('sv_admin_session') === 'active';
     const isCustomer = !!localStorage.getItem('sv_customer_session');
 
     if (view === 'admin' && !isAdmin) targetView = 'admin-login';
     if (view === 'customer' && !isCustomer) targetView = 'customer-login';
-
-    if (targetView === 'checkout') {
-      trackPixelEvent('InitiateCheckout');
-    }
+    if (targetView === 'checkout') trackPixelEvent('InitiateCheckout');
 
     setCurrentView(targetView);
     try {
       const url = new URL(window.location.href);
       url.searchParams.set('view', targetView);
-      
       if (targetView !== 'pdp' && targetView !== 'shop') {
         url.searchParams.delete('product');
         url.searchParams.delete('category');
       }
-      
       if (targetView === 'home') {
         url.searchParams.delete('view');
         url.searchParams.delete('product');
         url.searchParams.delete('category');
         setSelectedCategory(null);
       }
-      
       if (params) {
         Object.entries(params).forEach(([k, v]) => {
           if (v === null || v === '') {
@@ -253,15 +256,11 @@ const App: React.FC = () => {
             if (k === 'category') setSelectedCategory(v);
           }
         });
-      } else if (targetView === 'shop' && !params) {
-        // If navigating to shop with no params, reset current category
+      } else if (targetView === 'shop') {
         setSelectedCategory(null);
       }
-      
       window.history.pushState({}, '', url.toString());
-    } catch (err) {
-      console.warn("Navigation Error", err);
-    }
+    } catch (err) {}
     setTimeout(() => { isNavigatingRef.current = false; }, 100);
   };
 
@@ -293,7 +292,6 @@ const App: React.FC = () => {
       currency: 'BDT',
       num_items: item.quantity
     });
-
     setCart(prev => {
       const existing = prev.find(i => i.id === item.id && i.selectedSize === item.selectedSize);
       if (existing) {
@@ -304,12 +302,8 @@ const App: React.FC = () => {
       }
       return [...prev, item];
     });
-
-    if (shouldCheckout) {
-      handleNavigate('checkout');
-    } else {
-      setIsCartSidebarOpen(true);
-    }
+    if (shouldCheckout) handleNavigate('checkout');
+    else setIsCartSidebarOpen(true);
   };
 
   const handleUpdateCartQuantity = (index: number, delta: number) => {
@@ -332,7 +326,6 @@ const App: React.FC = () => {
       setCheckoutError(`PROTOCOL FAILURE: [${missing.label.toUpperCase()}] IS MANDATORY`);
       return;
     }
-
     if (createAccount && !accountPassword) {
       setCheckoutError("SECURITY FAILURE: ACCOUNT PASSWORD IS REQUIRED");
       return;
@@ -343,7 +336,6 @@ const App: React.FC = () => {
 
     try {
       let customerId = currentCustomer?.id;
-
       if (createAccount && !currentCustomer) {
         const newCustomer = await vaultApi.createCustomer({
           email: checkoutForm.email,
@@ -356,13 +348,12 @@ const App: React.FC = () => {
           zip_code: checkoutForm.zip_code || '',
           created_at: new Date().toISOString()
         });
-
         if (newCustomer) {
           customerId = newCustomer.id;
           localStorage.setItem('sv_customer_session', JSON.stringify(newCustomer));
           setCurrentCustomer(newCustomer);
         } else {
-          setCheckoutError("SECURITY PROTOCOL ERROR: FAILED TO CREATE IDENTITY. EMAIL MAY ALREADY BE REGISTERED.");
+          setCheckoutError("SECURITY PROTOCOL ERROR: FAILED TO CREATE IDENTITY.");
           setIsPlacingOrder(false);
           return;
         }
@@ -401,16 +392,10 @@ const App: React.FC = () => {
 
       const result = await vaultApi.createOrder(orderData);
       if (result) {
-        // Track Purchase event
         trackPixelEvent('Purchase', {
-          value: totalValue,
-          currency: 'BDT',
-          content_ids: cart.map(i => i.id),
-          content_type: 'product',
-          num_items: cart.reduce((a, b) => a + b.quantity, 0)
+          value: totalValue, currency: 'BDT', content_ids: cart.map(i => i.id), content_type: 'product', num_items: cart.reduce((a, b) => a + b.quantity, 0)
         });
-
-        await vaultApi.createTimelineEvent(orderId, OrderStatus.PLACED, 'Order protocol initiated and secured.');
+        await vaultApi.createTimelineEvent(orderId, OrderStatus.PLACED, 'Order protocol secured.');
         setLastOrder(orderData);
         setCart([]);
         await fetchData();
@@ -419,7 +404,7 @@ const App: React.FC = () => {
         setCheckoutError("VAULT OFFLINE: FAILED TO PERSIST ORDER DATA");
       }
     } catch (err) {
-      setCheckoutError("SYSTEM ERROR: AN UNEXPECTED EXCEPTION OCCURRED DURING CHECKOUT");
+      setCheckoutError("SYSTEM ERROR: AN UNEXPECTED EXCEPTION OCCURRED");
     } finally {
       setIsPlacingOrder(false);
     }
@@ -461,10 +446,10 @@ const App: React.FC = () => {
 
         {currentView === 'admin' && (
           isAdminAuthenticated ? (
-            <Dashboard orders={orders} sneakers={sneakers} customers={customers} brands={brands} categories={categories} paymentMethods={paymentMethods} slides={slides} navItems={navItems} checkoutFields={checkoutFields} shippingOptions={shippingOptions} footerConfig={footerConfig} siteIdentity={siteIdentity} onUpdateOrderStatus={async (id, s) => { 
+            <Dashboard orders={orders} sneakers={sneakers} customers={customers} brands={brands} categories={categories} paymentMethods={paymentMethods} slides={slides} navItems={navItems} checkoutFields={checkoutFields} shippingOptions={shippingOptions} footerConfig={footerConfig} siteIdentity={siteIdentity} onRefresh={fetchData} onRefreshOrders={fetchData} onUpdateOrderStatus={async (id, s) => { 
               const ok = await vaultApi.updateOrderStatus(id, s); 
               if(ok) {
-                await vaultApi.createTimelineEvent(id, s, `Protocol Status updated to ${s.toUpperCase()} by Administrator.`);
+                await vaultApi.createTimelineEvent(id, s, `Status set to ${s.toUpperCase()}.`);
                 await fetchData(); 
               }
               return ok; 

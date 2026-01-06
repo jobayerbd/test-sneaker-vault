@@ -16,7 +16,7 @@ export enum OrderStatus {
   RETURNED = 'Returned'
 }
 
-export type AdminSubView = 'overview' | 'orders' | 'inventory' | 'settings' | 'customers' | 'order-detail' | 'product-form' | 'brands' | 'categories' | 'slider' | 'menu' | 'checkout-config' | 'home-layout' | 'identity' | 'footer-settings';
+export type AdminSubView = 'overview' | 'orders' | 'inventory' | 'settings' | 'customers' | 'order-detail' | 'product-form' | 'order-form' | 'brands' | 'categories' | 'slider' | 'menu' | 'checkout-config' | 'home-layout' | 'identity' | 'footer-settings';
 
 export interface NavItem {
   id: string;
@@ -140,6 +140,7 @@ export interface Order {
   shipping_rate?: number;
   payment_method?: string;
   created_at?: string;
+  is_hidden?: boolean;
 }
 
 export interface CartItem extends Sneaker {

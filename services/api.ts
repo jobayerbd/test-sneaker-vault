@@ -10,18 +10,28 @@ const headers = {
   'Content-Type': 'application/json'
 };
 
+const getUrl = (path: string) => {
+  const separator = path.includes('?') ? '&' : '?';
+  return `${SUPABASE_URL}/rest/v1/${path}${separator}apikey=${SUPABASE_KEY}`;
+};
+
 export const vaultApi = {
   fetchSneakers: async () => {
-    const resp = await fetch(`${SUPABASE_URL}/rest/v1/sneakers?select=*&order=created_at.desc`, { headers });
-    return resp.ok ? await resp.json() : [];
+    try {
+      const resp = await fetch(getUrl('sneakers?select=*&order=created_at.desc'), { headers });
+      return resp.ok ? await resp.json() : [];
+    } catch (err) {
+      console.error("VAULT FETCH ERROR [sneakers]:", err);
+      return [];
+    }
   },
   
   saveProduct: async (product: Partial<Sneaker>) => {
     const isNew = !product.id;
-    const url = isNew ? `${SUPABASE_URL}/rest/v1/sneakers` : `${SUPABASE_URL}/rest/v1/sneakers?id=eq.${product.id}`;
+    const path = isNew ? 'sneakers' : `sneakers?id=eq.${product.id}`;
     const method = isNew ? 'POST' : 'PATCH';
     
-    const resp = await fetch(url, {
+    const resp = await fetch(getUrl(path), {
       method,
       headers: { ...headers, 'Prefer': 'return=representation' },
       body: JSON.stringify(product)
@@ -30,7 +40,7 @@ export const vaultApi = {
   },
 
   deleteProduct: async (id: string) => {
-    const resp = await fetch(`${SUPABASE_URL}/rest/v1/sneakers?id=eq.${id}`, {
+    const resp = await fetch(getUrl(`sneakers?id=eq.${id}`), {
       method: 'DELETE',
       headers
     });
@@ -38,19 +48,74 @@ export const vaultApi = {
   },
 
   fetchOrders: async () => {
-    const resp = await fetch(`${SUPABASE_URL}/rest/v1/orders?select=*,timeline:order_timeline(status,note,timestamp)&order=created_at.desc`, { headers });
-    return resp.ok ? await resp.json() : [];
+    // STRATEGY 1: Standard Sorted Fetch
+    // Attempts to get orders sorted by created_at. This is preferred.
+    try {
+      console.log("VAULT: Attempting Strategy 1 (Sorted Fetch)...");
+      const path = `orders?select=*&order=created_at.desc`;
+      // Use cache: 'no-store' to bypass browser caching instead of query param
+      const resp = await fetch(getUrl(path), { 
+        headers,
+        cache: 'no-store' 
+      });
+      
+      if (resp.ok) {
+        const data = await resp.json();
+        console.log(`VAULT: Strategy 1 Success. Found ${data.length} records.`);
+        return Array.isArray(data) ? data : [];
+      } else {
+        console.warn("VAULT: Strategy 1 Failed (API Error). Trying fallback...");
+      }
+    } catch (e) {
+      console.warn("VAULT: Strategy 1 Failed (Network). Trying fallback...", e);
+    }
+
+    // STRATEGY 2: Raw Fallback Fetch
+    // If Strategy 1 failed (e.g. created_at column missing), try getting raw data without sorting.
+    try {
+      console.log("VAULT: Attempting Strategy 2 (Raw Fallback)...");
+      const rawPath = `orders?select=*`;
+      const resp = await fetch(getUrl(rawPath), { 
+        headers,
+        cache: 'no-store'
+      });
+      
+      if (resp.ok) {
+        const data = await resp.json();
+        console.log(`VAULT: Strategy 2 Success. Found ${data.length} records.`);
+        return Array.isArray(data) ? data : [];
+      } else {
+        const errText = await resp.text();
+        console.error(`VAULT: Strategy 2 Failed. Status: ${resp.status}`, errText);
+      }
+    } catch (e) {
+      console.error("VAULT: All Fetch Strategies Failed.", e);
+    }
+
+    return [];
   },
 
   fetchOrderById: async (orderId: string) => {
-    const resp = await fetch(`${SUPABASE_URL}/rest/v1/orders?id=eq.${orderId}&select=*,timeline:order_timeline(status,note,timestamp)`, { headers });
-    if (!resp.ok) return null;
-    const data = await resp.json();
-    return data && data.length > 0 ? data[0] : null;
+    try {
+      const safeId = encodeURIComponent(orderId);
+      const path = `orders?id=eq.${safeId}&select=*`;
+      const resp = await fetch(getUrl(path), { headers });
+      if (!resp.ok) return null;
+      const data = await resp.json();
+      
+      if (data && data.length > 0) {
+        return data[0];
+      }
+      return null;
+    } catch (err) {
+      console.error("VAULT FETCH ERROR [orderById]:", err);
+      return null;
+    }
   },
 
   updateOrderStatus: async (orderId: string, status: OrderStatus) => {
-    const resp = await fetch(`${SUPABASE_URL}/rest/v1/orders?id=eq.${orderId}`, {
+    const safeId = encodeURIComponent(orderId);
+    const resp = await fetch(getUrl(`orders?id=eq.${safeId}`), {
       method: 'PATCH',
       headers,
       body: JSON.stringify({ status })
@@ -58,71 +123,144 @@ export const vaultApi = {
     return resp.ok;
   },
 
+  deleteOrder: async (orderId: string) => {
+    const safeId = encodeURIComponent(orderId);
+    console.log(`[VAULT] Initiating Archive Protocol for Order: ${orderId}`);
+
+    try {
+      // 1. Try Soft Delete (Update is_hidden = true)
+      // We use return=representation to confirm the row was actually found and updated.
+      const resp = await fetch(getUrl(`orders?id=eq.${safeId}`), {
+        method: 'PATCH',
+        headers: { ...headers, 'Prefer': 'return=representation' },
+        body: JSON.stringify({ is_hidden: true })
+      });
+      
+      if (resp.ok) {
+        const data = await resp.json();
+        if (Array.isArray(data) && data.length > 0) {
+            console.log(`[VAULT] Soft Archive Successful: ${orderId} marked as hidden.`);
+            return true;
+        } else {
+            console.warn(`[VAULT] Soft Archive returned 200 OK but no rows were updated. Possible RLS restriction or ID mismatch.`);
+        }
+      } else {
+        const errText = await resp.text();
+        console.warn(`[VAULT] Soft Archive Failed (${resp.status}):`, errText);
+      }
+
+      // 2. Fallback: Hard Delete (Permanently remove)
+      // If soft delete failed (e.g. column missing), we try to remove the record entirely.
+      console.warn("[VAULT] Fallback: Attempting Hard Delete sequence...");
+      const delResp = await fetch(getUrl(`orders?id=eq.${safeId}`), {
+        method: 'DELETE',
+        headers: { ...headers, 'Prefer': 'return=representation' } // Check if deletion happened
+      });
+      
+      if (delResp.ok) {
+         const delData = await delResp.json();
+         if (Array.isArray(delData) && delData.length > 0) {
+             console.log(`[VAULT] Hard Delete Successful: ${orderId} removed from database.`);
+             return true;
+         } else {
+             console.warn(`[VAULT] Hard Delete returned 200 OK but no rows found/deleted.`);
+             // If we reach here, it's likely the ID is wrong or RLS blocks everything.
+             return false;
+         }
+      } else {
+         const delErr = await delResp.text();
+         console.error(`[VAULT] Hard Delete Failed (${delResp.status}):`, delErr);
+         return false;
+      }
+    } catch (err) {
+      console.error("[VAULT ARCHIVE] Critical System Failure:", err);
+      return false;
+    }
+  },
+
   fetchCustomers: async () => {
-    const resp = await fetch(`${SUPABASE_URL}/rest/v1/customers?select=*&order=created_at.desc`, { headers });
-    return resp.ok ? await resp.json() : [];
+    try {
+      const resp = await fetch(getUrl('customers?select=*&order=created_at.desc'), { headers });
+      return resp.ok ? await resp.json() : [];
+    } catch (err) {
+      return [];
+    }
   },
 
   createCustomer: async (customerData: any) => {
-    const resp = await fetch(`${SUPABASE_URL}/rest/v1/customers`, {
+    const resp = await fetch(getUrl('customers'), {
       method: 'POST',
       headers: { ...headers, 'Prefer': 'return=representation' },
       body: JSON.stringify(customerData)
     });
-    if (!resp.ok) {
-      const errorMsg = await resp.text();
-      console.error("VAULT API ERROR [createCustomer]:", errorMsg);
-      return null;
-    }
+    if (!resp.ok) return null;
     const data = await resp.json();
     return data[0];
   },
 
   fetchBrands: async () => {
-    const resp = await fetch(`${SUPABASE_URL}/rest/v1/brands?select=*&order=name.asc`, { headers });
-    return resp.ok ? await resp.json() : [];
+    try {
+      const resp = await fetch(getUrl('brands?select=*&order=name.asc'), { headers });
+      return resp.ok ? await resp.json() : [];
+    } catch (err) {
+      return [];
+    }
   },
 
   saveBrand: async (brand: Partial<BrandEntity>) => {
     const isNew = !brand.id;
-    const url = isNew ? `${SUPABASE_URL}/rest/v1/brands` : `${SUPABASE_URL}/rest/v1/brands?id=eq.${brand.id}`;
-    const method = isNew ? 'POST' : 'PATCH';
-    const resp = await fetch(url, { method, headers, body: JSON.stringify(brand) });
+    const path = isNew ? 'brands' : `brands?id=eq.${brand.id}`;
+    const resp = await fetch(getUrl(path), { 
+      method: isNew ? 'POST' : 'PATCH', 
+      headers, 
+      body: JSON.stringify(brand) 
+    });
     return resp.ok;
   },
 
   deleteBrand: async (id: string) => {
-    const resp = await fetch(`${SUPABASE_URL}/rest/v1/brands?id=eq.${id}`, { method: 'DELETE', headers });
+    const resp = await fetch(getUrl(`brands?id=eq.${id}`), { method: 'DELETE', headers });
     return resp.ok;
   },
 
   fetchCategories: async () => {
-    const resp = await fetch(`${SUPABASE_URL}/rest/v1/categories?select=*&order=name.asc`, { headers });
-    return resp.ok ? await resp.json() : [];
+    try {
+      const resp = await fetch(getUrl('categories?select=*&order=name.asc'), { headers });
+      return resp.ok ? await resp.json() : [];
+    } catch (err) {
+      return [];
+    }
   },
 
   saveCategory: async (category: Partial<Category>) => {
     const isNew = !category.id;
-    const url = isNew ? `${SUPABASE_URL}/rest/v1/categories` : `${SUPABASE_URL}/rest/v1/categories?id=eq.${category.id}`;
-    const method = isNew ? 'POST' : 'PATCH';
-    const resp = await fetch(url, { method, headers, body: JSON.stringify(category) });
+    const path = isNew ? 'categories' : `categories?id=eq.${category.id}`;
+    const resp = await fetch(getUrl(path), { 
+      method: isNew ? 'POST' : 'PATCH', 
+      headers, 
+      body: JSON.stringify(category) 
+    });
     return resp.ok;
   },
 
   deleteCategory: async (id: string) => {
-    const resp = await fetch(`${SUPABASE_URL}/rest/v1/categories?id=eq.${id}`, { method: 'DELETE', headers });
+    const resp = await fetch(getUrl(`categories?id=eq.${id}`), { method: 'DELETE', headers });
     return resp.ok;
   },
 
   fetchPaymentMethods: async () => {
-    const resp = await fetch(`${SUPABASE_URL}/rest/v1/payment_methods?select=*&order=name.asc`, { headers });
-    return resp.ok ? await resp.json() : [];
+    try {
+      const resp = await fetch(getUrl('payment_methods?select=*&order=name.asc'), { headers });
+      return resp.ok ? await resp.json() : [];
+    } catch (err) {
+      return [];
+    }
   },
 
   savePaymentMethod: async (method: Partial<PaymentMethod>) => {
     const isNew = !method.id;
-    const url = isNew ? `${SUPABASE_URL}/rest/v1/payment_methods` : `${SUPABASE_URL}/rest/v1/payment_methods?id=eq.${method.id}`;
-    const resp = await fetch(url, { 
+    const path = isNew ? 'payment_methods' : `payment_methods?id=eq.${method.id}`;
+    const resp = await fetch(getUrl(path), { 
       method: isNew ? 'POST' : 'PATCH', 
       headers, 
       body: JSON.stringify(method) 
@@ -131,19 +269,23 @@ export const vaultApi = {
   },
 
   deletePaymentMethod: async (id: string) => {
-    const resp = await fetch(`${SUPABASE_URL}/rest/v1/payment_methods?id=eq.${id}`, { method: 'DELETE', headers });
+    const resp = await fetch(getUrl(`payment_methods?id=eq.${id}`), { method: 'DELETE', headers });
     return resp.ok;
   },
 
   fetchSlides: async () => {
-    const resp = await fetch(`${SUPABASE_URL}/rest/v1/home_slides?select=*&order=order.asc`, { headers });
-    return resp.ok ? await resp.json() : [];
+    try {
+      const resp = await fetch(getUrl('home_slides?select=*&order=order.asc'), { headers });
+      return resp.ok ? await resp.json() : [];
+    } catch (err) {
+      return [];
+    }
   },
 
   saveSlide: async (slide: Partial<HomeSlide>) => {
     const isNew = !slide.id;
-    const url = isNew ? `${SUPABASE_URL}/rest/v1/home_slides` : `${SUPABASE_URL}/rest/v1/home_slides?id=eq.${slide.id}`;
-    const resp = await fetch(url, { 
+    const path = isNew ? 'home_slides' : `home_slides?id=eq.${slide.id}`;
+    const resp = await fetch(getUrl(path), { 
       method: isNew ? 'POST' : 'PATCH', 
       headers, 
       body: JSON.stringify(slide) 
@@ -152,19 +294,23 @@ export const vaultApi = {
   },
 
   deleteSlide: async (id: string) => {
-    const resp = await fetch(`${SUPABASE_URL}/rest/v1/home_slides?id=eq.${id}`, { method: 'DELETE', headers });
+    const resp = await fetch(getUrl(`home_slides?id=eq.${id}`), { method: 'DELETE', headers });
     return resp.ok;
   },
 
   fetchNavItems: async () => {
-    const resp = await fetch(`${SUPABASE_URL}/rest/v1/site_navigation?select=*&order=order.asc`, { headers });
-    return resp.ok ? await resp.json() : [];
+    try {
+      const resp = await fetch(getUrl('site_navigation?select=*&order=order.asc'), { headers });
+      return resp.ok ? await resp.json() : [];
+    } catch (err) {
+      return [];
+    }
   },
 
   saveNavItem: async (item: Partial<NavItem>) => {
     const isNew = !item.id;
-    const url = isNew ? `${SUPABASE_URL}/rest/v1/site_navigation` : `${SUPABASE_URL}/rest/v1/site_navigation?id=eq.${item.id}`;
-    const resp = await fetch(url, { 
+    const path = isNew ? 'site_navigation' : `site_navigation?id=eq.${item.id}`;
+    const resp = await fetch(getUrl(path), { 
       method: isNew ? 'POST' : 'PATCH', 
       headers, 
       body: JSON.stringify(item) 
@@ -173,22 +319,24 @@ export const vaultApi = {
   },
 
   deleteNavItem: async (id: string) => {
-    const resp = await fetch(`${SUPABASE_URL}/rest/v1/site_navigation?id=eq.${id}`, { method: 'DELETE', headers });
+    const resp = await fetch(getUrl(`site_navigation?id=eq.${id}`), { method: 'DELETE', headers });
     return resp.ok;
   },
 
   fetchCheckoutFields: async () => {
-    const resp = await fetch(`${SUPABASE_URL}/rest/v1/checkout_fields?select=*&order=order.asc`, { headers });
-    return resp.ok ? await resp.json() : [];
+    try {
+      const resp = await fetch(getUrl('checkout_fields?select=*&order=order.asc'), { headers });
+      return resp.ok ? await resp.json() : [];
+    } catch (err) {
+      return [];
+    }
   },
 
   saveCheckoutField: async (field: Partial<CheckoutField>) => {
     const isNew = !field.id;
-    const url = isNew ? `${SUPABASE_URL}/rest/v1/checkout_fields` : `${SUPABASE_URL}/rest/v1/checkout_fields?id=eq.${field.id}`;
-    const method = isNew ? 'POST' : 'PATCH';
-    
-    const resp = await fetch(url, {
-      method,
+    const path = isNew ? 'checkout_fields' : `checkout_fields?id=eq.${field.id}`;
+    const resp = await fetch(getUrl(path), {
+      method: isNew ? 'POST' : 'PATCH',
       headers: { ...headers, 'Prefer': 'return=representation' },
       body: JSON.stringify(field)
     });
@@ -196,7 +344,7 @@ export const vaultApi = {
   },
 
   deleteCheckoutField: async (id: string) => {
-    const resp = await fetch(`${SUPABASE_URL}/rest/v1/checkout_fields?id=eq.${id}`, {
+    const resp = await fetch(getUrl(`checkout_fields?id=eq.${id}`), {
       method: 'DELETE',
       headers
     });
@@ -204,31 +352,40 @@ export const vaultApi = {
   },
 
   fetchShippingOptions: async () => {
-    const resp = await fetch(`${SUPABASE_URL}/rest/v1/shipping_options?select=*&order=rate.asc`, { headers });
-    return resp.ok ? await resp.json() : [];
+    try {
+      const resp = await fetch(getUrl('shipping_options?select=*&order=rate.asc'), { headers });
+      return resp.ok ? await resp.json() : [];
+    } catch (err) {
+      return [];
+    }
   },
 
   saveShippingOption: async (option: Partial<ShippingOption>) => {
     const isNew = !option.id;
-    const url = isNew ? `${SUPABASE_URL}/rest/v1/shipping_options` : `${SUPABASE_URL}/rest/v1/shipping_options?id=eq.${option.id}`;
-    const resp = await fetch(url, { method: isNew ? 'POST' : 'PATCH', headers, body: JSON.stringify(option) });
+    const path = isNew ? 'shipping_options' : `shipping_options?id=eq.${option.id}`;
+    const resp = await fetch(getUrl(path), { method: isNew ? 'POST' : 'PATCH', headers, body: JSON.stringify(option) });
     return resp.ok;
   },
 
   deleteShippingOption: async (id: string) => {
-    const resp = await fetch(`${SUPABASE_URL}/rest/v1/shipping_options?id=eq.${id}`, { method: 'DELETE', headers });
+    const resp = await fetch(getUrl(`shipping_options?id=eq.${id}`), { method: 'DELETE', headers });
     return resp.ok;
   },
 
   fetchSiteSettings: async (key: string) => {
-    const resp = await fetch(`${SUPABASE_URL}/rest/v1/site_settings?key=eq.${key}&select=data`, { headers });
-    if (!resp.ok) return null;
-    const data = await resp.json();
-    return data[0]?.data || null;
+    try {
+      const path = `site_settings?key=eq.${key}&select=data`;
+      const resp = await fetch(getUrl(path), { headers });
+      if (!resp.ok) return null;
+      const data = await resp.json();
+      return data[0]?.data || null;
+    } catch (err) {
+      return null;
+    }
   },
 
   saveSiteSettings: async (key: string, data: any) => {
-    const resp = await fetch(`${SUPABASE_URL}/rest/v1/site_settings?key=eq.${key}`, {
+    const resp = await fetch(getUrl(`site_settings?key=eq.${key}`), {
       method: 'PATCH',
       headers,
       body: JSON.stringify({ data })
@@ -237,7 +394,7 @@ export const vaultApi = {
   },
 
   updateCustomer: async (id: string, updates: Partial<Customer>) => {
-    const resp = await fetch(`${SUPABASE_URL}/rest/v1/customers?id=eq.${id}`, {
+    const resp = await fetch(getUrl(`customers?id=eq.${id}`), {
       method: 'PATCH',
       headers,
       body: JSON.stringify(updates)
@@ -246,7 +403,7 @@ export const vaultApi = {
   },
 
   createOrder: async (orderData: any) => {
-    const resp = await fetch(`${SUPABASE_URL}/rest/v1/orders`, {
+    const resp = await fetch(getUrl('orders'), {
       method: 'POST',
       headers: { ...headers, 'Prefer': 'return=representation' },
       body: JSON.stringify(orderData)
@@ -255,7 +412,6 @@ export const vaultApi = {
     if (!resp.ok) {
       const errorMsg = await resp.text();
       console.error("VAULT API ERROR [createOrder]:", errorMsg);
-      console.error("Payload causing error:", JSON.stringify(orderData, null, 2));
       return null;
     }
     
@@ -264,15 +420,15 @@ export const vaultApi = {
   },
 
   createTimelineEvent: async (orderId: string, status: OrderStatus, note: string) => {
-    const resp = await fetch(`${SUPABASE_URL}/rest/v1/order_timeline`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({ order_id: orderId, status, note })
-    });
-    if (!resp.ok) {
-      const errorMsg = await resp.text();
-      console.error("VAULT API ERROR [createTimelineEvent]:", errorMsg);
+    try {
+        const resp = await fetch(getUrl('order_timeline'), {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ order_id: orderId, status, note })
+        });
+        return resp.ok;
+    } catch (e) {
+        return false;
     }
-    return resp.ok;
   }
 };
