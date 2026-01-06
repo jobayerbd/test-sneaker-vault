@@ -58,6 +58,7 @@ const AdminOrders: React.FC<AdminOrdersProps> = ({
 }) => {
   const [orderToDelete, setOrderToDelete] = useState<Order | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   
   const resolveCustomerName = (order: any) => {
     const first = String(order.first_name || '').trim();
@@ -79,19 +80,27 @@ const AdminOrders: React.FC<AdminOrdersProps> = ({
 
   const handleDeleteTrigger = (e: React.MouseEvent, order: Order) => {
     e.stopPropagation();
+    setDeleteError(null);
     setOrderToDelete(order);
   };
 
   const confirmDelete = async () => {
     if (!orderToDelete) return;
     setIsDeleting(true);
-    const success = await onDeleteOrder(orderToDelete.id);
-    if (success) {
-      setOrderToDelete(null);
-    } else {
-      alert("ARCHIVE FAILURE: Could not hide protocol in vault.");
+    setDeleteError(null);
+    
+    try {
+      const success = await onDeleteOrder(orderToDelete.id);
+      if (success) {
+        setOrderToDelete(null);
+      } else {
+        setDeleteError("Archive Failed. Check permissions or database constraints.");
+      }
+    } catch (err) {
+      setDeleteError("System Error: Operation aborted.");
+    } finally {
+      setIsDeleting(false);
     }
-    setIsDeleting(false);
   };
 
   return (
@@ -105,9 +114,17 @@ const AdminOrders: React.FC<AdminOrdersProps> = ({
                 <i className="fa-solid fa-box-archive text-3xl"></i>
               </div>
               <h3 className="text-2xl font-black uppercase italic mb-3 tracking-tighter font-heading">Archive Protocol</h3>
-              <p className="text-xs text-gray-500 font-bold uppercase tracking-wider mb-10 leading-relaxed">
+              <p className="text-xs text-gray-500 font-bold uppercase tracking-wider mb-8 leading-relaxed">
                 You are about to move acquisition manifest <span className="text-black font-black">[{orderToDelete.id}]</span> to the hidden archives. It will no longer appear in the active registry.
               </p>
+              
+              {deleteError && (
+                <div className="bg-red-50 border border-red-100 p-4 rounded-xl mb-6 flex items-center gap-3">
+                  <i className="fa-solid fa-triangle-exclamation text-red-600"></i>
+                  <span className="text-[10px] font-black uppercase text-red-600">{deleteError}</span>
+                </div>
+              )}
+
               <div className="space-y-4">
                 <button 
                   onClick={confirmDelete}

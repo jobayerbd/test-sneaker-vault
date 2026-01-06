@@ -125,55 +125,27 @@ export const vaultApi = {
 
   deleteOrder: async (orderId: string) => {
     const safeId = encodeURIComponent(orderId);
-    console.log(`[VAULT] Initiating Archive Protocol for Order: ${orderId}`);
+    console.log(`[VAULT] Hiding Order Protocol: ${orderId}`);
 
     try {
-      // 1. Try Soft Delete (Update is_hidden = true)
-      // We use return=representation to confirm the row was actually found and updated.
+      // STRICTLY update is_hidden to true. No hard deletes.
+      // We use Prefer: return=minimal to avoid issues with RLS policies that allow update but block select.
       const resp = await fetch(getUrl(`orders?id=eq.${safeId}`), {
         method: 'PATCH',
-        headers: { ...headers, 'Prefer': 'return=representation' },
+        headers: { ...headers, 'Prefer': 'return=minimal' }, 
         body: JSON.stringify({ is_hidden: true })
       });
-      
+
       if (resp.ok) {
-        const data = await resp.json();
-        if (Array.isArray(data) && data.length > 0) {
-            console.log(`[VAULT] Soft Archive Successful: ${orderId} marked as hidden.`);
-            return true;
-        } else {
-            console.warn(`[VAULT] Soft Archive returned 200 OK but no rows were updated. Possible RLS restriction or ID mismatch.`);
-        }
+        console.log(`[VAULT] Order ${orderId} successfully marked as hidden.`);
+        return true;
       } else {
         const errText = await resp.text();
-        console.warn(`[VAULT] Soft Archive Failed (${resp.status}):`, errText);
-      }
-
-      // 2. Fallback: Hard Delete (Permanently remove)
-      // If soft delete failed (e.g. column missing), we try to remove the record entirely.
-      console.warn("[VAULT] Fallback: Attempting Hard Delete sequence...");
-      const delResp = await fetch(getUrl(`orders?id=eq.${safeId}`), {
-        method: 'DELETE',
-        headers: { ...headers, 'Prefer': 'return=representation' } // Check if deletion happened
-      });
-      
-      if (delResp.ok) {
-         const delData = await delResp.json();
-         if (Array.isArray(delData) && delData.length > 0) {
-             console.log(`[VAULT] Hard Delete Successful: ${orderId} removed from database.`);
-             return true;
-         } else {
-             console.warn(`[VAULT] Hard Delete returned 200 OK but no rows found/deleted.`);
-             // If we reach here, it's likely the ID is wrong or RLS blocks everything.
-             return false;
-         }
-      } else {
-         const delErr = await delResp.text();
-         console.error(`[VAULT] Hard Delete Failed (${delResp.status}):`, delErr);
-         return false;
+        console.error(`[VAULT] Hide Operation Failed (${resp.status}):`, errText);
+        return false;
       }
     } catch (err) {
-      console.error("[VAULT ARCHIVE] Critical System Failure:", err);
+      console.error("[VAULT] System Error during Hide Operation:", err);
       return false;
     }
   },
