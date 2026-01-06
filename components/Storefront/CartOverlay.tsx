@@ -150,7 +150,7 @@ const CartOverlay: React.FC<CartOverlayProps> = ({
                onClick={handleCheckoutClick}
                className="w-full bg-red-700 py-5 rounded-2xl font-black uppercase tracking-[0.3em] text-[10px] flex items-center justify-center gap-3"
              >
-               CHECKOUT NOW
+               PLACE ORDER
              </button>
           </div>
         )}
