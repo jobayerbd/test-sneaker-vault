@@ -1,14 +1,16 @@
 
 import React, { useState } from 'react';
-import { NavItem } from '../../types.ts';
+import { NavItem, Category, BrandEntity } from '../../types.ts';
 
 interface AdminMenuManagementProps {
   navItems: NavItem[];
+  categories: Category[];
+  brands: BrandEntity[];
   onSave: (item: Partial<NavItem>) => Promise<boolean>;
   onDelete: (id: string) => Promise<boolean>;
 }
 
-const AdminMenuManagement: React.FC<AdminMenuManagementProps> = ({ navItems, onSave, onDelete }) => {
+const AdminMenuManagement: React.FC<AdminMenuManagementProps> = ({ navItems, categories, brands, onSave, onDelete }) => {
   const [editing, setEditing] = useState<Partial<NavItem> | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -18,8 +20,16 @@ const AdminMenuManagement: React.FC<AdminMenuManagementProps> = ({ navItems, onS
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editing?.label) return;
+    
+    // Safety check: ensure link_type and link_value are set if missing (for legacy items)
+    const payload = { 
+      ...editing,
+      link_type: editing.link_type || 'view',
+      link_value: editing.link_value || editing.target_view || 'home'
+    };
+
     setIsSaving(true);
-    const success = await onSave(editing);
+    const success = await onSave(payload);
     if (success) setEditing(null);
     else alert("VAULT ERROR: Synchronization failed. Review network connectivity.");
     setIsSaving(false);
@@ -49,6 +59,61 @@ const AdminMenuManagement: React.FC<AdminMenuManagementProps> = ({ navItems, onS
     await onSave({ id: targetItem.id, order: item.order });
   };
 
+  const renderDestinationInput = () => {
+    if (!editing) return null;
+    const type = editing.link_type || 'view';
+
+    switch (type) {
+      case 'category':
+        return (
+          <div>
+            <label className="text-[9px] font-black uppercase text-gray-500 mb-2 block italic">Select Category Destination</label>
+            <select 
+              value={editing.link_value || ''} 
+              onChange={e => setEditing({...editing, link_value: e.target.value})}
+              className="w-full bg-white/5 p-4 rounded-xl font-bold uppercase text-xs outline-none border-2 border-transparent focus:border-red-600 appearance-none"
+            >
+              <option value="" className="bg-black">SELECT COLLECTION...</option>
+              <optgroup label="BRANDS" className="bg-black">
+                {brands.map(b => <option key={b.id} value={b.name.toLowerCase()} className="bg-black">{b.name.toUpperCase()}</option>)}
+              </optgroup>
+              <optgroup label="CATEGORIES" className="bg-black">
+                {categories.map(c => <option key={c.id} value={c.name.toLowerCase()} className="bg-black">{c.name.toUpperCase()}</option>)}
+              </optgroup>
+            </select>
+          </div>
+        );
+      case 'url':
+        return (
+          <div>
+            <label className="text-[9px] font-black uppercase text-gray-500 mb-2 block italic">Custom URL Sequence</label>
+            <input 
+              type="url" 
+              value={editing.link_value || ''} 
+              onChange={e => setEditing({...editing, link_value: e.target.value})}
+              className="w-full bg-white/5 p-4 rounded-xl font-bold text-xs outline-none focus:ring-1 ring-red-600" 
+              placeholder="https://example.com"
+            />
+          </div>
+        );
+      default: // view
+        return (
+          <div>
+            <label className="text-[9px] font-black uppercase text-gray-500 mb-2 block italic">Select View Protocol</label>
+            <select 
+              value={editing.link_value || editing.target_view || 'home'} 
+              onChange={e => setEditing({...editing, link_value: e.target.value, target_view: e.target.value})}
+              className="w-full bg-white/5 p-4 rounded-xl font-bold uppercase text-xs outline-none border-2 border-transparent focus:border-red-600 appearance-none"
+            >
+              <option value="home" className="bg-black">HOME</option>
+              <option value="shop" className="bg-black">SHOP / ARCHIVES</option>
+              <option value="drops" className="bg-black">DROPS</option>
+            </select>
+          </div>
+        );
+    }
+  };
+
   return (
     <div className="space-y-8 animate-in fade-in">
       <div className="flex justify-between items-center">
@@ -58,7 +123,7 @@ const AdminMenuManagement: React.FC<AdminMenuManagementProps> = ({ navItems, onS
         </div>
         <button 
           disabled={!!deletingId}
-          onClick={() => setEditing({ label: '', target_view: 'shop', order: navItems.length + 1, active: true })} 
+          onClick={() => setEditing({ label: '', link_type: 'view', link_value: 'shop', order: navItems.length + 1, active: true })} 
           className="bg-black text-white px-8 py-4 rounded-xl font-black uppercase text-[10px] tracking-widest shadow-xl hover:bg-red-700 transition-all disabled:opacity-50"
         >
           Add Nav Item
@@ -80,7 +145,9 @@ const AdminMenuManagement: React.FC<AdminMenuManagementProps> = ({ navItems, onS
                        <span className={`w-2 h-2 rounded-full ${item.active ? 'bg-green-500' : 'bg-gray-300'}`}></span>
                        <h4 className="text-sm font-black uppercase italic">{item.label}</h4>
                     </div>
-                    <p className="text-[9px] text-gray-400 font-bold uppercase mt-1 tracking-tighter">Target: {item.target_view} | Order Index: {item.order}</p>
+                    <p className="text-[9px] text-gray-400 font-bold uppercase mt-1 tracking-tighter">
+                      Dest: <span className="text-red-600">[{item.link_type?.toUpperCase() || 'VIEW'}]</span> {item.link_value || item.target_view}
+                    </p>
                  </div>
               </div>
               <div className="flex gap-2">
@@ -117,24 +184,32 @@ const AdminMenuManagement: React.FC<AdminMenuManagementProps> = ({ navItems, onS
                   <label className="text-[9px] font-black uppercase text-gray-500 mb-2 block italic">Link Label</label>
                   <input 
                     type="text" 
+                    required
                     value={editing.label} 
                     onChange={e => setEditing({...editing, label: e.target.value})}
                     className="w-full bg-white/5 p-4 rounded-xl font-bold uppercase text-xs outline-none focus:ring-1 ring-red-600" 
                     placeholder="e.g. MEN"
                   />
                 </div>
+
                 <div>
-                  <label className="text-[9px] font-black uppercase text-gray-500 mb-2 block italic">Target View Protocol</label>
-                  <select 
-                    value={editing.target_view} 
-                    onChange={e => setEditing({...editing, target_view: e.target.value})}
-                    className="w-full bg-white/5 p-4 rounded-xl font-bold uppercase text-xs outline-none border-2 border-transparent focus:border-red-600 appearance-none"
-                  >
-                    <option value="home" className="bg-black text-white">HOME</option>
-                    <option value="shop" className="bg-black text-white">SHOP / ARCHIVES</option>
-                    <option value="drops" className="bg-black text-white">DROPS</option>
-                  </select>
+                  <label className="text-[9px] font-black uppercase text-gray-500 mb-2 block italic">Destination Type</label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {['view', 'category', 'url'].map(type => (
+                      <button 
+                        key={type}
+                        type="button"
+                        onClick={() => setEditing({...editing, link_type: type as any, link_value: ''})}
+                        className={`py-2 rounded-lg text-[8px] font-black uppercase border transition-all ${editing.link_type === type ? 'bg-white text-black border-white' : 'bg-white/5 text-gray-400 border-white/10 hover:border-white/20'}`}
+                      >
+                        {type}
+                      </button>
+                    ))}
+                  </div>
                 </div>
+
+                {renderDestinationInput()}
+
                 <div>
                   <label className="text-[9px] font-black uppercase text-gray-500 mb-2 block italic">Sequence Order</label>
                   <input 
@@ -144,6 +219,7 @@ const AdminMenuManagement: React.FC<AdminMenuManagementProps> = ({ navItems, onS
                     className="w-full bg-white/5 p-4 rounded-xl font-bold text-xs outline-none focus:ring-1 ring-red-600" 
                   />
                 </div>
+                
                 <label className="flex items-center gap-3 cursor-pointer pt-2">
                   <input type="checkbox" checked={editing.active} onChange={e => setEditing({...editing, active: e.target.checked})} className="w-5 h-5 rounded border-white/10 bg-white/5 text-red-600 focus:ring-red-600" />
                   <span className="text-[10px] font-black uppercase tracking-widest text-gray-400 italic">Activate Directive</span>

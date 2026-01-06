@@ -22,6 +22,8 @@ export interface NavItem {
   id: string;
   label: string;
   target_view: string;
+  link_type?: 'view' | 'category' | 'url';
+  link_value?: string;
   order: number;
   active: boolean;
 }

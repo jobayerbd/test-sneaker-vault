@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { NavItem, SiteIdentity } from '../types.ts';
 
 interface NavigationProps {
-  onNavigate: (view: any) => void;
+  onNavigate: (view: any, params?: Record<string, string>) => void;
   cartCount: number;
   wishlistCount: number;
   currentView: string;
@@ -22,8 +22,25 @@ const Navigation: React.FC<NavigationProps> = ({
 
   const activeNavItems = navItems.filter(i => i.active).sort((a, b) => a.order - b.order);
 
-  const handleMobileNav = (view: any) => {
-    onNavigate(view);
+  const handleItemClick = (item: NavItem) => {
+    const type = item.link_type || 'view';
+    const value = item.link_value || item.target_view;
+
+    if (type === 'category') {
+      onNavigate('shop', { category: value || '' });
+    } else if (type === 'url') {
+      if (value) window.open(value, '_blank');
+    } else {
+      // For 'view' type, if it's 'shop', we explicitly reset category to clear filters
+      const params = value === 'shop' ? { category: '' } : undefined;
+      onNavigate(value as any, params);
+    }
+    
+    setIsMobileMenuOpen(false);
+  };
+
+  const handleLogoClick = () => {
+    onNavigate('home', { category: '' }); // Clear category when going home
     setIsMobileMenuOpen(false);
   };
 
@@ -41,7 +58,7 @@ const Navigation: React.FC<NavigationProps> = ({
             </button>
 
             <button 
-              onClick={() => onNavigate('home')}
+              onClick={handleLogoClick}
               className="flex items-center"
             >
               {siteIdentity.logo_url ? (
@@ -58,7 +75,7 @@ const Navigation: React.FC<NavigationProps> = ({
               {activeNavItems.map((item) => (
                 <button 
                   key={item.id}
-                  onClick={() => onNavigate(item.target_view)} 
+                  onClick={() => handleItemClick(item)} 
                   className="text-[11px] font-bold text-gray-800 uppercase tracking-widest hover:text-red-600 transition-colors"
                 >
                   {item.label}
@@ -116,7 +133,7 @@ const Navigation: React.FC<NavigationProps> = ({
               {activeNavItems.map((item) => (
                 <button 
                   key={item.id}
-                  onClick={() => handleMobileNav(item.target_view)}
+                  onClick={() => handleItemClick(item)}
                   className="w-full text-left text-lg font-black uppercase italic tracking-tight hover:text-red-600 transition-colors flex justify-between items-center group"
                 >
                   {item.label}
@@ -128,14 +145,14 @@ const Navigation: React.FC<NavigationProps> = ({
             <div className="pt-8 border-t border-gray-100 space-y-4">
                <p className="text-gray-400 text-[9px] font-black uppercase tracking-[0.4em] italic mb-6">User Options</p>
                <button 
-                 onClick={() => handleMobileNav('customer')}
+                 onClick={() => { onNavigate('customer'); setIsMobileMenuOpen(false); }}
                  className="w-full text-left text-xs font-black uppercase tracking-widest flex items-center gap-3"
                >
                  <i className={`${isLoggedIn ? 'fa-solid text-red-600' : 'fa-regular text-gray-400'} fa-circle-user`}></i>
                  {isLoggedIn ? "My Account" : "Sign In"}
                </button>
                <button 
-                 onClick={() => handleMobileNav('admin')}
+                 onClick={() => { onNavigate('admin'); setIsMobileMenuOpen(false); }}
                  className="w-full text-left text-xs font-black uppercase tracking-widest flex items-center gap-3"
                >
                  <i className="fa-solid fa-shield-halved text-red-600"></i>

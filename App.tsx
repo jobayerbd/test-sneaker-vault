@@ -239,13 +239,22 @@ const App: React.FC = () => {
         url.searchParams.delete('view');
         url.searchParams.delete('product');
         url.searchParams.delete('category');
+        setSelectedCategory(null);
       }
       
       if (params) {
         Object.entries(params).forEach(([k, v]) => {
-          if (v === null || v === '') url.searchParams.delete(k);
-          else url.searchParams.set(k, v);
+          if (v === null || v === '') {
+            url.searchParams.delete(k);
+            if (k === 'category') setSelectedCategory(null);
+          } else {
+            url.searchParams.set(k, v);
+            if (k === 'category') setSelectedCategory(v);
+          }
         });
+      } else if (targetView === 'shop' && !params) {
+        // If navigating to shop with no params, reset current category
+        setSelectedCategory(null);
       }
       
       window.history.pushState({}, '', url.toString());

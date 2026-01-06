@@ -205,7 +205,7 @@ const Dashboard: React.FC<DashboardProps> = (props) => {
       case 'slider':
         return <AdminSlider slides={slides} onSave={onSaveSlide} onDelete={onDeleteSlide} />;
       case 'menu':
-        return <AdminMenuManagement navItems={navItems} onSave={onSaveNavItem} onDelete={onDeleteNavItem} />;
+        return <AdminMenuManagement navItems={navItems} categories={categories} brands={brands} onSave={onSaveNavItem} onDelete={onDeleteNavItem} />;
       case 'footer-settings':
         return <AdminFooterSettings footerConfig={footerConfig} onSaveFooterConfig={onSaveFooterConfig} />;
       case 'checkout-config':
