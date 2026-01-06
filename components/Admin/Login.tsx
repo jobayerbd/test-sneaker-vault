@@ -113,7 +113,7 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess, supabaseUrl, supabaseKey 
               )}
             </button>
           </form>
-
+/*
           <div className="mt-10 pt-10 border-t border-gray-50 flex flex-col items-center">
              <p className="text-[9px] font-black text-gray-300 uppercase tracking-widest mb-6 italic">Quick Dev Bypass</p>
              <button 
@@ -126,7 +126,7 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess, supabaseUrl, supabaseKey 
              </button>
           </div>
         </div>
-
+*/
         <p className="text-center mt-12 text-[10px] text-gray-300 font-bold uppercase tracking-[0.3em] leading-relaxed italic px-8">
           Authorized personnel only. All access sequences are monitored by the Vault Security Core.
         </p>

@@ -371,7 +371,8 @@ const App: React.FC = () => {
       const subtotalValue = cart.reduce((a, b) => a + (b.price * b.quantity), 0);
       const totalValue = subtotalValue + (selectedShipping?.rate || 0);
 
-      const orderData = {
+      // Fix: Added missing 'timeline' property to satisfy the Order interface requirement.
+      const orderData: Order = {
         id: orderId,
         customer_id: customerId,
         first_name: checkoutForm.first_name || '',
@@ -391,6 +392,7 @@ const App: React.FC = () => {
           quantity: i.quantity,
           price: i.price
         })),
+        timeline: [],
         shipping_name: selectedShipping?.name,
         shipping_rate: selectedShipping?.rate,
         payment_method: selectedPayment?.name,
