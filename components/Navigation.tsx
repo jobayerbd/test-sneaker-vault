@@ -81,6 +81,12 @@ const Navigation: React.FC<NavigationProps> = ({
                   {item.label}
                 </button>
               ))}
+              <button 
+                onClick={() => onNavigate('order-tracking')} 
+                className={`text-[11px] font-bold uppercase tracking-widest hover:text-red-600 transition-colors ${currentView === 'order-tracking' ? 'text-red-600' : 'text-gray-800'}`}
+              >
+                Track Order
+              </button>
             </div>
           </div>
 
@@ -140,6 +146,13 @@ const Navigation: React.FC<NavigationProps> = ({
                   <i className="fa-solid fa-arrow-right-long opacity-0 group-hover:opacity-100 transition-opacity text-sm"></i>
                 </button>
               ))}
+              <button 
+                onClick={() => { onNavigate('order-tracking'); setIsMobileMenuOpen(false); }}
+                className="w-full text-left text-lg font-black uppercase italic tracking-tight hover:text-red-600 transition-colors flex justify-between items-center group"
+              >
+                Track Order
+                <i className="fa-solid fa-satellite-dish opacity-100 text-sm"></i>
+              </button>
             </div>
 
             <div className="pt-8 border-t border-gray-100 space-y-4">

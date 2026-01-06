@@ -42,6 +42,13 @@ export const vaultApi = {
     return resp.ok ? await resp.json() : [];
   },
 
+  fetchOrderById: async (orderId: string) => {
+    const resp = await fetch(`${SUPABASE_URL}/rest/v1/orders?id=eq.${orderId}&select=*,timeline:order_timeline(status,note,timestamp)`, { headers });
+    if (!resp.ok) return null;
+    const data = await resp.json();
+    return data && data.length > 0 ? data[0] : null;
+  },
+
   updateOrderStatus: async (orderId: string, status: OrderStatus) => {
     const resp = await fetch(`${SUPABASE_URL}/rest/v1/orders?id=eq.${orderId}`, {
       method: 'PATCH',

@@ -10,6 +10,7 @@ import UnifiedLogin from './components/Auth/UnifiedLogin.tsx';
 import CustomerPortal from './components/Customer/CustomerPortal.tsx';
 import CheckoutPage from './components/Storefront/CheckoutPage.tsx';
 import OrderSuccess from './components/Storefront/OrderSuccess.tsx';
+import OrderTracking from './components/Storefront/OrderTracking.tsx';
 import CartOverlay from './components/Storefront/CartOverlay.tsx';
 import SearchOverlay from './components/Storefront/SearchOverlay.tsx';
 import { updateBrowserIdentity } from './services/identityService.ts';
@@ -36,7 +37,7 @@ const DEFAULT_IDENTITY: SiteIdentity = {
   favicon_url: ""
 };
 
-type View = 'home' | 'shop' | 'admin' | 'cart' | 'pdp' | 'wishlist' | 'checkout' | 'order-success' | 'admin-login' | 'customer-login' | 'customer-account' | 'order-details-view' | 'customer';
+type View = 'home' | 'shop' | 'admin' | 'cart' | 'pdp' | 'wishlist' | 'checkout' | 'order-success' | 'admin-login' | 'customer-login' | 'customer-account' | 'order-details-view' | 'customer' | 'order-tracking';
 
 declare global {
   interface Window {
@@ -371,7 +372,6 @@ const App: React.FC = () => {
       const subtotalValue = cart.reduce((a, b) => a + (b.price * b.quantity), 0);
       const totalValue = subtotalValue + (selectedShipping?.rate || 0);
 
-      // Fix: Added missing 'timeline' property to satisfy the Order interface requirement.
       const orderData: Order = {
         id: orderId,
         customer_id: customerId,
@@ -449,6 +449,7 @@ const App: React.FC = () => {
         {currentView === 'pdp' && <ProductDetail isLoading={isFetchingSneakers} sneaker={selectedProduct} sneakers={sneakers} onAddToCart={handleAddToCart} onBack={() => handleNavigate('shop')} onToggleWishlist={() => {}} isInWishlist={false} onSelectProduct={handleSelectProduct} />}
         {currentView === 'checkout' && <CheckoutPage cart={cart} checkoutFields={checkoutFields} shippingOptions={shippingOptions} paymentMethods={paymentMethods} selectedShipping={selectedShipping} selectedPayment={selectedPayment} checkoutForm={checkoutForm} checkoutError={checkoutError} isPlacingOrder={isPlacingOrder} createAccount={createAccount} accountPassword={accountPassword} currentCustomer={currentCustomer} onFormChange={(k, v) => setCheckoutForm({...checkoutForm, [k]: v})} onShippingChange={setSelectedShipping} onPaymentChange={setSelectedPayment} onToggleCreateAccount={setCreateAccount} onPasswordChange={setAccountPassword} onUpdateCartQuantity={handleUpdateCartQuantity} onRemoveFromCart={handleRemoveFromCart} onPlaceOrder={handlePlaceOrder} onNavigate={handleNavigate} />}
         {currentView === 'order-success' && <OrderSuccess lastOrder={lastOrder} onNavigate={handleNavigate} />}
+        {currentView === 'order-tracking' && <OrderTracking />}
         
         {currentView === 'customer' && (
           currentCustomer ? (
